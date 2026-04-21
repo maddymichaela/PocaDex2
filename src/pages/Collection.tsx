@@ -36,9 +36,9 @@ function GroupTile({ name, count, imageUrl, onClick }: GroupTileProps) {
     <motion.div
       whileHover={{ y: -8, rotate: -1.5, scale: 1.02 }}
       onClick={onClick}
-      className="glass-card rounded-[32px] p-5 shadow-lg flex flex-col gap-5 relative overflow-hidden group cursor-pointer border-4 border-white transition-all hover:shadow-2xl"
+      className="glass-card rounded-[32px] p-5 shadow-lg flex flex-col gap-5 relative overflow-hidden group cursor-pointer border-4 border-card/80 transition-all hover:shadow-2xl"
     >
-      <div className="w-full aspect-[2/3] rounded-2xl bg-white overflow-hidden relative ring-1 ring-black/5 shadow-inner">
+      <div className="w-full aspect-[2/3] rounded-2xl bg-card overflow-hidden relative ring-1 ring-black/5 shadow-inner">
         <img 
           src={imageUrl || "/placeholder.png"} 
           alt={name} 
@@ -56,7 +56,7 @@ function GroupTile({ name, count, imageUrl, onClick }: GroupTileProps) {
         )}
       </div>
       <div className="px-1 text-center">
-        <h3 className="font-black text-xl text-foreground truncate uppercase tracking-tighter italic leading-none">{name}</h3>
+        <h3 className="heading-scrapbook text-xl text-foreground truncate leading-none">{name}</h3>
       </div>
     </motion.div>
   );
@@ -211,7 +211,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
             />
             
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex bg-white border-gray-100 border-2 p-1 rounded-2xl shadow-sm h-13 items-center overflow-x-auto no-scrollbar max-w-full">
+              <div className="flex bg-card border-border border-2 p-1 rounded-2xl shadow-sm h-13 items-center overflow-x-auto no-scrollbar max-w-full">
                 <div className="flex gap-1">
                   {VIEW_MODES.map((m) => (
                     <button
@@ -234,7 +234,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
                     <button
                       key={f.key}
                       onClick={() => setFilters({ ...filters, [f.key]: 'All' })}
-                      className="bg-primary/20 text-primary text-[9px] font-black uppercase tracking-[0.1em] px-4 py-2 rounded-xl border-2 border-white shadow-sm flex items-center gap-2 hover:bg-primary/30 transition-all hover:scale-105"
+                      className="bg-primary/20 text-primary text-[9px] font-black uppercase tracking-[0.1em] px-4 py-2 rounded-xl border-2 border-card shadow-sm flex items-center gap-2 hover:bg-primary/30 transition-all hover:scale-105"
                     >
                       {f.label}: {f.value}
                       <X size={10} className="stroke-[4px]" />
@@ -242,7 +242,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
                   ))}
                   <button 
                     onClick={() => setFilters({ group: 'All', member: 'All', album: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' })}
-                    className="text-[9px] font-black text-foreground/40 uppercase hover:text-red-400 p-2 italic bg-white/30 rounded-xl px-3 border border-white"
+                    className="text-[9px] font-black text-foreground/40 uppercase hover:text-red-400 p-2 italic bg-card/30 rounded-xl px-3 border border-border"
                   >
                     Clear All
                   </button>
@@ -257,7 +257,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
               className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 h-11 rounded-[14px] text-[10px] md:text-xs font-black uppercase tracking-widest transition-all border-2 ${
                 selectMode 
                   ? 'bg-secondary text-white border-white/20 shadow-lg shadow-secondary/20' 
-                  : 'bg-white text-foreground/40 border-gray-100 shadow-sm hover:text-secondary'
+                  : 'bg-card text-muted-foreground border-border shadow-sm hover:text-secondary'
               }`}
             >
               <CheckSquare className="w-4 h-4 md:w-4.5 md:h-4.5" />
@@ -267,7 +267,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
             {!selectMode && (
               <button
                 onClick={() => setIsAdding(true)}
-                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 sm:px-8 h-11 bg-primary text-white rounded-[14px] text-[10px] md:text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.05] active:scale-[0.95] hover:rotate-1 transition-all whitespace-nowrap border-white/20 border-2"
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 sm:px-8 h-11 bg-primary text-white rounded-[14px] text-[10px] md:text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.05] active:scale-[0.95] hover:rotate-1 transition-all whitespace-nowrap border-card/20 border-2"
               >
                 <Plus className="w-4.5 h-4.5 md:w-5 md:h-5" />
                 <span className="hidden xs:inline">New Card</span>
@@ -283,7 +283,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
               initial={{ opacity: 0, height: 0, marginBottom: 0 }}
               animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
               exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-              className="flex flex-col sm:flex-row items-center justify-between px-6 md:px-10 py-4 md:py-5 bg-secondary/10 border-2 sm:border-4 border-white rounded-[24px] md:rounded-[32px] overflow-hidden shadow-sm gap-4"
+              className="flex flex-col sm:flex-row items-center justify-between px-6 md:px-10 py-4 md:py-5 bg-secondary/10 border-2 sm:border-4 border-card/80 rounded-[24px] md:rounded-[32px] overflow-hidden shadow-sm gap-4"
             >
               <div className="flex items-center gap-4 md:gap-6">
                 <span className="text-[11px] md:text-xs font-black text-secondary uppercase tracking-[0.1em] italic">
@@ -300,7 +300,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
                 <button
                   disabled={selectedIds.length === 0}
                   onClick={() => setIsBulkEditing(true)}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 md:px-6 py-2.5 md:py-3 bg-white text-secondary rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black uppercase tracking-widest shadow-md hover:bg-secondary hover:text-white disabled:opacity-30 transition-all border-white/20 border-2"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 md:px-6 py-2.5 md:py-3 bg-card text-secondary rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black uppercase tracking-widest shadow-md hover:bg-secondary hover:text-white disabled:opacity-30 transition-all border-card/20 border-2"
                 >
                   <Edit3 className="w-3.5 h-3.5 md:w-4 md:h-4" />
                   Bulk Edit
@@ -308,7 +308,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
                 <button
                   disabled={selectedIds.length === 0}
                   onClick={deleteSelected}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 md:px-6 py-2.5 md:py-3 bg-red-500 text-white rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black uppercase tracking-widest shadow-md hover:scale-105 active:scale-95 disabled:opacity-30 transition-all border-white/20 border-2"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 md:px-6 py-2.5 md:py-3 bg-red-500 text-white rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black uppercase tracking-widest shadow-md hover:scale-105 active:scale-95 disabled:opacity-30 transition-all border-card/20 border-2"
                 >
                   <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
                   Burn
@@ -327,12 +327,12 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
         >
            <button
             onClick={() => setDrilldownValue(null)}
-            className="p-4 bg-white border-4 border-white shadow-lg rounded-[24px] text-primary hover:rotate-[-10deg] transition-all hover:scale-110 active:scale-90"
+            className="p-4 bg-card border-4 border-card shadow-lg rounded-[24px] text-primary hover:rotate-[-10deg] transition-all hover:scale-110 active:scale-90"
           >
             <ChevronLeft size={24} className="stroke-[3px]" />
           </button>
           <div className="space-y-1">
-            <h2 className="text-4xl font-black text-foreground uppercase tracking-tighter italic leading-none">{drilldownValue}</h2>
+            <h2 className="heading-scrapbook text-4xl text-foreground leading-none">{drilldownValue}</h2>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
               <p className="text-[11px] font-black text-foreground/40 uppercase tracking-widest">{processedPhotocards.length} Items Found</p>
@@ -381,13 +381,13 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
               key="empty-view"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col items-center justify-center py-32 glass-card border-white border-8 rounded-[48px] shadow-sm text-foreground/20"
+              className="flex flex-col items-center justify-center py-32 glass-card border-card/50 border-8 rounded-[48px] shadow-sm text-foreground/20"
             >
               <div className="text-8xl mb-6 grayscale opacity-30 animate-bounce">📔</div>
               <p className="font-black uppercase tracking-[0.3em] text-sm italic">Binder section is currently empty</p>
               <button 
                 onClick={() => { setFilters({ group: 'All', member: 'All', album: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' }); setDrilldownValue(null); }}
-                className="mt-8 px-8 py-4 bg-white text-primary border-2 border-primary/20 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-xl shadow-primary/10"
+                className="mt-8 px-8 py-4 bg-card text-primary border-2 border-primary/20 rounded-2xl font-semibold text-xs uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-xl shadow-primary/10"
               >
                 Return to Full View
               </button>
