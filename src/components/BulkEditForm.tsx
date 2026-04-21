@@ -54,14 +54,14 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
 
   const fieldClass = (field: string) => `
     flex flex-col gap-2 p-4 rounded-2xl border-2 transition-all
-    ${activeFields.has(field) ? 'bg-white border-primary/20 shadow-sm' : 'bg-gray-50/50 border-transparent opacity-60'}
+    ${activeFields.has(field) ? 'bg-card border-primary/20 shadow-sm' : 'bg-muted/50 border-transparent opacity-60'}
   `;
 
   const Checkbox = ({ id }: { id: string }) => (
     <div 
       onClick={() => toggleField(id)}
       className={`w-5 h-5 rounded-md border-2 flex items-center justify-center cursor-pointer transition-all ${
-        activeFields.has(id) ? 'bg-primary border-primary text-white' : 'bg-white border-gray-200'
+        activeFields.has(id) ? 'bg-primary border-primary text-white' : 'bg-card border-border'
       }`}
     >
       {activeFields.has(id) && (
@@ -83,10 +83,10 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
       <motion.div
         initial={{ scale: 0.95, y: 20 }}
         animate={{ scale: 1, y: 0 }}
-        className="bg-white w-full max-w-2xl rounded-[40px] overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]"
+        className="bg-card w-full max-w-2xl rounded-[40px] overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-8 border-b border-gray-100 flex justify-between items-center shrink-0">
+        <div className="p-8 border-b border-border flex justify-between items-center shrink-0">
           <div className="space-y-1">
             <h2 className="text-2xl font-black text-foreground uppercase tracking-tight italic flex items-center gap-3">
               <Layers className="text-primary" size={28} />
@@ -96,7 +96,7 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
               Updating {selectedCount} selected cards
             </p>
           </div>
-          <button onClick={onClose} className="p-3 bg-gray-50 rounded-2xl text-foreground/20 hover:text-primary transition-all">
+          <button onClick={onClose} className="p-3 bg-muted rounded-2xl text-foreground/20 hover:text-primary transition-all">
             <X size={24} />
           </button>
         </div>
@@ -185,10 +185,10 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
           </p>
         </div>
 
-        <div className="p-8 border-t border-gray-100 flex gap-4 shrink-0">
+        <div className="p-8 border-t border-border flex gap-4 shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-4 bg-gray-50 text-foreground/40 rounded-2xl font-black text-xs uppercase tracking-widest border-2 border-white hover:bg-white transition-all"
+            className="flex-1 py-4 bg-muted text-muted-foreground rounded-2xl font-semibold text-xs uppercase tracking-widest border-2 border-border hover:bg-card transition-all"
           >
             Cancel
           </button>
