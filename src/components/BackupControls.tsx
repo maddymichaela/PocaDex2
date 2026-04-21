@@ -60,13 +60,13 @@ export default function BackupControls({ photocards, onImport }: BackupControlsP
 
   return (
     <div className="space-y-4">
-      <div className="glass-card p-8 rounded-[32px] border-2 border-white shadow-sm relative overflow-hidden">
+      <div className="glass-card p-8 rounded-[32px] border-2 border-card shadow-sm relative overflow-hidden">
         <h3 className="text-sm font-black text-foreground mb-6 uppercase tracking-widest opacity-60">Backup & Restore</h3>
         
         <div className="flex gap-4">
           <button
             onClick={handleExport}
-            className="flex-1 h-14 glass-card bg-primary/5 text-primary rounded-[24px] font-black uppercase tracking-widest text-xs shadow-lg shadow-primary/5 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 border-white border-4"
+            className="flex-1 h-14 glass-card bg-primary/5 text-primary rounded-[24px] font-black uppercase tracking-widest text-xs shadow-lg shadow-primary/5 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 border-card border-4"
           >
             <Download size={18} />
             Export Data
@@ -74,7 +74,7 @@ export default function BackupControls({ photocards, onImport }: BackupControlsP
           
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex-1 h-14 glass-card bg-secondary/5 text-secondary rounded-[24px] font-black uppercase tracking-widest text-xs shadow-lg shadow-secondary/5 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 border-white border-4"
+            className="flex-1 h-14 glass-card bg-secondary/5 text-secondary rounded-[24px] font-black uppercase tracking-widest text-xs shadow-lg shadow-secondary/5 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 border-card border-4"
           >
             <Upload size={18} />
             Import JSON
@@ -119,9 +119,9 @@ export default function BackupControls({ photocards, onImport }: BackupControlsP
             <motion.div
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              className="glass-card rounded-[40px] p-10 max-w-sm w-full border-white border-8 shadow-2xl space-y-8"
+              className="glass-card rounded-[40px] p-10 max-w-sm w-full border-card border-8 shadow-2xl space-y-8"
             >
-              <div className="w-20 h-20 bg-secondary/10 text-secondary rounded-3xl flex items-center justify-center mx-auto border-2 border-white">
+              <div className="w-20 h-20 bg-secondary/10 text-secondary rounded-3xl flex items-center justify-center mx-auto border-2 border-card">
                 <Upload size={32} />
               </div>
               
@@ -135,7 +135,7 @@ export default function BackupControls({ photocards, onImport }: BackupControlsP
               <div className="flex flex-col gap-3">
                 <button
                   onClick={() => confirmImport('merge')}
-                  className="w-full py-5 bg-white text-foreground rounded-[24px] font-black uppercase text-xs tracking-widest shadow-lg hover:bg-secondary hover:text-white transition-all flex items-center justify-center gap-3"
+                  className="w-full py-5 bg-card text-foreground rounded-[24px] font-black uppercase text-xs tracking-widest shadow-lg hover:bg-secondary hover:text-white transition-all flex items-center justify-center gap-3"
                 >
                   <CopyPlus size={18} />
                   Merge Collections
