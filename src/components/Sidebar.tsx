@@ -16,18 +16,16 @@ export function StatCard({ label, value, highlightColor, isWishlist }: StatCardP
   return (
     <motion.div
       whileHover={{ y: -4, scale: 1.02 }}
-      className={`glass-card p-5 rounded-3xl shadow-sm border-2 transition-all hover:shadow-md active:scale-95 ${
-        isWishlist ? 'border-secondary/20' : 'border-card/50'
+      className={`glass-card p-6 rounded-3xl shadow-sm border-2 transition-all hover:shadow-md active:scale-95 ${
+        isWishlist ? 'border-secondary/20' : 'border-white/50'
       }`}
     >
-      {/* Label uses Outfit (sans) — small, uppercase, muted */}
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
+      <div className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-2">
         {label}
       </div>
-      {/* Value uses Jua (serif) — display weight, visually distinctive */}
-      <div
-        className="text-3xl leading-none font-serif tracking-tight"
-        style={{ color: highlightColor ? highlightColor : 'hsl(var(--foreground))' }}
+      <div 
+        className="text-3xl font-black text-foreground tracking-tighter"
+        style={{ color: highlightColor ? highlightColor : 'inherit' }}
       >
         {value}
       </div>
@@ -38,30 +36,30 @@ export function StatCard({ label, value, highlightColor, isWishlist }: StatCardP
 export function Sidebar({ stats }: { stats: any }) {
   return (
     <aside className="w-full lg:w-60 flex flex-col gap-4 shrink-0">
-      <StatCard
-        label="Owned"
-        value={stats.totalCollected.toLocaleString()}
-        highlightColor="hsl(var(--accent-green))"
+      <StatCard 
+        label="Owned" 
+        value={stats.totalCollected.toLocaleString()} 
+        highlightColor="var(--accent-green)" 
       />
-      <StatCard
-        label="On The Way"
-        value={stats.onTheWay.toLocaleString()}
-        highlightColor="hsl(var(--accent-blue))"
+      <StatCard 
+        label="On The Way" 
+        value={stats.onTheWay.toLocaleString()} 
+        highlightColor="var(--accent-blue)" 
       />
-      <StatCard
-        label="Wishlist"
-        value={stats.wishlistGoals}
-        isWishlist
+      <StatCard 
+        label="Wishlist" 
+        value={stats.wishlistGoals} 
+        isWishlist 
       />
-      <StatCard
-        label="Duplicates"
-        value={stats.duplicates || 0}
-        highlightColor="hsl(var(--secondary))"
+      <StatCard 
+        label="Duplicates" 
+        value={stats.duplicates || 0} 
+        highlightColor="var(--secondary)" 
       />
-      <StatCard
-        label="Est. Value"
-        value={`$${stats.collectionValue.toLocaleString()}`}
-        highlightColor="hsl(var(--primary))"
+      <StatCard 
+        label="Est. Value" 
+        value={`$${stats.collectionValue.toLocaleString()}`} 
+        highlightColor="var(--primary)" 
       />
     </aside>
   );

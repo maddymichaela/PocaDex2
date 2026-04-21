@@ -45,24 +45,24 @@ export default function Dashboard({ photocards, onEdit, onDelete, onImport }: Da
       
       <div className="flex-1 flex flex-col gap-8">
         <div>
-          <h2 className="heading-scrapbook text-2xl text-foreground mb-6">Recent Memories</h2>
+          <h2 className="text-2xl font-black text-foreground mb-6 uppercase tracking-tight italic">Recent Memories</h2>
           <PhotocardGrid 
             photocards={recentPhotocards} 
             onCardClick={onEdit}
           />
         </div>
         
-        <div className="glass-card p-10 rounded-[32px] border-2 border-card shadow-sm relative overflow-hidden">
+        <div className="glass-card p-10 rounded-[32px] border-2 border-white shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-accent/20 rounded-full -mr-16 -mt-16 blur-3xl" />
           
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-6">Collection Progress</h3>
+          <h3 className="text-sm font-black text-foreground mb-6 uppercase tracking-widest opacity-60">Collection Progress</h3>
           <div className="w-full h-6 bg-white/50 rounded-full border-2 border-white overflow-hidden p-1 shadow-inner">
             <div 
               className="h-full bg-gradient-to-r from-primary to-secondary rounded-full shadow-lg shadow-primary/20 transition-all duration-1000" 
               style={{ width: `${Math.min(Math.round((ownedCount / 2000) * 100), 100)}%` }} 
             />
           </div>
-          <div className="flex justify-between mt-4 text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.2em]">
+          <div className="flex justify-between mt-4 text-[10px] font-black text-foreground/40 uppercase tracking-[0.2em]">
             <span>{ownedCount.toLocaleString()} Added</span>
             <span className="text-secondary">{Math.round((ownedCount / 2000) * 100)}% Complete</span>
             <span>2,000 Target</span>
