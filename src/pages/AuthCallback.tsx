@@ -3,18 +3,29 @@ import { supabase } from '../lib/supabase';
 
 export default function AuthCallback() {
   useEffect(() => {
-    const code = new URL(window.location.href).searchParams.get('code');
-    if (code) {
-      supabase.auth.exchangeCodeForSession(code).then(() => {
+    const finishLogin = async () => {
+      const code = new URL(window.location.href).searchParams.get('code');
+
+      try {
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            console.error('Failed to exchange auth code for session:', error);
+          }
+        } else {
+          const { error } = await supabase.auth.getSession();
+          if (error) {
+            console.error('Failed to read auth session on callback:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Unexpected auth callback error:', error);
+      } finally {
         window.location.replace('/');
-      });
-    } else {
-      // Implicit flow — session already processed by the SDK via the hash
-      supabase.auth.getSession().then(({ data }) => {
-        if (data.session) window.location.replace('/');
-        else window.location.replace('/');
-      });
-    }
+      }
+    };
+
+    void finishLogin();
   }, []);
 
   return (
