@@ -8,11 +8,11 @@
   --color-foreground: hsl(280, 40%, 15%);
   --color-accent-green: hsl(150, 40%, 60%);
   --color-accent-blue: hsl(200, 50%, 75%);
-  
+
   --radius-xl: 20px;
   --radius-2xl: 24px;
   --radius-3xl: 32px;
-  
+
   --shadow-sm: 0 2px 8px rgba(100, 50, 80, 0.05);
   --shadow-md: 0 8px 24px rgba(100, 50, 80, 0.08);
   --shadow-lg: 0 12px 32px rgba(100, 50, 80, 0.12);
@@ -33,7 +33,8 @@
   --radius: 20px;
 }
 
-html, body {
+html,
+body {
   font-family: var(--font-sans);
   background-color: var(--bg);
   background-image: radial-gradient(var(--accent) 1px, transparent 1px);
@@ -43,8 +44,15 @@ html, body {
   overflow-x: hidden;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-serif);
+  color: #7f4b72;
+  font-weight: bold;
 }
 
 .font-heading {
@@ -58,11 +66,11 @@ h1, h2, h3, h4, h5, h6 {
       radial-gradient(circle at 78% 22%, rgba(176, 225, 255, 0.65), transparent 24%),
       radial-gradient(circle at 74% 72%, rgba(189, 243, 222, 0.58), transparent 24%),
       radial-gradient(circle at 18% 78%, rgba(255, 210, 231, 0.7), transparent 22%),
-      linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.92));
+      linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.92));
   }
 
   .dreamy-page-dots {
-    background-image: radial-gradient(rgba(255,255,255,0.9) 1.4px, transparent 1.4px);
+    background-image: radial-gradient(rgba(255, 255, 255, 0.9) 1.4px, transparent 1.4px);
     background-size: 26px 26px;
   }
 
@@ -70,7 +78,7 @@ h1, h2, h3, h4, h5, h6 {
     border: 1px solid #ef8fc3;
     background: linear-gradient(180deg, #ff9fd4 0%, #f36eb5 100%);
     color: #fff;
-    box-shadow: 0 20px 45px rgba(243, 110, 181, 0.28);
+    box-shadow: 0 0 45px rgba(243, 110, 181, 0.28);
     transition:
       transform 180ms ease,
       box-shadow 180ms ease,
@@ -97,6 +105,7 @@ h1, h2, h3, h4, h5, h6 {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
@@ -106,7 +115,7 @@ h1, h2, h3, h4, h5, h6 {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
   }
-  
+
   .glass-card {
     background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(8px);
