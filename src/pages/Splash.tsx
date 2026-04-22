@@ -30,8 +30,8 @@ export default function Splash({ onGetStarted, onSignIn }: Props) {
       {/* Main content */}
       <div className="relative z-10 flex flex-col items-center text-center px-8 max-w-md">
         {/* Logo mark */}
-        <div className="mb-6 w-20 h-20 rounded-[28px] bg-white/20 backdrop-blur-sm border-2 border-white/40 flex items-center justify-center shadow-2xl">
-          <span className="text-4xl">🎴</span>
+        <div className="mb-6">
+          <img src="/pocadex.png" alt="PocaDex" className="h-24 w-auto object-contain drop-shadow-2xl" />
         </div>
 
         {/* Brand name */}
