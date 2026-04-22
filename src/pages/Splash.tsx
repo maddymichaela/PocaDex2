@@ -1,67 +1,186 @@
+import { Cloud, Heart, Sparkles, Star } from 'lucide-react';
+
 interface Props {
   onGetStarted: () => void;
   onSignIn: () => void;
 }
 
 export default function Splash({ onGetStarted, onSignIn }: Props) {
+  const decorations = [
+    { icon: Cloud, size: 82, className: 'top-[8%] left-[5%] rotate-[-8deg]' },
+    { icon: Star, size: 54, className: 'top-[18%] right-[10%] rotate-[12deg]' },
+    { icon: Heart, size: 22, className: 'top-[30%] right-[18%]' },
+    { icon: Sparkles, size: 24, className: 'top-[16%] left-[22%]' },
+    { icon: Cloud, size: 72, className: 'bottom-[20%] right-[8%]' },
+    { icon: Star, size: 42, className: 'bottom-[13%] left-[10%] rotate-[-14deg]' },
+    { icon: Heart, size: 18, className: 'bottom-[24%] left-[12%] rotate-[-12deg]' },
+    { icon: Sparkles, size: 20, className: 'bottom-[28%] right-[24%]' },
+  ];
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden"
-      style={{ background: 'linear-gradient(135deg, hsl(330,80%,60%) 0%, hsl(280,50%,60%) 100%)' }}>
+    <div className="relative min-h-screen overflow-hidden bg-white">
+      <div
+        className="absolute inset-0 opacity-70"
+        style={{
+          background: `
+            radial-gradient(circle at 20% 18%, rgba(214, 192, 255, 0.6), transparent 24%),
+            radial-gradient(circle at 78% 22%, rgba(176, 225, 255, 0.65), transparent 24%),
+            radial-gradient(circle at 74% 72%, rgba(189, 243, 222, 0.58), transparent 24%),
+            radial-gradient(circle at 18% 78%, rgba(255, 210, 231, 0.7), transparent 22%),
+            linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.92))
+          `,
+        }}
+      />
 
-      {/* Dot pattern overlay */}
-      <div className="absolute inset-0 opacity-20"
-        style={{ backgroundImage: 'radial-gradient(white 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+      <div
+        className="absolute inset-0 opacity-60"
+        style={{
+          backgroundImage: 'radial-gradient(rgba(255,255,255,0.9) 1.4px, transparent 1.4px)',
+          backgroundSize: '26px 26px',
+        }}
+      />
 
-      {/* Floating card shapes */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-14 -left-12 h-44 w-44 rounded-full bg-white/90 blur-sm" />
+        <div className="absolute top-[6%] right-[-3rem] h-32 w-40 rounded-full bg-white/95 blur-sm" />
+        <div className="absolute bottom-[-4rem] left-[-2rem] h-48 w-52 rounded-full bg-white/95 blur-sm" />
+        <div className="absolute bottom-[6%] right-[-2rem] h-40 w-48 rounded-full bg-white/95 blur-sm" />
+
+        {decorations.map(({ icon: Icon, size, className }, index) => (
+          <div
+            key={index}
+            className={`absolute text-white/95 drop-shadow-[0_8px_18px_rgba(255,180,224,0.45)] ${className}`}
+          >
+            <Icon
+              size={size}
+              strokeWidth={1.8}
+              className="animate-[pulse_5s_ease-in-out_infinite]"
+            />
+          </div>
+        ))}
+
         {[
-          { w: 80, h: 110, top: '8%', left: '5%', rotate: '-15deg', opacity: 0.12 },
-          { w: 60, h: 85, top: '15%', right: '8%', rotate: '20deg', opacity: 0.10 },
-          { w: 70, h: 98, bottom: '20%', left: '10%', rotate: '10deg', opacity: 0.10 },
-          { w: 90, h: 126, bottom: '10%', right: '5%', rotate: '-8deg', opacity: 0.12 },
-          { w: 55, h: 77, top: '45%', left: '3%', rotate: '25deg', opacity: 0.08 },
-          { w: 65, h: 91, top: '35%', right: '3%', rotate: '-20deg', opacity: 0.08 },
-        ].map((s, i) => (
-          <div key={i} className="absolute rounded-2xl bg-white"
-            style={{ width: s.w, height: s.h, top: s.top, left: s.left, right: s.right, bottom: s.bottom, transform: `rotate(${s.rotate})`, opacity: s.opacity }} />
+          'top-[12%] left-[46%]',
+          'top-[24%] left-[28%]',
+          'top-[42%] right-[9%]',
+          'bottom-[33%] left-[18%]',
+          'bottom-[18%] right-[18%]',
+        ].map((position, index) => (
+          <div
+            key={position}
+            className={`absolute ${position} h-2.5 w-2.5 rounded-full bg-white/95 shadow-[0_0_18px_rgba(255,255,255,0.95)] ${
+              index % 2 === 0 ? 'animate-pulse' : ''
+            }`}
+          />
         ))}
       </div>
 
-      {/* Main content */}
-      <div className="relative z-10 flex flex-col items-center text-center px-8 max-w-md">
-        {/* Logo mark */}
-        <div className="mb-6">
-          <img src="/pocadex.png" alt="PocaDex" className="h-24 w-auto object-contain drop-shadow-2xl" />
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-5 py-10 sm:px-8">
+        <div className="grid w-full max-w-6xl items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
+          <div className="mx-auto flex w-full max-w-xl flex-col items-center text-center lg:items-start lg:text-left">
+            <img
+              src="/pocadex.png"
+              alt="PocaDex"
+              className="mb-5 h-auto w-[min(100%,26rem)] drop-shadow-[0_18px_30px_rgba(245,130,195,0.24)]"
+            />
+
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#f5c6dd] bg-white/85 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-[#d85ea5] shadow-[0_12px_30px_rgba(255,182,217,0.16)] backdrop-blur-sm">
+              <Sparkles size={14} strokeWidth={2.2} />
+              Collect with a little sparkle
+            </div>
+
+            <p className="max-w-lg text-3xl font-black leading-[1.05] tracking-tight text-[#7f4b72] sm:text-[2.75rem]">
+              Keep every photocard memory in one dreamy little binder.
+            </p>
+
+            <p className="mt-4 max-w-md text-base leading-7 text-[#9b6d8b] sm:text-lg">
+              Organize your pulls, wishlist the cards you still need, and make your collection feel as cute as the shelves it lives on.
+            </p>
+
+            <div className="mt-8 flex w-full max-w-md flex-col gap-3">
+              <button
+                onClick={onGetStarted}
+                className="w-full rounded-[1.65rem] border border-[#ef8fc3] bg-[linear-gradient(180deg,#ff9fd4_0%,#f36eb5_100%)] px-6 py-4 text-base font-black tracking-[0.08em] text-white shadow-[0_20px_45px_rgba(243,110,181,0.28)] transition-transform hover:scale-[1.01] active:scale-[0.985]"
+              >
+                Start Your Binder
+              </button>
+              <button
+                onClick={onSignIn}
+                className="w-full rounded-[1.65rem] border border-[#f4d8e8] bg-white/85 px-6 py-4 text-sm font-bold tracking-[0.06em] text-[#b85d92] shadow-[0_14px_30px_rgba(227,173,203,0.12)] backdrop-blur-sm transition-all hover:border-[#efb6d6] hover:bg-white"
+              >
+                I already have an account
+              </button>
+            </div>
+
+            <p className="mt-6 text-xs font-semibold uppercase tracking-[0.26em] text-[#c690b2]">
+              Track · Wishlist · Collect
+            </p>
+          </div>
+
+          <div className="relative mx-auto flex w-full max-w-md items-center justify-center">
+            <div
+              className="absolute inset-auto h-[23rem] w-[23rem] rounded-full blur-3xl"
+              style={{
+                background:
+                  'conic-gradient(from 180deg, rgba(255,198,226,0.7), rgba(204,224,255,0.75), rgba(198,244,226,0.72), rgba(232,205,255,0.75), rgba(255,198,226,0.7))',
+              }}
+            />
+
+            <div className="relative w-full rounded-[2.25rem] border border-white/80 bg-white/70 p-4 shadow-[0_28px_70px_rgba(222,171,202,0.26)] backdrop-blur-xl sm:p-5">
+              <div className="absolute -left-4 top-9 h-18 w-18 rounded-full bg-white/70 blur-xl" />
+              <div className="absolute -right-4 bottom-10 h-20 w-20 rounded-full bg-[#ffd9ef]/55 blur-2xl" />
+
+              <div
+                className="rounded-[2rem] border border-[#ffd6ea] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)] sm:p-4"
+                style={{
+                  background:
+                    'linear-gradient(145deg, rgba(245,219,255,0.9) 0%, rgba(212,232,255,0.9) 35%, rgba(220,248,235,0.88) 68%, rgba(255,226,239,0.92) 100%)',
+                }}
+              >
+                <div className="rounded-[1.7rem] border border-white/70 bg-white/45 p-3 backdrop-blur-md">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="rounded-full bg-white/75 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-[#cf68a8] shadow-sm">
+                      My Collection
+                    </span>
+                    <Sparkles size={18} className="text-[#ee88c1]" strokeWidth={2.1} />
+                  </div>
+
+                  <div className="relative overflow-hidden rounded-[1.45rem] border-[3px] border-white/80 bg-white shadow-[0_18px_35px_rgba(213,160,197,0.24)]">
+                    <img
+                      src="/placeholder.png"
+                      alt="Photocard preview"
+                      className="aspect-[3/4] w-full object-cover"
+                    />
+                    <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,transparent_0%,rgba(255,255,255,0.92)_55%,rgba(255,255,255,0.98)_100%)] px-4 pb-4 pt-12">
+                      <div className="rounded-[1.1rem] border border-[#f5d2e4] bg-white/85 px-4 py-3 shadow-lg backdrop-blur-sm">
+                        <p className="text-xs font-black uppercase tracking-[0.22em] text-[#d56eaa]">
+                          Favorite Pull
+                        </p>
+                        <p className="mt-1 text-lg font-black text-[#7f4b72]">
+                          White-back binder vibes
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#d390b5]">
+                        Pocket-ready
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-[#8f5f7e]">
+                        Soft pink, glossy, and collector-coded.
+                      </p>
+                    </div>
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] border border-white/80 bg-white/80 text-[#e96fb2] shadow-md">
+                      <Heart size={20} fill="currentColor" strokeWidth={1.8} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-
-        {/* Brand name */}
-        <h1 className="text-6xl font-black text-white uppercase tracking-tighter italic mb-3 drop-shadow-lg">
-          PocaDex
-        </h1>
-
-        {/* Tagline */}
-        <p className="text-xl text-white/90 font-semibold mb-2">
-          Your K-pop photocard collection,<br />digitized.
-        </p>
-        <p className="text-sm text-white/70 font-medium mb-12 uppercase tracking-widest">
-          Track · Wishlist · Collect
-        </p>
-
-        {/* Actions */}
-        <div className="flex flex-col gap-3 w-full">
-          <button onClick={onGetStarted}
-            className="w-full py-4 rounded-2xl bg-white text-primary font-black text-lg uppercase tracking-tight shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-transform">
-            Get Started →
-          </button>
-          <button onClick={onSignIn}
-            className="w-full py-4 rounded-2xl bg-white/15 border-2 border-white/40 text-white font-bold text-base backdrop-blur-sm hover:bg-white/25 transition-colors">
-            Already have an account? Sign In
-          </button>
-        </div>
-
-        <p className="mt-10 text-xs text-white/50 font-medium">
-          A fan-made app for photocard collectors 💗
-        </p>
       </div>
     </div>
   );
