@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -19,7 +18,7 @@
   --shadow-lg: 0 12px 32px rgba(100, 50, 80, 0.12);
 
   --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Georgia", serif;
+  --font-serif: "Fraunces", serif;
   --font-mono: "Menlo", ui-monospace, SFMono-Regular, monospace;
 }
 
@@ -35,13 +34,21 @@
 }
 
 html, body {
-  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
   background-color: var(--bg);
   background-image: radial-gradient(var(--accent) 1px, transparent 1px);
   background-size: 24px 24px;
   color: var(--foreground);
   min-height: 100vh;
   overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif);
+}
+
+.font-heading {
+  font-family: var(--font-serif);
 }
 
 @layer utilities {

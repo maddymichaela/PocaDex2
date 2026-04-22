@@ -87,7 +87,7 @@ export default function Splash({ onGetStarted, onSignIn }: Props) {
             Collect with a little sparkle
           </div>
 
-          <p className="max-w-lg text-3xl font-black leading-[1.05] tracking-tight text-[#7f4b72] sm:text-[2.75rem]">
+          <p className="font-heading max-w-lg text-3xl font-black leading-[1.05] tracking-tight text-[#7f4b72] sm:text-[2.75rem]">
             Keep every photocard memory in one dreamy little binder.
           </p>
 

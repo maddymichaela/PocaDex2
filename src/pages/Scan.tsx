@@ -555,7 +555,7 @@ export default function Scan({ onDone }: { onDone: () => void }) {
             <CheckCircle2 size={36} className="text-green-500" />
           </div>
           <div>
-            <p className="font-black text-2xl text-foreground uppercase tracking-tighter italic">All done!</p>
+            <p className="font-heading text-2xl font-black text-foreground uppercase tracking-tighter italic">All done!</p>
             <p className="text-sm text-foreground/50 font-medium mt-2">
               Added <span className="font-black text-foreground">{savedCount}</span> photocard{savedCount !== 1 ? 's' : ''} to your collection.
             </p>
