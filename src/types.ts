@@ -34,3 +34,13 @@ export interface CollectionStats {
   wishlistGoals: number;
   collectionValue: number;
 }
+
+export interface Profile {
+  id: string;
+  username: string;
+  nickname: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  created_at: string;
+  updated_at: string;
+}

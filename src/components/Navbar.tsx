@@ -3,18 +3,33 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Menu, X as CloseIcon } from 'lucide-react';
+import { Menu, X as CloseIcon, LogOut, User } from 'lucide-react';
+import { Profile } from '../types';
 
 interface NavbarProps {
   currentPage: string;
   onPageChange: (page: string) => void;
+  profile?: Profile | null;
+  onSignOut?: () => void;
 }
 
-export default function Navbar({ currentPage, onPageChange }: NavbarProps) {
+export default function Navbar({ currentPage, onPageChange, profile, onSignOut }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const links = ['Dashboard', 'Collection', 'Groups', 'Trade Finder'];
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const links = ['Dashboard', 'Collection', 'Scan', 'Groups'];
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   const handleNav = (page: string) => {
     onPageChange(page);
@@ -64,12 +79,52 @@ export default function Navbar({ currentPage, onPageChange }: NavbarProps) {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4">
-        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-accent border-2 border-white shadow-sm overflow-hidden shrink-0 flex items-center justify-center text-[10px] md:text-xs font-black text-primary">
-          Me
+        {/* Profile avatar + dropdown */}
+        <div className="relative" ref={profileRef}>
+          <button
+            onClick={() => setIsProfileOpen(v => !v)}
+            className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-accent border-2 border-white shadow-sm overflow-hidden shrink-0 flex items-center justify-center text-[10px] md:text-xs font-black text-primary hover:ring-2 hover:ring-primary/40 transition-all"
+          >
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              <span>{(profile?.nickname ?? profile?.username ?? 'Me').charAt(0).toUpperCase()}</span>
+            )}
+          </button>
+          <AnimatePresence>
+            {isProfileOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                transition={{ duration: 0.15 }}
+                className="absolute right-0 top-12 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50"
+              >
+                <div className="px-4 py-3 border-b border-gray-50">
+                  <p className="font-black text-sm text-foreground truncate">{profile?.nickname ?? profile?.username ?? 'My Account'}</p>
+                  <p className="text-xs text-foreground/40 font-medium truncate">@{profile?.username}</p>
+                </div>
+                <button
+                  onClick={() => { setIsProfileOpen(false); onPageChange('Profile'); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-foreground/60 hover:bg-gray-50 hover:text-foreground transition-colors"
+                >
+                  <User size={14} /> My Profile
+                </button>
+                {onSignOut && (
+                  <button
+                    onClick={() => { setIsProfileOpen(false); onSignOut(); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                  >
+                    <LogOut size={14} /> Sign Out
+                  </button>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-        
+
         {/* Burger Menu Button */}
-        <button 
+        <button
           onClick={() => setIsMenuOpen(!isMenuOpen)}
           className="md:hidden p-2 text-foreground/40 hover:text-primary transition-colors"
         >
