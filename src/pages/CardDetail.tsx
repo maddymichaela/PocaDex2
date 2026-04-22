@@ -119,7 +119,7 @@ export default function CardDetail({ photocard, onUpdate, onDelete, onBack }: Ca
               </button>
               <button
                 onClick={handleSave}
-                className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 transition-all hover:scale-105"
+                className="btn-primary-pink flex items-center gap-2 rounded-xl px-6 py-2.5 text-[10px] font-black uppercase tracking-widest"
               >
                 <Save size={14} />
                 Save Changes

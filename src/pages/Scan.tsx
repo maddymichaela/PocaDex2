@@ -405,13 +405,13 @@ export default function Scan({ onDone }: { onDone: () => void }) {
                 <div className="flex gap-2 pt-1">
                   {detectMode === 'ai' ? (
                     <button onClick={runAiDetect}
-                      className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-primary text-white font-black text-sm uppercase tracking-tight shadow-lg hover:opacity-90 active:scale-[0.98] transition-all">
+                      className="btn-primary-pink flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-black uppercase tracking-tight">
                       <Sparkles size={15} /> Detect with AI
                     </button>
                   ) : (
                     <>
                       <button onClick={runGridDetect}
-                        className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-primary text-white font-black text-sm uppercase tracking-tight shadow-md hover:opacity-90 transition-all">
+                        className="btn-primary-pink flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black uppercase tracking-tight">
                         <Grid3x3 size={14} /> Auto-detect Grid
                       </button>
                       <button onClick={runManualGrid}
@@ -529,7 +529,7 @@ export default function Scan({ onDone }: { onDone: () => void }) {
               <button
                 onClick={handleSave}
                 disabled={selectedCards.length === 0}
-                className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-primary text-white font-black text-sm uppercase tracking-tight shadow-md hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                className="btn-primary-pink flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-black uppercase tracking-tight disabled:cursor-not-allowed disabled:opacity-40">
                 Add to Collection →
               </button>
             </div>
@@ -562,7 +562,7 @@ export default function Scan({ onDone }: { onDone: () => void }) {
           </div>
           <div className="flex gap-3">
             <button onClick={onDone}
-              className="px-6 py-3 rounded-2xl bg-primary text-white font-black text-sm uppercase tracking-tight shadow-md hover:opacity-90 transition-all">
+              className="btn-primary-pink rounded-2xl px-6 py-3 text-sm font-black uppercase tracking-tight">
               View Collection
             </button>
             <button onClick={reset}

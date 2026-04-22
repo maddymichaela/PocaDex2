@@ -20,24 +20,11 @@ export default function Splash({ onGetStarted, onSignIn }: Props) {
   return (
     <div className="relative min-h-screen overflow-hidden bg-white">
       <div
-        className="absolute inset-0 opacity-70"
-        style={{
-          background: `
-            radial-gradient(circle at 20% 18%, rgba(214, 192, 255, 0.6), transparent 24%),
-            radial-gradient(circle at 78% 22%, rgba(176, 225, 255, 0.65), transparent 24%),
-            radial-gradient(circle at 74% 72%, rgba(189, 243, 222, 0.58), transparent 24%),
-            radial-gradient(circle at 18% 78%, rgba(255, 210, 231, 0.7), transparent 22%),
-            linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.92))
-          `,
-        }}
+        className="dreamy-page-bg absolute inset-0 opacity-70"
       />
 
       <div
-        className="absolute inset-0 opacity-60"
-        style={{
-          backgroundImage: 'radial-gradient(rgba(255,255,255,0.9) 1.4px, transparent 1.4px)',
-          backgroundSize: '26px 26px',
-        }}
+        className="dreamy-page-dots absolute inset-0 opacity-60"
       />
 
       <div className="pointer-events-none absolute inset-0">
@@ -93,7 +80,7 @@ export default function Splash({ onGetStarted, onSignIn }: Props) {
           <div className="mt-8 flex w-full max-w-md flex-col gap-3">
             <button
               onClick={onGetStarted}
-              className="w-full rounded-[1.65rem] border border-[#ef8fc3] bg-[linear-gradient(180deg,#ff9fd4_0%,#f36eb5_100%)] px-6 py-4 text-base font-black tracking-[0.08em] text-white shadow-[0_20px_45px_rgba(243,110,181,0.28)] transition-transform hover:scale-[1.01] active:scale-[0.985]"
+              className="btn-primary-pink w-full rounded-[1.65rem] px-6 py-4 text-base font-black tracking-[0.08em]"
             >
               Start Your Binder
             </button>

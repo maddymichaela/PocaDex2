@@ -199,7 +199,7 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = 1 /
             </button>
             <button
               onClick={handleSave}
-              className="flex-[2] py-3.5 md:py-4 bg-primary text-white rounded-xl md:rounded-[24px] font-black uppercase tracking-widest text-[9px] md:text-xs flex items-center justify-center gap-2 md:gap-3 shadow-lg shadow-primary/30 hover:scale-[1.01] active:scale-[0.98] transition-all border-white/20 border-2 md:border-4 shrink-0"
+              className="btn-primary-pink flex-[2] shrink-0 rounded-xl border-2 border-white/20 py-3.5 text-[9px] font-black uppercase tracking-widest md:rounded-[24px] md:border-4 md:py-4 md:text-xs flex items-center justify-center gap-2 md:gap-3"
             >
               <Check size={18} className="stroke-[3px]" />
               Polish Card

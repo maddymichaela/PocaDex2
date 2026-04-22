@@ -195,7 +195,7 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
           <button
             onClick={handleSave}
             disabled={activeFields.size === 0}
-            className="flex-2 py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-30 disabled:scale-100"
+            className="btn-primary-pink flex flex-[2] items-center justify-center gap-3 rounded-2xl py-4 text-xs font-black uppercase tracking-widest disabled:scale-100 disabled:opacity-30"
           >
             <Save size={18} />
             Apply Changes

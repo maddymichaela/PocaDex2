@@ -408,7 +408,7 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
           <button
             type="submit"
             form="photocard-form"
-            className="flex-1 h-12 md:h-14 bg-primary text-white rounded-xl md:rounded-2xl font-black uppercase tracking-widest text-xs md:text-sm shadow-lg shadow-primary/30 hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-2 md:gap-3 group border-white/10 border-2 md:border-4"
+            className="btn-primary-pink group flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border-2 border-white/10 text-xs font-black uppercase tracking-widest md:h-14 md:gap-3 md:rounded-2xl md:border-4 md:text-sm"
           >
             {isEditing ? <Save size={20} /> : <Upload size={20} className="group-hover:translate-y-[-2px] transition-transform" />}
             {isEditing ? 'Save Changes' : 'Add to Collection'}

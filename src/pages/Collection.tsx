@@ -272,7 +272,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
             {!selectMode && (
               <button
                 onClick={() => setIsAdding(true)}
-                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 sm:px-8 h-11 bg-primary text-white rounded-[14px] text-[10px] md:text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.05] active:scale-[0.95] hover:rotate-1 transition-all whitespace-nowrap border-white/20 border-2"
+                className="btn-primary-pink flex-1 md:flex-none flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-[14px] border-2 border-white/20 px-4 text-[10px] font-black uppercase tracking-widest sm:px-8 md:text-xs"
               >
                 <Plus className="w-4.5 h-4.5 md:w-5 md:h-5" />
                 <span className="hidden xs:inline">New Card</span>
