@@ -82,12 +82,7 @@ export default function Splash({ onGetStarted, onSignIn }: Props) {
             className="mb-5 h-auto w-[min(100%,26rem)] drop-shadow-[0_18px_30px_rgba(245,130,195,0.24)]"
           />
 
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#f5c6dd] bg-white/85 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-[#d85ea5] shadow-[0_12px_30px_rgba(255,182,217,0.16)] backdrop-blur-sm">
-            <Sparkles size={14} strokeWidth={2.2} />
-            Collect with a little sparkle
-          </div>
-
-          <h1 className="max-w-lg text-[1.75rem] font-bold leading-[1.05] tracking-tight text-[#7f4b72] sm:text-[2.75rem]">
+          <h1 className="max-w-lg text-[1.75rem] font-bold leading-[1.05] tracking-tight text-[#7f4b72] sm:text-[1.75rem]">
             Keep every photocard memory in one dreamy little binder.
           </h1>
 
