@@ -19,7 +19,7 @@ export default function Navbar({ currentPage, onPageChange, profile, onSignOut }
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
-  const links = ['Dashboard', 'Collection', 'Groups', 'Trade Finder'];
+  const links = ['Dashboard', 'Collection', 'Scan', 'Groups'];
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {

@@ -7,6 +7,7 @@ import CardDetail from './pages/CardDetail';
 import Splash from './pages/Splash';
 import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
+import Scan from './pages/Scan';
 import { Photocard } from './types';
 import { useAuth } from './contexts/AuthContext';
 import {
@@ -135,6 +136,10 @@ export default function App() {
             onDelete={handleDeletePhotocard}
             onImport={() => {}}
           />
+        );
+      case 'Scan':
+        return (
+          <Scan onDone={() => setCurrentPage('Collection')} />
         );
       case 'Collection':
         return (
