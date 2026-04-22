@@ -31,23 +31,28 @@ export default function App() {
   // Handle /auth/callback route
   if (window.location.pathname === '/auth/callback') return <AuthCallback />;
 
-  // Load photocards when user authenticates
+  // Load photocards only when the user ID changes, not on every token refresh
+  const userId = user?.id;
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     setDataLoading(true);
-    fetchPhotocards(user.id)
+    fetchPhotocards(userId)
       .then(setPhotocards)
       .catch(console.error)
       .finally(() => setDataLoading(false));
-  }, [user]);
+  }, [userId]);
 
   const handleAddPhotocard = useCallback(async (newPC: Photocard) => {
     if (!user) return;
+    // Optimistically add so the card appears instantly
+    setPhotocards(prev => [newPC, ...prev]);
     try {
       const saved = await insertPhotocard(user.id, newPC);
-      setPhotocards(prev => [saved, ...prev]);
+      // Replace temp entry with server version (gets real storage URL)
+      setPhotocards(prev => prev.map(pc => pc.id === newPC.id ? saved : pc));
     } catch (err) {
       console.error('Failed to add photocard:', err);
+      setPhotocards(prev => prev.filter(pc => pc.id !== newPC.id));
     }
   }, [user]);
 
