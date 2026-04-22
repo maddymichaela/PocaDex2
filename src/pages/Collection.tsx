@@ -40,20 +40,20 @@ function GroupTile({ name, count, imageUrl, onClick }: GroupTileProps) {
       className="glass-card rounded-[32px] p-5 shadow-lg flex flex-col gap-5 relative overflow-hidden group cursor-pointer border-4 border-white transition-all hover:shadow-2xl"
     >
       <div className="w-full aspect-[2/3] rounded-2xl bg-white overflow-hidden relative ring-1 ring-black/5 shadow-inner">
-        <img 
-          src={imageUrl || "/placeholder.png"} 
-          alt={name} 
+        <img
+          src={imageUrl || "/placeholder.png"}
+          alt={name}
           className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
           referrerPolicy="no-referrer"
         />
         <div className="absolute bottom-4 right-4 bg-black/60 text-white text-[11px] font-black px-4 py-1.5 rounded-full backdrop-blur-md shadow-lg border border-white/20">
           {count} CARDS
         </div>
-        
+
         {!imageUrl && (
-           <div className="absolute inset-0 flex items-center justify-center opacity-10">
-             <LayoutGrid size={64} />
-           </div>
+          <div className="absolute inset-0 flex items-center justify-center opacity-10">
+            <LayoutGrid size={64} />
+          </div>
         )}
       </div>
       <div className="px-1 text-center">
@@ -99,7 +99,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
       const matchAlbum = filters.album === 'All' || pc.album === filters.album;
       const matchYear = filters.year === 'All' || pc.year === filters.year;
       const matchStatus = filters.status === 'All' || pc.status === filters.status;
-      const matchSearch = filters.search === '' || 
+      const matchSearch = filters.search === '' ||
         pc.cardName.toLowerCase().includes(filters.search.toLowerCase()) ||
         pc.version.toLowerCase().includes(filters.search.toLowerCase()) ||
         pc.member.toLowerCase().includes(filters.search.toLowerCase()) ||
@@ -140,7 +140,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
   // Grouped data for tiles
   const groupedData = useMemo(() => {
     if (viewMode === 'all' || drilldownValue) return [];
-    
+
     const groups = new Map<string, { count: number, imageUrl?: string }>();
     filteredPhotocards.forEach(pc => {
       const key = (viewMode === 'era' ? pc.era : pc[viewMode as keyof Photocard] as string) || 'Unknown';
@@ -150,7 +150,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
         imageUrl: existing.imageUrl || pc.imageUrl
       });
     });
-    
+
     return Array.from(groups.entries())
       .map(([name, data]) => ({ name, ...data }))
       .sort((a, b) => b.count - a.count);
@@ -165,7 +165,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
   };
 
   const toggleSelect = (id: string) => {
-    setSelectedIds(prev => 
+    setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -214,7 +214,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
               uniqueAlbums={uniqueAlbums as string[]}
               uniqueYears={uniqueYears as string[]}
             />
-            
+
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex bg-white border-gray-100 border-2 p-1 rounded-2xl shadow-sm h-13 items-center overflow-x-auto no-scrollbar max-w-full">
                 <div className="flex gap-1">
@@ -222,9 +222,8 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
                     <button
                       key={m.id}
                       onClick={() => { setViewMode(m.id); setDrilldownValue(null); }}
-                      className={`flex items-center gap-2 px-4 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${
-                        viewMode === m.id ? 'bg-primary text-white shadow-md' : 'text-foreground/40 hover:text-foreground'
-                      }`}
+                      className={`flex items-center gap-2 px-4 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${viewMode === m.id ? 'bg-primary text-white shadow-md' : 'text-foreground/40 hover:text-foreground'
+                        }`}
                     >
                       <m.icon size={14} />
                       <span className="hidden sm:inline">{m.label}</span>
@@ -245,7 +244,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
                       <X size={10} className="stroke-[4px]" />
                     </button>
                   ))}
-                  <button 
+                  <button
                     onClick={() => setFilters({ group: 'All', member: 'All', album: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' })}
                     className="text-[9px] font-black text-foreground/40 uppercase hover:text-red-400 p-2 italic bg-white/30 rounded-xl px-3 border border-white"
                   >
@@ -255,15 +254,14 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
               )}
             </div>
           </div>
-          
+
           <div className="flex gap-2 sm:gap-3 w-full md:w-auto shrink-0 mt-auto pb-[2px]">
             <button
               onClick={toggleSelectMode}
-              className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 h-11 rounded-[14px] text-[10px] md:text-xs font-black uppercase tracking-widest transition-all border-2 ${
-                selectMode 
-                  ? 'bg-secondary text-white border-white/20 shadow-lg shadow-secondary/20' 
+              className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 h-11 rounded-[14px] text-[10px] md:text-xs font-black uppercase tracking-widest transition-all border-2 ${selectMode
+                  ? 'bg-secondary text-white border-white/20 shadow-lg shadow-secondary/20'
                   : 'bg-white text-foreground/40 border-gray-100 shadow-sm hover:text-secondary'
-              }`}
+                }`}
             >
               <CheckSquare className="w-4 h-4 md:w-4.5 md:h-4.5" />
               <span className="hidden xs:inline">{selectMode ? 'Cancel Selection' : 'Select'}</span>
@@ -325,12 +323,12 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
       </div>
 
       {drilldownValue && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           className="flex items-center gap-5 p-2"
         >
-           <button
+          <button
             onClick={() => setDrilldownValue(null)}
             className="p-4 bg-white border-4 border-white shadow-lg rounded-[24px] text-primary hover:rotate-[-10deg] transition-all hover:scale-110 active:scale-90"
           >
@@ -345,11 +343,11 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
           </div>
         </motion.div>
       )}
-      
+
       <div className="min-h-[600px] animate-in fade-in slide-in-from-bottom-4 duration-700">
         <AnimatePresence mode="wait">
           {viewMode !== 'all' && !drilldownValue ? (
-            <motion.div 
+            <motion.div
               key="grouped-view"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -357,24 +355,24 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
               className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6"
             >
               {groupedData.map((group) => (
-                <GroupTile 
-                  key={group.name} 
-                  name={group.name} 
-                  count={group.count} 
-                  imageUrl={group.imageUrl} 
+                <GroupTile
+                  key={group.name}
+                  name={group.name}
+                  count={group.count}
+                  imageUrl={group.imageUrl}
                   onClick={() => setDrilldownValue(group.name)}
                 />
               ))}
               {groupedData.length === 0 && (
-                 <div className="col-span-full py-32 text-center text-foreground/20 font-black uppercase tracking-widest text-sm italic">
+                <div className="col-span-full py-32 text-center text-foreground/20 font-black uppercase tracking-widest text-sm italic">
                   Nothing grouped yet in this dimension
-                 </div>
+                </div>
               )}
             </motion.div>
           ) : processedPhotocards.length > 0 ? (
             <motion.div key="grid-view" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <PhotocardGrid 
-                photocards={processedPhotocards} 
+              <PhotocardGrid
+                photocards={processedPhotocards}
                 onCardClick={handleCardClick}
                 selectMode={selectMode}
                 selectedIds={selectedIds}
@@ -382,7 +380,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
               />
             </motion.div>
           ) : (
-            <motion.div 
+            <motion.div
               key="empty-view"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -390,7 +388,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
             >
               <div className="text-8xl mb-6 grayscale opacity-30 animate-bounce">📔</div>
               <p className="font-black uppercase tracking-[0.3em] text-sm italic">Binder section is currently empty</p>
-              <button 
+              <button
                 onClick={() => { setFilters({ group: 'All', member: 'All', album: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' }); setDrilldownValue(null); }}
                 className="mt-8 px-8 py-4 bg-white text-primary border-2 border-primary/20 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-xl shadow-primary/10"
               >
@@ -403,9 +401,9 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
 
       <AnimatePresence>
         {isAdding && (
-          <PhotocardForm 
-            onSubmit={onAdd} 
-            onClose={handleCloseForm} 
+          <PhotocardForm
+            onSubmit={onAdd}
+            onClose={handleCloseForm}
           />
         )}
         {isBulkEditing && (

@@ -34,7 +34,7 @@ export function StatCard({ label, value, highlightColor, isWishlist }: StatCardP
 
 export function Sidebar({ stats }: { stats: any }) {
   return (
-    <aside className="w-full lg:w-60 flex flex-col gap-4 shrink-0">
+    <aside className="w-full md:w-50 lg:w-60 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-1 gap-4 shrink-0">
       <StatCard
         label="Owned"
         value={stats.totalCollected.toLocaleString()}
