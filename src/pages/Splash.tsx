@@ -87,9 +87,9 @@ export default function Splash({ onGetStarted, onSignIn }: Props) {
             Collect with a little sparkle
           </div>
 
-          <p className="font-heading max-w-lg text-3xl font-black leading-[1.05] tracking-tight text-[#7f4b72] sm:text-[2.75rem]">
+          <h1 className="max-w-lg text-[1.75rem] font-black leading-[1.05] tracking-tight text-[#7f4b72] sm:text-[2.75rem]">
             Keep every photocard memory in one dreamy little binder.
-          </p>
+          </h1>
 
           <p className="mt-4 max-w-md text-base leading-7 text-[#9b6d8b] sm:text-lg">
             Organize your pulls, wishlist the cards you still need, and make your collection feel as cute as the shelves it lives on.
