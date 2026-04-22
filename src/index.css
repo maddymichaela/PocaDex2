@@ -88,7 +88,7 @@ h6 {
 
   .btn-primary-pink:hover {
     transform: scale(1.01);
-    box-shadow: 0 24px 52px rgba(243, 110, 181, 0.32);
+    box-shadow: 0 0px 52px rgba(243, 110, 181, 0.32);
     filter: saturate(1.03);
   }
 
