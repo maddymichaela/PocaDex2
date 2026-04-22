@@ -68,118 +68,51 @@ export default function Splash({ onGetStarted, onSignIn }: Props) {
         ].map((position, index) => (
           <div
             key={position}
-            className={`absolute ${position} h-2.5 w-2.5 rounded-full bg-white/95 shadow-[0_0_18px_rgba(255,255,255,0.95)] ${
-              index % 2 === 0 ? 'animate-pulse' : ''
-            }`}
+            className={`absolute ${position} h-2.5 w-2.5 rounded-full bg-white/95 shadow-[0_0_18px_rgba(255,255,255,0.95)] ${index % 2 === 0 ? 'animate-pulse' : ''
+              }`}
           />
         ))}
       </div>
 
       <div className="relative z-10 flex min-h-screen items-center justify-center px-5 py-10 sm:px-8">
-        <div className="grid w-full max-w-6xl items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
-          <div className="mx-auto flex w-full max-w-xl flex-col items-center text-center lg:items-start lg:text-left">
-            <img
-              src="/pocadex.png"
-              alt="PocaDex"
-              className="mb-5 h-auto w-[min(100%,26rem)] drop-shadow-[0_18px_30px_rgba(245,130,195,0.24)]"
-            />
+        <div className="mx-auto flex w-full max-w-xl flex-col items-center text-center">
+          <img
+            src="/pocadex.png"
+            alt="PocaDex"
+            className="mb-5 h-auto w-[min(100%,26rem)] drop-shadow-[0_18px_30px_rgba(245,130,195,0.24)]"
+          />
 
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#f5c6dd] bg-white/85 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-[#d85ea5] shadow-[0_12px_30px_rgba(255,182,217,0.16)] backdrop-blur-sm">
-              <Sparkles size={14} strokeWidth={2.2} />
-              Collect with a little sparkle
-            </div>
-
-            <p className="max-w-lg text-3xl font-black leading-[1.05] tracking-tight text-[#7f4b72] sm:text-[2.75rem]">
-              Keep every photocard memory in one dreamy little binder.
-            </p>
-
-            <p className="mt-4 max-w-md text-base leading-7 text-[#9b6d8b] sm:text-lg">
-              Organize your pulls, wishlist the cards you still need, and make your collection feel as cute as the shelves it lives on.
-            </p>
-
-            <div className="mt-8 flex w-full max-w-md flex-col gap-3">
-              <button
-                onClick={onGetStarted}
-                className="w-full rounded-[1.65rem] border border-[#ef8fc3] bg-[linear-gradient(180deg,#ff9fd4_0%,#f36eb5_100%)] px-6 py-4 text-base font-black tracking-[0.08em] text-white shadow-[0_20px_45px_rgba(243,110,181,0.28)] transition-transform hover:scale-[1.01] active:scale-[0.985]"
-              >
-                Start Your Binder
-              </button>
-              <button
-                onClick={onSignIn}
-                className="w-full rounded-[1.65rem] border border-[#f4d8e8] bg-white/85 px-6 py-4 text-sm font-bold tracking-[0.06em] text-[#b85d92] shadow-[0_14px_30px_rgba(227,173,203,0.12)] backdrop-blur-sm transition-all hover:border-[#efb6d6] hover:bg-white"
-              >
-                I already have an account
-              </button>
-            </div>
-
-            <p className="mt-6 text-xs font-semibold uppercase tracking-[0.26em] text-[#c690b2]">
-              Track · Wishlist · Collect
-            </p>
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#f5c6dd] bg-white/85 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-[#d85ea5] shadow-[0_12px_30px_rgba(255,182,217,0.16)] backdrop-blur-sm">
+            <Sparkles size={14} strokeWidth={2.2} />
+            Collect with a little sparkle
           </div>
 
-          <div className="relative mx-auto flex w-full max-w-md items-center justify-center">
-            <div
-              className="absolute inset-auto h-[23rem] w-[23rem] rounded-full blur-3xl"
-              style={{
-                background:
-                  'conic-gradient(from 180deg, rgba(255,198,226,0.7), rgba(204,224,255,0.75), rgba(198,244,226,0.72), rgba(232,205,255,0.75), rgba(255,198,226,0.7))',
-              }}
-            />
+          <p className="max-w-lg text-3xl font-black leading-[1.05] tracking-tight text-[#7f4b72] sm:text-[2.75rem]">
+            Keep every photocard memory in one dreamy little binder.
+          </p>
 
-            <div className="relative w-full rounded-[2.25rem] border border-white/80 bg-white/70 p-4 shadow-[0_28px_70px_rgba(222,171,202,0.26)] backdrop-blur-xl sm:p-5">
-              <div className="absolute -left-4 top-9 h-18 w-18 rounded-full bg-white/70 blur-xl" />
-              <div className="absolute -right-4 bottom-10 h-20 w-20 rounded-full bg-[#ffd9ef]/55 blur-2xl" />
+          <p className="mt-4 max-w-md text-base leading-7 text-[#9b6d8b] sm:text-lg">
+            Organize your pulls, wishlist the cards you still need, and make your collection feel as cute as the shelves it lives on.
+          </p>
 
-              <div
-                className="rounded-[2rem] border border-[#ffd6ea] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92)] sm:p-4"
-                style={{
-                  background:
-                    'linear-gradient(145deg, rgba(245,219,255,0.9) 0%, rgba(212,232,255,0.9) 35%, rgba(220,248,235,0.88) 68%, rgba(255,226,239,0.92) 100%)',
-                }}
-              >
-                <div className="rounded-[1.7rem] border border-white/70 bg-white/45 p-3 backdrop-blur-md">
-                  <div className="mb-3 flex items-center justify-between">
-                    <span className="rounded-full bg-white/75 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-[#cf68a8] shadow-sm">
-                      My Collection
-                    </span>
-                    <Sparkles size={18} className="text-[#ee88c1]" strokeWidth={2.1} />
-                  </div>
-
-                  <div className="relative overflow-hidden rounded-[1.45rem] border-[3px] border-white/80 bg-white shadow-[0_18px_35px_rgba(213,160,197,0.24)]">
-                    <img
-                      src="/placeholder.png"
-                      alt="Photocard preview"
-                      className="aspect-[3/4] w-full object-cover"
-                    />
-                    <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,transparent_0%,rgba(255,255,255,0.92)_55%,rgba(255,255,255,0.98)_100%)] px-4 pb-4 pt-12">
-                      <div className="rounded-[1.1rem] border border-[#f5d2e4] bg-white/85 px-4 py-3 shadow-lg backdrop-blur-sm">
-                        <p className="text-xs font-black uppercase tracking-[0.22em] text-[#d56eaa]">
-                          Favorite Pull
-                        </p>
-                        <p className="mt-1 text-lg font-black text-[#7f4b72]">
-                          White-back binder vibes
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#d390b5]">
-                        Pocket-ready
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-[#8f5f7e]">
-                        Soft pink, glossy, and collector-coded.
-                      </p>
-                    </div>
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] border border-white/80 bg-white/80 text-[#e96fb2] shadow-md">
-                      <Heart size={20} fill="currentColor" strokeWidth={1.8} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div className="mt-8 flex w-full max-w-md flex-col gap-3">
+            <button
+              onClick={onGetStarted}
+              className="w-full rounded-[1.65rem] border border-[#ef8fc3] bg-[linear-gradient(180deg,#ff9fd4_0%,#f36eb5_100%)] px-6 py-4 text-base font-black tracking-[0.08em] text-white shadow-[0_20px_45px_rgba(243,110,181,0.28)] transition-transform hover:scale-[1.01] active:scale-[0.985]"
+            >
+              Start Your Binder
+            </button>
+            <button
+              onClick={onSignIn}
+              className="w-full rounded-[1.65rem] border border-[#f4d8e8] bg-white/85 px-6 py-4 text-sm font-bold tracking-[0.06em] text-[#b85d92] shadow-[0_14px_30px_rgba(227,173,203,0.12)] backdrop-blur-sm transition-all hover:border-[#efb6d6] hover:bg-white"
+            >
+              I already have an account
+            </button>
           </div>
+
+          <p className="mt-6 text-xs font-semibold uppercase tracking-[0.26em] text-[#c690b2]">
+            Track · Wishlist · Collect
+          </p>
         </div>
       </div>
     </div>
