@@ -98,7 +98,7 @@ export function PhotocardCard({
         <img
           src={photocard.imageUrl || "/placeholder.png"}
           alt={photocard.cardName}
-          className={`w-full h-full object-cover transition-transform duration-700 ${!selectMode && 'group-hover:scale-110'} ${!photocard.imageUrl ? 'opacity-90 brightness-50' : ''}`}
+          className={`w-full h-full object-cover transition-transform duration-700 ${!selectMode && 'group-hover:scale-110'} ${!photocard.imageUrl ? 'opacity-90 brightness-150' : ''}`}
           referrerPolicy="no-referrer"
         />
 
@@ -175,7 +175,7 @@ export function PhotocardGrid({
         ? 'grid-cols-1 sm:grid-cols-2'
         : layout === 'four-up'
           ? 'grid-cols-2 lg:grid-cols-4'
-        : 'grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
+          : 'grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
         }`}
       style={gridStyle}
     >

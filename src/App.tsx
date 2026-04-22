@@ -209,7 +209,14 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen flex flex-col lg:flex-row overflow-hidden">
+    <div className="relative h-screen flex flex-col lg:flex-row overflow-hidden bg-white">
+      <div className="pointer-events-none absolute inset-0 app-shell-bg" />
+      <div className="pointer-events-none absolute inset-0 app-shell-dots opacity-60" />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-20 left-[8%] h-48 w-48 rounded-full bg-white/55 blur-3xl" />
+        <div className="absolute top-[10%] right-[-3rem] h-44 w-44 rounded-full bg-white/65 blur-3xl" />
+        <div className="absolute bottom-[-5rem] left-[-2rem] h-56 w-56 rounded-full bg-white/60 blur-3xl" />
+      </div>
       <Navbar
         currentPage={currentPage}
         onPageChange={(page) => { setCurrentPage(page); setSelectedId(null); }}
@@ -217,7 +224,7 @@ export default function App() {
         onSignOut={signOut}
         onAddCard={handleAddCard}
       />
-      <main className="flex-1 overflow-auto overflow-x-hidden">
+      <main className="relative z-10 flex-1 overflow-auto overflow-x-hidden">
         <div className="px-4 py-5 lg:p-8 max-w-6xl mx-auto w-full">
           {dataLoading ? (
             <div className="flex items-center justify-center h-64">

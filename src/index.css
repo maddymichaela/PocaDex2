@@ -74,6 +74,20 @@ h6 {
     background-size: 26px 26px;
   }
 
+  .app-shell-bg {
+    background:
+      radial-gradient(circle at 14% 18%, rgba(255, 212, 231, 0.6), transparent 24%),
+      radial-gradient(circle at 86% 16%, rgba(198, 231, 255, 0.52), transparent 24%),
+      radial-gradient(circle at 78% 78%, rgba(204, 241, 226, 0.48), transparent 22%),
+      radial-gradient(circle at 18% 84%, rgba(236, 215, 255, 0.5), transparent 24%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 250, 253, 0.96));
+  }
+
+  .app-shell-dots {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.82) 1.2px, transparent 1.2px);
+    background-size: 28px 28px;
+  }
+
   .btn-primary-pink {
     border: 1px solid #ef8fc3;
     background: linear-gradient(180deg, #ff9fd4 0%, #f36eb5 100%);
