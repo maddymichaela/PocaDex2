@@ -67,6 +67,33 @@ function Field({ label, value, onChange, placeholder }: {
   );
 }
 
+// ── Bulk field (apply one value to all selected cards) ─────────────────────
+
+function BulkField({ label, placeholder, onApply }: {
+  label: string; placeholder?: string; onApply: (v: string) => void;
+}) {
+  const [val, setVal] = useState('');
+  return (
+    <div className="flex items-end gap-1">
+      <div>
+        <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">{label}</label>
+        <input
+          value={val}
+          onChange={e => setVal(e.target.value)}
+          placeholder={placeholder ?? label}
+          className="w-24 px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-medium text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-primary/40"
+        />
+      </div>
+      <button
+        onClick={() => { if (val.trim()) { onApply(val.trim()); setVal(''); } }}
+        className="px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-[10px] font-black uppercase tracking-tight hover:bg-primary hover:text-white transition-all"
+      >
+        Fill
+      </button>
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 
 export default function Scan({ onDone }: { onDone: () => void }) {
@@ -421,25 +448,39 @@ export default function Scan({ onDone }: { onDone: () => void }) {
       {step === 'review' && (
         <div className="space-y-5">
           {/* Controls */}
-          <div className="glass-card rounded-2xl px-5 py-4 border border-white/60 flex flex-wrap items-center gap-4">
-            <button onClick={toggleAll} className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-foreground/50 hover:text-foreground transition-colors">
-              {cards.every(c => c.selected) ? <CheckSquare size={14} className="text-primary" /> : <Square size={14} />}
-              {cards.every(c => c.selected) ? 'Deselect all' : 'Select all'}
-            </button>
+          <div className="glass-card rounded-2xl px-5 py-4 border border-white/60 space-y-3">
+            <div className="flex flex-wrap items-center gap-4">
+              <button onClick={toggleAll} className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-foreground/50 hover:text-foreground transition-colors">
+                {cards.every(c => c.selected) ? <CheckSquare size={14} className="text-primary" /> : <Square size={14} />}
+                {cards.every(c => c.selected) ? 'Deselect all' : 'Select all'}
+              </button>
 
-            <div className="flex items-center gap-2 ml-auto">
-              <span className="text-xs font-black uppercase tracking-widest text-foreground/40">Status:</span>
-              <select value={globalStatus} onChange={e => setGlobalStatus(e.target.value as Status)}
-                className="appearance-none px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-bold text-foreground focus:outline-none focus:border-primary/50 cursor-pointer">
-                <option value="owned">Owned</option>
-                <option value="wishlist">Wishlist</option>
-                <option value="on_the_way">On the way</option>
-              </select>
+              <div className="flex items-center gap-2 ml-auto">
+                <span className="text-xs font-black uppercase tracking-widest text-foreground/40">Status:</span>
+                <select value={globalStatus} onChange={e => setGlobalStatus(e.target.value as Status)}
+                  className="appearance-none px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-bold text-foreground focus:outline-none focus:border-primary/50 cursor-pointer">
+                  <option value="owned">Owned</option>
+                  <option value="wishlist">Wishlist</option>
+                  <option value="on_the_way">On the way</option>
+                </select>
+              </div>
+
+              <span className="text-xs font-bold text-foreground/40">
+                {selectedCards.length} / {cards.length} selected
+              </span>
             </div>
 
-            <span className="text-xs font-bold text-foreground/40">
-              {selectedCards.length} / {cards.length} selected
-            </span>
+            {/* Bulk fill row */}
+            <div className="border-t border-gray-100 pt-3">
+              <p className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-2">Fill selected cards:</p>
+              <div className="flex flex-wrap gap-3">
+                <BulkField label="Group" placeholder="e.g. aespa" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, group: v } : c))} />
+                <BulkField label="Member" placeholder="e.g. Karina" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, member: v } : c))} />
+                <BulkField label="Album/Era" placeholder="e.g. Drama" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, album: v, era: v } : c))} />
+                <BulkField label="Version" placeholder="e.g. A ver." onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, version: v } : c))} />
+                <BulkField label="Year" placeholder="e.g. 2024" onApply={v => { const y = parseInt(v); if (!isNaN(y)) setCards(prev => prev.map(c => c.selected ? { ...c, year: y } : c)); }} />
+              </div>
+            </div>
           </div>
 
           {/* Card grid */}
