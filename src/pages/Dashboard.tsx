@@ -39,10 +39,10 @@ export default function Dashboard({ photocards, onEdit, onDelete, onImport }: Da
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-8 w-full">
+    <div className="flex flex-col gap-8 w-full">
       <Sidebar stats={stats} />
 
-      <div className="flex-1 flex flex-col gap-8">
+      <div className="flex flex-col gap-8">
         <div>
           <h2 className="text-2xl font-bold text-foreground mb-6 tracking-tight">Recently Added</h2>
           <PhotocardGrid
