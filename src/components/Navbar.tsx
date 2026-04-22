@@ -1,11 +1,6 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Menu, X as CloseIcon, LogOut, User } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { LayoutGrid, BookOpen, ScanLine, Users, Plus, LogOut, ChevronUp } from 'lucide-react';
 import { Profile } from '../types';
 
 interface NavbarProps {
@@ -13,148 +8,193 @@ interface NavbarProps {
   onPageChange: (page: string) => void;
   profile?: Profile | null;
   onSignOut?: () => void;
+  onAddCard?: () => void;
 }
 
-export default function Navbar({ currentPage, onPageChange, profile, onSignOut }: NavbarProps) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const profileRef = useRef<HTMLDivElement>(null);
-  const links = ['Dashboard', 'Collection', 'Scan', 'Groups'];
+const NAV_ITEMS = [
+  { id: 'Dashboard', label: 'Dashboard', icon: LayoutGrid },
+  { id: 'Collection', label: 'My Binder', icon: BookOpen },
+  { id: 'Scan', label: 'Scan', icon: ScanLine },
+  { id: 'Groups', label: 'Groups', icon: Users },
+] as const;
+
+export default function Navbar({ currentPage, onPageChange, profile, onSignOut, onAddCard }: NavbarProps) {
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const desktopMenuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
-        setIsProfileOpen(false);
-      }
+    function handleClickOutside(e: MouseEvent) {
+      const t = e.target as Node;
+      const inDesktop = desktopMenuRef.current?.contains(t);
+      const inMobile = mobileMenuRef.current?.contains(t);
+      if (!inDesktop && !inMobile) setShowUserMenu(false);
     }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleNav = (page: string) => {
-    onPageChange(page);
-    setIsMenuOpen(false);
-  };
+  const displayName = profile?.nickname || profile?.username || 'You';
+  const avatarLetter = displayName.charAt(0).toUpperCase();
+
+  const renderAvatar = (className: string) =>
+    profile?.avatar_url ? (
+      <img src={profile.avatar_url} alt="Avatar" className={`object-cover ${className}`} />
+    ) : (
+      <div className={`bg-primary/15 flex items-center justify-center text-primary font-black text-sm ${className}`}>
+        {avatarLetter}
+      </div>
+    );
+
+  const signOutButton = (
+    <button
+      onClick={onSignOut}
+      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 text-sm font-semibold text-red-500 transition-colors"
+    >
+      <LogOut size={15} /> Sign out
+    </button>
+  );
 
   return (
-    <nav className="h-16 md:h-20 bg-white border-b border-gray-100 shadow-sm flex items-center px-4 md:px-10 justify-between sticky top-0 z-[60] font-sans">
-      <div 
-        className="cursor-pointer flex items-center shrink-0"
-        onClick={() => handleNav('Dashboard')}
-      >
-        <img 
-          src="/pocadex.png" 
-          alt="Pocadex" 
-          className="h-8 md:h-12 w-auto object-contain"
-          referrerPolicy="no-referrer"
-        />
-      </div>
-      
-      {/* Desktop Navigation */}
-      <div className="hidden md:flex flex-1 justify-center px-4">
-        <div className="flex items-center gap-1 bg-gray-50 p-1.5 rounded-full border-2 border-white shadow-inner">
-          {links.map((link) => (
-            <button
-              key={link}
-              onClick={() => onPageChange(link)}
-              className={`text-[11px] uppercase tracking-widest font-black px-6 py-2.5 rounded-full transition-all relative shrink-0 ${
-                currentPage === link ? 'text-white' : 'text-foreground/40 hover:text-foreground'
-              }`}
-            >
-              <span className="relative z-10">{link}</span>
-              {currentPage === link && (
-                <motion.div
-                  layoutId="nav-pill"
-                  className="absolute inset-0 bg-primary rounded-full shadow-lg shadow-primary/20"
-                  transition={{ 
-                    type: 'spring', 
-                    bounce: 0.1, 
-                    duration: 0.4,
-                  }}
-                />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
+    <>
+      {/* ── Desktop / iPad landscape sidebar ── */}
+      <aside className="hidden lg:flex flex-col w-60 shrink-0 h-screen sticky top-0 bg-white/80 backdrop-blur-xl border-r border-gray-100 shadow-sm">
 
-      <div className="flex items-center gap-2 sm:gap-4">
-        {/* Profile avatar + dropdown */}
-        <div className="relative" ref={profileRef}>
-          <button
-            onClick={() => setIsProfileOpen(v => !v)}
-            className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-accent border-2 border-white shadow-sm overflow-hidden shrink-0 flex items-center justify-center text-[10px] md:text-xs font-black text-primary hover:ring-2 hover:ring-primary/40 transition-all"
-          >
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <span>{(profile?.nickname ?? profile?.username ?? 'Me').charAt(0).toUpperCase()}</span>
-            )}
-          </button>
-          <AnimatePresence>
-            {isProfileOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: -8, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                transition={{ duration: 0.15 }}
-                className="absolute right-0 top-12 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50"
-              >
-                <div className="px-4 py-3 border-b border-gray-50">
-                  <p className="font-black text-sm text-foreground truncate">{profile?.nickname ?? profile?.username ?? 'My Account'}</p>
-                  <p className="text-xs text-foreground/40 font-medium truncate">@{profile?.username}</p>
-                </div>
-                <button
-                  onClick={() => { setIsProfileOpen(false); onPageChange('Profile'); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-foreground/60 hover:bg-gray-50 hover:text-foreground transition-colors"
-                >
-                  <User size={14} /> My Profile
-                </button>
-                {onSignOut && (
-                  <button
-                    onClick={() => { setIsProfileOpen(false); onSignOut(); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                  >
-                    <LogOut size={14} /> Sign Out
-                  </button>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Burger Menu Button */}
-        <button
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="md:hidden p-2 text-foreground/40 hover:text-primary transition-colors"
+        {/* Logo */}
+        <div
+          className="px-5 pt-6 pb-3 shrink-0 cursor-pointer"
+          onClick={() => onPageChange('Dashboard')}
         >
-          {isMenuOpen ? <CloseIcon size={24} /> : <Menu size={24} />}
-        </button>
-      </div>
+          <img src="/pocadex.png" alt="PocaDex" className="w-full h-auto" />
+        </div>
 
-      {/* Mobile Menu Overlay */}
-      <AnimatePresence>
-        {isMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="absolute top-[64px] left-0 w-full bg-white border-b border-gray-100 shadow-xl md:hidden z-50 p-6 space-y-4"
-          >
-            {links.map((link) => (
+        {/* Nav items */}
+        <nav className="flex-1 px-3 py-2 flex flex-col gap-0.5 overflow-y-auto min-h-0">
+          {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+            const active = currentPage === id;
+            return (
               <button
-                key={link}
-                onClick={() => handleNav(link)}
-                className={`w-full py-4 px-6 rounded-2xl text-sm font-black uppercase tracking-widest transition-all text-left ${
-                  currentPage === link ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-gray-50 text-foreground/40'
+                key={id}
+                onClick={() => onPageChange(id)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 w-full text-left group ${
+                  active
+                    ? 'bg-primary text-white shadow-md shadow-primary/20'
+                    : 'text-foreground/60 hover:bg-primary/10 hover:text-primary'
                 }`}
               >
-                {link}
+                <Icon
+                  size={17}
+                  className={active ? '' : 'group-hover:-rotate-6 transition-transform duration-200'}
+                />
+                {label}
               </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </nav>
+            );
+          })}
+        </nav>
+
+        {/* Bottom: Add button + profile */}
+        <div className="p-4 shrink-0 border-t border-gray-100 space-y-2">
+          <button
+            onClick={onAddCard}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary/10 hover:bg-primary/20 text-primary font-bold text-sm border border-primary/20 hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200"
+          >
+            <Plus size={17} />
+            Add New Card
+          </button>
+
+          <div className="relative" ref={desktopMenuRef}>
+            <button
+              onClick={() => setShowUserMenu(v => !v)}
+              className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-gray-50 transition-colors"
+            >
+              <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0">
+                {renderAvatar('w-9 h-9 rounded-xl')}
+              </div>
+              <div className="flex-1 text-left min-w-0">
+                <p className="text-sm font-semibold text-foreground truncate">{displayName}</p>
+                {profile?.username && (
+                  <p className="text-xs text-foreground/40 truncate">@{profile.username}</p>
+                )}
+              </div>
+              <ChevronUp
+                size={14}
+                className={`text-foreground/30 shrink-0 transition-transform duration-200 ${showUserMenu ? '' : 'rotate-180'}`}
+              />
+            </button>
+
+            <AnimatePresence>
+              {showUserMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 6 }}
+                  className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-gray-100 rounded-2xl shadow-xl overflow-hidden z-50"
+                >
+                  {signOutButton}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </aside>
+
+      {/* ── Mobile / tablet portrait top bar ── */}
+      <div className="lg:hidden sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-100 shadow-sm">
+        <div className="flex items-center justify-between px-4 py-2">
+          <img
+            src="/pocadex.png"
+            alt="PocaDex"
+            className="h-12 w-auto cursor-pointer"
+            onClick={() => onPageChange('Dashboard')}
+          />
+          <div className="relative" ref={mobileMenuRef}>
+            <button
+              onClick={() => setShowUserMenu(v => !v)}
+              className="w-10 h-10 rounded-2xl overflow-hidden border-2 border-gray-100 hover:border-primary/40 transition-colors"
+            >
+              {renderAvatar('w-10 h-10 rounded-2xl')}
+            </button>
+            <AnimatePresence>
+              {showUserMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-100 rounded-2xl shadow-xl overflow-hidden z-50"
+                >
+                  {signOutButton}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* Horizontal scrolling nav */}
+        <nav className="flex gap-1 px-3 pb-2 overflow-x-auto no-scrollbar">
+          {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+            const active = currentPage === id;
+            return (
+              <button
+                key={id}
+                onClick={() => onPageChange(id)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all shrink-0 ${
+                  active ? 'bg-primary text-white shadow-sm' : 'text-foreground/50 hover:text-primary'
+                }`}
+              >
+                <Icon size={13} />
+                {label}
+              </button>
+            );
+          })}
+          <button
+            onClick={onAddCard}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-bold whitespace-nowrap bg-primary/10 text-primary hover:bg-primary/20 transition-all shrink-0 ml-2"
+          >
+            <Plus size={13} />
+            Add
+          </button>
+        </nav>
+      </div>
+    </>
   );
 }

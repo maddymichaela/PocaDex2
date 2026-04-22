@@ -27,6 +27,13 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [photocards, setPhotocards] = useState<Photocard[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
+  const [addTrigger, setAddTrigger] = useState(0);
+
+  const handleAddCard = useCallback(() => {
+    setCurrentPage('Collection');
+    setSelectedId(null);
+    setAddTrigger(prev => prev + 1);
+  }, []);
 
   // Handle /auth/callback route
   if (window.location.pathname === '/auth/callback') return <AuthCallback />;
@@ -155,6 +162,7 @@ export default function App() {
             onDelete={handleDeletePhotocard}
             onBulkUpdate={handleBulkUpdatePartial}
             onCardClick={(pc) => setSelectedId(pc.id)}
+            triggerAdd={addTrigger}
           />
         );
       case 'Groups': {
@@ -201,32 +209,26 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="h-screen flex flex-col lg:flex-row overflow-hidden">
       <Navbar
         currentPage={currentPage}
-        onPageChange={setCurrentPage}
+        onPageChange={(page) => { setCurrentPage(page); setSelectedId(null); }}
         profile={profile}
         onSignOut={signOut}
+        onAddCard={handleAddCard}
       />
-      <main className="flex-1 px-10 py-8 max-w-7xl mx-auto w-full">
-        {dataLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-              <p className="text-xs font-black uppercase tracking-widest text-foreground/40">Loading your collection…</p>
+      <main className="flex-1 overflow-auto overflow-x-hidden">
+        <div className="px-4 py-5 lg:p-8 max-w-6xl mx-auto w-full">
+          {dataLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+                <p className="text-xs font-black uppercase tracking-widest text-foreground/40">Loading your collection…</p>
+              </div>
             </div>
-          </div>
-        ) : renderPage()}
-      </main>
-      <footer className="py-8 px-10 border-t border-gray-100 mt-auto">
-        <div className="flex justify-between items-center max-w-7xl mx-auto w-full text-[10px] font-bold uppercase tracking-wider text-gray-400">
-          <div>© 2026 PocaDex. All Rights Reserved.</div>
-          <div className="flex gap-6">
-            <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-primary transition-colors">Terms of Service</a>
-          </div>
+          ) : renderPage()}
         </div>
-      </footer>
+      </main>
     </div>
   );
 }
