@@ -61,7 +61,7 @@ export default function BackupControls({ photocards, onImport }: BackupControlsP
   return (
     <div className="space-y-4">
       <div className="glass-card p-8 rounded-[32px] border-2 border-white shadow-sm relative overflow-hidden">
-        <h3 className="text-sm font-black text-foreground mb-6 uppercase tracking-widest opacity-60">Backup & Restore</h3>
+        <h3 className="text-sm font-bold text-foreground mb-6 tracking-tight opacity-60">Backup & Restore</h3>
         
         <div className="flex gap-4">
           <button
@@ -126,7 +126,7 @@ export default function BackupControls({ photocards, onImport }: BackupControlsP
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-2xl font-black italic tracking-tight text-foreground uppercase">Import Collection</h3>
+                <h3 className="text-2xl font-bold tracking-tight text-foreground">Import Collection</h3>
                 <p className="text-sm text-foreground/50 font-medium">
                   We found <span className="text-primary font-black">{importPendingData?.length}</span> photocards. How should we process them?
                 </p>

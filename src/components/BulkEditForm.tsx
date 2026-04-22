@@ -88,7 +88,7 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
       >
         <div className="p-8 border-b border-gray-100 flex justify-between items-center shrink-0">
           <div className="space-y-1">
-            <h2 className="text-2xl font-black text-foreground uppercase tracking-tight italic flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-3">
               <Layers className="text-primary" size={28} />
               Bulk Edit
             </h2>

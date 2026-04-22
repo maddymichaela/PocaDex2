@@ -78,7 +78,7 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = 1 /
               <Sparkles className="animate-pulse w-4.5 h-4.5 md:w-5.5 md:h-5.5" />
             </div>
             <div className="space-y-0.5">
-              <h3 className="font-black text-lg md:text-2xl text-foreground uppercase tracking-tight italic leading-none">Studio Editor</h3>
+              <h3 className="text-lg md:text-2xl font-bold text-foreground tracking-tight leading-none">Studio Editor</h3>
               <p className="hidden md:block text-[9px] font-bold text-foreground/30 uppercase tracking-widest">Adjust & Crop Card Memory</p>
             </div>
           </div>

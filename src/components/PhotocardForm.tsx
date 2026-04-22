@@ -115,7 +115,7 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
             <Trash size={32} />
           </div>
           <div className="space-y-3">
-            <h3 className="text-2xl font-black italic tracking-tight text-foreground uppercase">Delete Photocard?</h3>
+            <h3 className="text-2xl font-bold tracking-tight text-foreground">Delete Photocard?</h3>
             <p className="text-sm text-foreground/60 font-medium">This action cannot be undone. Are you sure you want to remove this card from your precious collection?</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4">
@@ -154,7 +154,7 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
       >
         <div className="flex justify-between items-center px-6 md:px-10 py-5 md:py-6 border-b border-gray-100 bg-white sticky top-0 z-30 font-sans">
           <div className="space-y-1">
-            <h2 className="text-xl md:text-2xl font-black text-foreground uppercase tracking-tight italic leading-tight">
+            <h2 className="text-xl md:text-2xl font-bold text-foreground tracking-tight leading-tight">
               {isEditing ? 'Edit Card' : 'New Photocard'}
             </h2>
             <div className="flex items-center gap-2">

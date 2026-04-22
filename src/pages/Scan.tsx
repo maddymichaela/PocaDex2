@@ -310,7 +310,7 @@ export default function Scan({ onDone }: { onDone: () => void }) {
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-black text-foreground uppercase tracking-tighter italic">Scan Template</h2>
+          <h2 className="text-3xl font-bold text-foreground tracking-tight">Scan Template</h2>
           <p className="text-sm text-foreground/40 font-medium mt-1">Upload a fan template to auto-splice and import photocards</p>
         </div>
         {step !== 'upload' && step !== 'done' && (
@@ -555,7 +555,7 @@ export default function Scan({ onDone }: { onDone: () => void }) {
             <CheckCircle2 size={36} className="text-green-500" />
           </div>
           <div>
-            <p className="font-heading text-2xl font-black text-foreground uppercase tracking-tighter italic">All done!</p>
+            <p className="font-heading text-2xl font-bold text-foreground tracking-tight">All done!</p>
             <p className="text-sm text-foreground/50 font-medium mt-2">
               Added <span className="font-black text-foreground">{savedCount}</span> photocard{savedCount !== 1 ? 's' : ''} to your collection.
             </p>

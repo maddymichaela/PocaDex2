@@ -131,7 +131,7 @@ export function PhotocardCard({
             </span>
           )}
           <div className="flex justify-between items-start">
-            <h3 className="font-black text-lg text-foreground tracking-tight leading-none truncate">{photocard.member}</h3>
+            <h3 className="text-lg font-bold text-foreground tracking-tight leading-none truncate">{photocard.member}</h3>
             <span className="text-[10px] font-black text-foreground/40 mt-1">{photocard.year}</span>
           </div>
         </div>

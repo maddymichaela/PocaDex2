@@ -57,7 +57,7 @@ function GroupTile({ name, count, imageUrl, onClick }: GroupTileProps) {
         )}
       </div>
       <div className="px-1 text-center">
-        <h3 className="font-black text-xl text-foreground truncate uppercase tracking-tighter italic leading-none">{name}</h3>
+        <h3 className="text-xl font-bold text-foreground truncate tracking-tight leading-none">{name}</h3>
       </div>
     </motion.div>
   );
@@ -337,7 +337,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
             <ChevronLeft size={24} className="stroke-[3px]" />
           </button>
           <div className="space-y-1">
-            <h2 className="text-4xl font-black text-foreground uppercase tracking-tighter italic leading-none">{drilldownValue}</h2>
+            <h2 className="text-4xl font-bold text-foreground tracking-tight leading-none">{drilldownValue}</h2>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
               <p className="text-[11px] font-black text-foreground/40 uppercase tracking-widest">{processedPhotocards.length} Items Found</p>

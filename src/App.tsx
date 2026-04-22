@@ -174,7 +174,7 @@ export default function App() {
         const groupStats = Object.entries(groupCounts).sort((a, b) => (b[1] as number) - (a[1] as number));
         return (
           <div className="space-y-8 animate-in fade-in duration-500">
-            <h2 className="text-3xl font-black text-foreground uppercase tracking-tighter italic">Groups Binder</h2>
+            <h2 className="text-3xl font-bold text-foreground tracking-tight">Groups Binder</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {groupStats.map(([name, count]) => (
                 <motion.div key={name} whileHover={{ y: -8, scale: 1.02 }}
@@ -184,7 +184,7 @@ export default function App() {
                     {name.charAt(0)}
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-foreground uppercase tracking-tight leading-none mb-1">{name}</h3>
+                    <h3 className="text-xl font-bold text-foreground tracking-tight leading-none mb-1">{name}</h3>
                     <p className="text-xs font-black text-foreground/40 uppercase tracking-widest">{count} Photocards</p>
                   </div>
                 </motion.div>

@@ -153,7 +153,7 @@ export default function CardDetail({ photocard, onUpdate, onDelete, onBack }: Ca
 
               {!previewUrl && (
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-                  <span className="font-heading text-2xl font-black italic uppercase tracking-tighter text-primary/30">No Photo Yet</span>
+                  <span className="font-heading text-2xl font-bold tracking-tight text-primary/30">No Photo Yet</span>
                 </div>
               )}
 
@@ -217,7 +217,7 @@ export default function CardDetail({ photocard, onUpdate, onDelete, onBack }: Ca
                     <span className="w-1.5 h-1.5 bg-primary/20 rounded-full" />
                     {year}
                   </div>
-                  <h1 className="text-5xl md:text-5xl font-black text-foreground uppercase tracking-tight leading-none">{member}</h1>
+                  <h1 className="text-5xl md:text-5xl font-bold text-foreground tracking-tight leading-none">{member}</h1>
                   <div className="h-1.5 w-24 bg-primary rounded-full mt-4" />
                 </div>
               )}
@@ -299,7 +299,7 @@ export default function CardDetail({ photocard, onUpdate, onDelete, onBack }: Ca
                       placeholder="Album Title"
                     />
                   ) : (
-                    <p className="font-heading text-xl font-black text-foreground uppercase italic">{album}</p>
+                    <p className="font-heading text-xl font-bold text-foreground tracking-tight">{album}</p>
                   )}
                 </div>
 
@@ -316,7 +316,7 @@ export default function CardDetail({ photocard, onUpdate, onDelete, onBack }: Ca
                       placeholder="e.g. Backdoor"
                     />
                   ) : (
-                    <p className="font-heading text-xl font-black text-foreground uppercase italic">{era || "Backdoor"}</p>
+                    <p className="font-heading text-xl font-bold text-foreground tracking-tight">{era || "Backdoor"}</p>
                   )}
                 </div>
               </div>
@@ -345,7 +345,7 @@ export default function CardDetail({ photocard, onUpdate, onDelete, onBack }: Ca
                     </div>
                   ) : (
                     <div className="space-y-1">
-                      <p className="font-heading text-lg font-black text-foreground uppercase leading-none">{cardName}</p>
+                      <p className="font-heading text-lg font-bold text-foreground tracking-tight leading-none">{cardName}</p>
                       {version && <p className="text-sm font-black text-primary uppercase tracking-wider">{version}</p>}
                     </div>
                   )}
@@ -388,7 +388,7 @@ export default function CardDetail({ photocard, onUpdate, onDelete, onBack }: Ca
                 <div className="h-px bg-red-100 w-full" />
                 <div className="flex items-center shadow-inner justify-between bg-red-50 p-8 rounded-[40px] border-2 border-white">
                   <div className="space-y-1">
-                    <h4 className="text-lg font-black uppercase text-red-500 tracking-tight leading-none">Delete Photocard?</h4>
+                    <h4 className="text-lg font-bold text-red-500 tracking-tight leading-none">Delete Photocard?</h4>
                     <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest opacity-60">Irreversibly remove from collection</p>
                   </div>
                   {showConfirmDelete ? (

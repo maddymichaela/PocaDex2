@@ -48,7 +48,7 @@ export default function Login({ onBack }: Props) {
           <button onClick={onBack} className="text-primary text-sm font-bold uppercase tracking-widest hover:underline mb-6 block mx-auto">
             ← PocaDex
           </button>
-          <h1 className="text-4xl font-black text-foreground uppercase tracking-tighter italic">
+          <h1 className="text-4xl font-bold text-foreground tracking-tight">
             {mode === 'signin' ? 'Welcome back' : 'Join PocaDex'}
           </h1>
           <p className="text-sm text-foreground/50 font-medium mt-1">
@@ -60,7 +60,7 @@ export default function Login({ onBack }: Props) {
           {signupSuccess ? (
             <div className="text-center py-4">
               <div className="text-4xl mb-4">📬</div>
-              <h2 className="font-black text-lg text-foreground uppercase tracking-tight mb-2">Check your email!</h2>
+              <h2 className="text-lg font-bold text-foreground tracking-tight mb-2">Check your email!</h2>
               <p className="text-sm text-foreground/60">We sent a confirmation link to <strong>{email}</strong>. Click it to activate your account.</p>
               <button onClick={() => setSignupSuccess(false)}
                 className="mt-6 text-primary font-bold text-sm hover:underline">
