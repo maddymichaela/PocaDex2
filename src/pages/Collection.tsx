@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Photocard } from '../types';
 import { PhotocardGrid } from '../components/PhotocardGrid';
 import PhotocardForm from '../components/PhotocardForm';
@@ -19,6 +19,7 @@ interface CollectionProps {
   onDelete: (id: string) => void;
   onBulkUpdate: (ids: string[], updates: Partial<Photocard>) => void;
   onCardClick: (pc: Photocard) => void;
+  triggerAdd?: number;
 }
 
 type ViewMode = 'all' | 'member' | 'era' | 'album' | 'year';
@@ -62,10 +63,10 @@ function GroupTile({ name, count, imageUrl, onClick }: GroupTileProps) {
   );
 }
 
-export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBulkUpdate, onCardClick }: CollectionProps) {
+export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBulkUpdate, onCardClick, triggerAdd }: CollectionProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('all');
   const [drilldownValue, setDrilldownValue] = useState<string | null>(null);
-  
+
   const [filters, setFilters] = useState<FilterState>({
     group: 'All',
     member: 'All',
@@ -76,6 +77,10 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
     sortBy: 'recently-added'
   });
   const [isAdding, setIsAdding] = useState(false);
+
+  useEffect(() => {
+    if (triggerAdd) setIsAdding(true);
+  }, [triggerAdd]);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkEditing, setIsBulkEditing] = useState(false);
