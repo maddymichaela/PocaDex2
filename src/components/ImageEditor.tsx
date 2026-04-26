@@ -5,9 +5,9 @@
 
 import { useState, useCallback } from 'react';
 import Cropper, { Point, Area } from 'react-easy-crop';
-import { motion } from 'motion/react';
-import { X, Check, RotateCcw, Sun, Contrast, Droplets, ZoomIn, ZoomOut, RotateCw, Sparkles } from 'lucide-react';
+import { Check, RotateCcw, Sun, Contrast, Droplets, ZoomIn, ZoomOut, RotateCw, Sparkles } from 'lucide-react';
 import { getCroppedImg } from '../lib/imageUtils';
+import ModalShell from './ModalShell';
 
 interface ImageEditorProps {
   image: string;
@@ -58,36 +58,32 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = 1 /
   const rotate = () => setRotation((prev) => (prev + 90) % 360);
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[120] bg-black/95 flex items-center justify-center p-4 md:p-6"
-    >
-      {/* Dialog */}
-      <div className="w-full max-w-5xl bg-white rounded-[32px] md:rounded-[48px] shadow-2xl flex flex-col max-h-[92dvh] border-4 md:border-[12px] border-white overflow-hidden">
-
-        {/* Header — always visible */}
-        <div className="px-5 md:px-8 py-3 md:py-5 flex justify-between items-center bg-white border-b border-gray-100 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 md:w-11 md:h-11 bg-primary/10 rounded-xl md:rounded-2xl flex items-center justify-center text-primary shadow-inner border border-white">
-              <Sparkles className="animate-pulse w-4 h-4 md:w-5 md:h-5" />
-            </div>
-            <div className="space-y-0.5">
-              <h3 className="text-lg md:text-2xl font-bold text-foreground tracking-tight leading-none">Studio Editor</h3>
-              <p className="hidden md:block text-[9px] font-bold text-foreground/30 uppercase tracking-widest">Adjust & Crop Card Memory</p>
-            </div>
-          </div>
+    <ModalShell
+      title="Studio Editor"
+      subtitle="Adjust & crop card memory"
+      icon={<Sparkles className="h-5 w-5 animate-pulse" />}
+      onClose={onCancel}
+      maxWidth="md:max-w-5xl"
+      overlayClassName="bg-black/80 backdrop-blur-sm"
+      panelClassName="md:border-[8px] md:border-white"
+      footer={(
+        <div className="flex gap-3 md:gap-4">
           <button
             onClick={onCancel}
-            className="p-2 md:p-3 bg-gray-50 hover:bg-white border-2 border-white hover:border-primary/20 rounded-xl md:rounded-2xl transition-all shadow-sm hover:shadow-md group"
+            className="flex-1 shrink-0 rounded-xl border-2 border-gray-50 bg-white py-3.5 text-[9px] font-black uppercase tracking-widest text-foreground/30 transition-all hover:bg-gray-50 hover:text-foreground md:rounded-2xl md:py-4 md:text-xs"
           >
-            <X className="text-foreground/30 group-hover:text-primary w-5 h-5 md:w-6 md:h-6" />
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="btn-primary-pink flex flex-[2] shrink-0 items-center justify-center gap-2 rounded-xl border-2 border-white/20 py-3.5 text-[9px] font-black uppercase tracking-widest md:rounded-2xl md:py-4 md:text-xs"
+          >
+            <Check size={18} className="stroke-[3px]" />
+            Polish Card
           </button>
         </div>
-
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto bg-white min-h-0">
+      )}
+    >
           {/* 2-column on md+, stacked on mobile */}
           <div className="flex flex-col md:flex-row gap-5 p-5 md:gap-6 md:p-6 xl:gap-8 xl:p-8 md:items-start">
 
@@ -214,27 +210,8 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = 1 /
                   ))}
                 </div>
               </div>
-
-              {/* Actions */}
-              <div className="flex gap-3 md:gap-4">
-                <button
-                  onClick={onCancel}
-                  className="flex-1 py-3.5 md:py-4 border-2 md:border-4 border-gray-50 bg-white text-foreground/30 rounded-xl md:rounded-[24px] font-black uppercase tracking-widest text-[9px] md:text-xs hover:bg-gray-50 hover:text-foreground transition-all shrink-0"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  className="btn-primary-pink flex-[2] shrink-0 rounded-xl border-2 border-white/20 py-3.5 text-[9px] font-black uppercase tracking-widest md:rounded-[24px] md:border-4 md:py-4 md:text-xs flex items-center justify-center gap-2 md:gap-3"
-                >
-                  <Check size={18} className="stroke-[3px]" />
-                  Polish Card
-                </button>
-              </div>
             </div>
           </div>
-        </div>
-      </div>
-    </motion.div>
+    </ModalShell>
   );
 }

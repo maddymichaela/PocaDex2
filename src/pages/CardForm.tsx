@@ -1,9 +1,10 @@
 import { useState, useRef, FormEvent, ChangeEvent } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { ChevronLeft, Image as ImageIcon, Save, Upload, Trash2, Edit3 } from 'lucide-react';
+import { Image as ImageIcon, Save, Upload, Trash2, Edit3 } from 'lucide-react';
 import { Status, Photocard, Condition } from '../types';
 import { useImageUpload } from '../hooks/useImageUpload';
 import ImageEditor from '../components/ImageEditor';
+import ModalShell from '../components/ModalShell';
 import { placeholderImage } from '../lib/assets';
 
 interface CardFormProps {
@@ -73,37 +74,39 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
   };
 
   return (
-    <div className="bg-gray-50/30">
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 py-4 flex items-center justify-between">
+    <ModalShell
+      title={isEditing ? 'Edit Card' : 'New Photocard'}
+      subtitle={isEditing ? 'Updating entry' : 'Adding to binder'}
+      icon={isEditing ? <Edit3 size={19} /> : <ImageIcon size={19} />}
+      onClose={onBack}
+      maxWidth="md:max-w-5xl xl:max-w-6xl"
+      bodyClassName="bg-gray-50/30"
+      footer={(
+        <div className="mx-auto flex w-full max-w-md gap-3">
           <button
             type="button"
             onClick={onBack}
-            className="flex items-center gap-2 group px-4 py-2 hover:bg-gray-100 rounded-2xl transition-all"
+            className="flex-1 rounded-xl border-2 border-gray-50 bg-white py-3.5 text-[10px] font-black uppercase tracking-widest text-foreground/35 transition-all hover:bg-gray-50 hover:text-foreground md:py-4 md:text-xs"
           >
-            <ChevronLeft className="text-foreground/40 group-hover:text-primary transition-colors" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/40 group-hover:text-foreground">
-              {isEditing ? 'Back to Card' : 'Back to Binder'}
-            </span>
+            Cancel
           </button>
           <button
             type="submit"
             form="card-form"
-            className="btn-primary-pink flex items-center gap-2 rounded-xl px-6 py-2.5 text-[10px] font-black uppercase tracking-widest"
+            className="btn-primary-pink flex flex-1 items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-[10px] font-black uppercase tracking-widest md:rounded-2xl md:py-4 md:text-xs"
           >
-            {isEditing ? <Save size={14} /> : <Upload size={14} />}
+            {isEditing ? <Save size={16} /> : <Upload size={16} />}
             {isEditing ? 'Save Changes' : 'Add to Collection'}
           </button>
         </div>
-      </div>
-
+      )}
+    >
       <form id="card-form" onSubmit={handleSubmit}>
-        <div className="max-w-6xl mx-auto p-4 md:px-6 md:py-5 xl:p-8">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-6 xl:gap-20 items-start">
+        <div className="max-w-6xl mx-auto p-4 pb-8 md:px-6 md:py-5 xl:p-8">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-5 xl:gap-8 items-start">
 
             {/* Left Column: Image */}
-            <div className="md:col-span-4 space-y-3 md:sticky md:top-32">
+            <div className="mx-auto w-full max-w-[320px] space-y-3 md:sticky md:top-5 md:col-span-4 md:max-w-[300px] xl:max-w-[340px]">
               <div
                 className={`relative aspect-[1/1.5] w-full rounded-[48px] overflow-hidden shadow-md border-[6px] border-white ring-1 ring-black/5 ${!previewUrl ? 'cursor-pointer' : ''}`}
                 onClick={() => !previewUrl && fileInputRef.current?.click()}
@@ -115,7 +118,7 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
                 />
 
                 {!previewUrl && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 border-[3px] border-dashed border-primary/25 bg-primary/[0.04]">
+                  <div className="absolute inset-2 flex flex-col items-center justify-center gap-5 rounded-[40px] border-[3px] border-dashed border-primary/25 bg-primary/[0.04]">
                     <div className="flex h-20 w-20 items-center justify-center rounded-[28px] bg-white shadow-xl shadow-primary/10 ring-1 ring-primary/10">
                       <ImageIcon size={34} className="text-primary" />
                     </div>
@@ -170,7 +173,7 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
                     type="text"
                     value={group}
                     onChange={e => setGroup(e.target.value)}
-                    className="w-full px-6 py-4 bg-white border-2 border-gray-100 rounded-[20px] text-xl font-semibold text-primary focus:border-primary/30 outline-none transition-all"
+                    className="w-full rounded-[16px] border-2 border-gray-100 bg-white px-4 py-3 text-base font-semibold text-primary outline-none transition-all focus:border-primary/30 md:rounded-[20px] md:px-6 md:py-4 md:text-xl"
                     placeholder="Group Name"
                   />
                 </div>
@@ -181,7 +184,7 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
                     type="text"
                     value={member}
                     onChange={e => setMember(e.target.value)}
-                    className="w-full px-6 py-4 bg-white border-2 border-gray-100 rounded-[20px] text-xl font-semibold text-foreground focus:border-primary/30 outline-none transition-all"
+                    className="w-full rounded-[16px] border-2 border-gray-100 bg-white px-4 py-3 text-base font-semibold text-foreground outline-none transition-all focus:border-primary/30 md:rounded-[20px] md:px-6 md:py-4 md:text-xl"
                     placeholder="Member Name"
                   />
                 </div>
@@ -323,6 +326,6 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
           />
         )}
       </AnimatePresence>
-    </div>
+    </ModalShell>
   );
 }

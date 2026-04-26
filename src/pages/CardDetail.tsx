@@ -17,22 +17,24 @@ export default function CardDetail({ photocard, onBack, onEdit, hasPrev, hasNext
     <div className="bg-gray-50/30">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-1">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-2 py-2 md:px-6 md:py-4">
+          <div className="flex min-w-0 items-center gap-0.5">
             <button
               onClick={onBack}
-              className="flex items-center gap-2 group px-4 py-2 hover:bg-gray-100 rounded-2xl transition-all"
+              className="group flex items-center gap-1.5 rounded-xl px-2 py-2 transition-all hover:bg-gray-100 md:gap-2 md:rounded-2xl md:px-4"
             >
-              <ChevronLeft className="text-foreground/40 group-hover:text-primary transition-colors" />
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/40 group-hover:text-foreground">Back to Binder</span>
+              <ChevronLeft size={18} className="shrink-0 text-foreground/40 transition-colors group-hover:text-primary md:size-6" />
+              <span className="text-[9px] font-black uppercase tracking-[0.12em] text-foreground/40 group-hover:text-foreground sm:text-[10px] sm:tracking-[0.2em]">
+                Back<span className="hidden sm:inline"> to Binder</span>
+              </span>
             </button>
 
-            <div className="flex items-center gap-0.5 pl-1 border-l border-gray-100 ml-1">
+            <div className="ml-0.5 flex items-center gap-0.5 border-l border-gray-100 pl-1 md:ml-1">
               <button
                 onClick={onPrev}
                 disabled={!hasPrev}
                 aria-label="Previous card"
-                className="p-2 rounded-xl hover:bg-gray-100 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
+                className="rounded-xl p-1.5 transition-all hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-25 md:p-2"
               >
                 <ChevronLeft size={16} className="text-foreground/50" />
               </button>
@@ -40,7 +42,7 @@ export default function CardDetail({ photocard, onBack, onEdit, hasPrev, hasNext
                 onClick={onNext}
                 disabled={!hasNext}
                 aria-label="Next card"
-                className="p-2 rounded-xl hover:bg-gray-100 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
+                className="rounded-xl p-1.5 transition-all hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-25 md:p-2"
               >
                 <ChevronRight size={16} className="text-foreground/50" />
               </button>
@@ -49,10 +51,10 @@ export default function CardDetail({ photocard, onBack, onEdit, hasPrev, hasNext
 
           <button
             onClick={onEdit}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white border-2 border-primary/20 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-sm"
+            className="flex shrink-0 items-center gap-1.5 rounded-xl border-2 border-primary/20 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] text-primary shadow-sm transition-all hover:bg-primary hover:text-white sm:text-[10px] sm:tracking-widest md:gap-2 md:px-5 md:py-2.5"
           >
             <Edit3 size={14} />
-            Edit Card
+            Edit<span className="hidden sm:inline"> Card</span>
           </button>
         </div>
       </div>
@@ -70,7 +72,7 @@ export default function CardDetail({ photocard, onBack, onEdit, hasPrev, hasNext
                 referrerPolicy="no-referrer"
               />
               {!photocard.imageUrl && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 border-[3px] border-dashed border-transparent bg-gray-50">
+                <div className="absolute inset-2 flex flex-col items-center justify-center gap-5 rounded-[40px] border-[3px] border-dashed border-primary/20 bg-white/35 backdrop-blur-[1px]">
                   <div className="flex h-20 w-20 items-center justify-center rounded-[28px] bg-white shadow-xl shadow-primary/10 ring-1 ring-primary/10">
                     <ImageIcon size={34} className="text-primary/35" />
                   </div>

@@ -4,9 +4,9 @@
  */
 
 import { useState } from 'react';
-import { motion } from 'motion/react';
-import { X, Save, Edit3, Layers } from 'lucide-react';
+import { Save, Layers } from 'lucide-react';
 import { Status, Photocard, Condition } from '../types';
+import ModalShell from './ModalShell';
 
 interface BulkEditFormProps {
   selectedCount: number;
@@ -73,35 +73,33 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
   );
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ scale: 0.95, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        className="bg-white w-full max-w-2xl rounded-[40px] overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="p-8 border-b border-gray-100 flex justify-between items-center shrink-0">
-          <div className="space-y-1">
-            <h2 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-3">
-              <Layers className="text-primary" size={28} />
-              Bulk Edit
-            </h2>
-            <p className="text-[10px] font-black text-foreground/30 uppercase tracking-widest ml-1">
-              Updating {selectedCount} selected cards
-            </p>
-          </div>
-          <button onClick={onClose} className="p-3 bg-gray-50 rounded-2xl text-foreground/20 hover:text-primary transition-all">
-            <X size={24} />
+    <ModalShell
+      title="Bulk Edit"
+      subtitle={`Updating ${selectedCount} selected cards`}
+      icon={<Layers size={19} />}
+      onClose={onClose}
+      maxWidth="md:max-w-2xl"
+      bodyClassName="custom-scrollbar"
+      footer={(
+        <div className="flex gap-3 md:gap-4">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl border-2 border-white bg-gray-50 py-3.5 text-[10px] font-black uppercase tracking-widest text-foreground/40 transition-all hover:bg-white md:rounded-2xl md:py-4 md:text-xs"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={activeFields.size === 0}
+            className="btn-primary-pink flex flex-[2] items-center justify-center gap-3 rounded-xl py-3.5 text-[10px] font-black uppercase tracking-widest disabled:scale-100 disabled:opacity-30 md:rounded-2xl md:py-4 md:text-xs"
+          >
+            <Save size={18} />
+            Apply Changes
           </button>
         </div>
-
-        <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+      )}
+    >
+        <div className="space-y-6 p-5 md:p-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Group */}
             <div className={fieldClass('group')}>
@@ -184,24 +182,6 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
             Only checked fields will be updated on all selected items.
           </p>
         </div>
-
-        <div className="p-8 border-t border-gray-100 flex gap-4 shrink-0">
-          <button
-            onClick={onClose}
-            className="flex-1 py-4 bg-gray-50 text-foreground/40 rounded-2xl font-black text-xs uppercase tracking-widest border-2 border-white hover:bg-white transition-all"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={activeFields.size === 0}
-            className="btn-primary-pink flex flex-[2] items-center justify-center gap-3 rounded-2xl py-4 text-xs font-black uppercase tracking-widest disabled:scale-100 disabled:opacity-30"
-          >
-            <Save size={18} />
-            Apply Changes
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
+    </ModalShell>
   );
 }

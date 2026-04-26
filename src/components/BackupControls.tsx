@@ -5,9 +5,10 @@
 
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, Upload, AlertCircle, CheckCircle2, X, RefreshCcw, CopyPlus } from 'lucide-react';
+import { Download, Upload, AlertCircle, CheckCircle2, RefreshCcw, CopyPlus } from 'lucide-react';
 import { Photocard } from '../types';
 import { exportCollection, importCollection } from '../lib/backup';
+import ModalShell from './ModalShell';
 
 interface BackupControlsProps {
   photocards: Photocard[];
@@ -110,27 +111,18 @@ export default function BackupControls({ photocards, onImport }: BackupControlsP
 
       <AnimatePresence>
         {isImportModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-primary/10 backdrop-blur-md z-[150] flex items-center justify-center p-4 text-center"
+          <ModalShell
+            title="Import Collection"
+            subtitle={`${importPendingData?.length ?? 0} photocards found`}
+            icon={<Upload size={19} />}
+            onClose={() => { setIsImportModalOpen(false); setImportPendingData(null); }}
+            maxWidth="md:max-w-sm"
+            overlayClassName="bg-primary/10 backdrop-blur-md"
           >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="glass-card rounded-[40px] p-10 max-w-sm w-full border-white border-8 shadow-2xl space-y-8"
-            >
-              <div className="w-20 h-20 bg-secondary/10 text-secondary rounded-3xl flex items-center justify-center mx-auto border-2 border-white">
-                <Upload size={32} />
-              </div>
-              
-              <div className="space-y-2">
-                <h3 className="text-2xl font-bold tracking-tight text-foreground">Import Collection</h3>
-                <p className="text-sm text-foreground/50 font-medium">
-                  We found <span className="text-primary font-black">{importPendingData?.length}</span> photocards. How should we process them?
-                </p>
-              </div>
+            <div className="space-y-8 p-6 text-center md:p-8">
+              <p className="text-sm font-medium text-foreground/50">
+                We found <span className="font-black text-primary">{importPendingData?.length}</span> photocards. How should we process them?
+              </p>
 
               <div className="flex flex-col gap-3">
                 <button
@@ -154,8 +146,8 @@ export default function BackupControls({ photocards, onImport }: BackupControlsP
                   Cancel
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </ModalShell>
         )}
       </AnimatePresence>
     </div>

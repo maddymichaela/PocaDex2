@@ -105,12 +105,12 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-red-500/40 backdrop-blur-md z-[150] flex items-center justify-center p-4"
+        className="fixed inset-0 z-[220] flex items-center justify-center bg-red-500/40 p-0 backdrop-blur-md md:p-4"
       >
         <motion.div
           initial={{ scale: 0.9, rotate: -2 }}
           animate={{ scale: 1, rotate: 0 }}
-          className="bg-white rounded-[40px] p-8 md:p-10 max-w-sm w-full text-center space-y-8 shadow-2xl relative border-8 border-red-50"
+          className="relative flex h-full w-full flex-col justify-center space-y-8 bg-white p-8 text-center shadow-2xl md:h-auto md:max-w-sm md:rounded-[40px] md:border-8 md:border-red-50 md:p-10"
         >
           <div className="w-20 h-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto shadow-inner border-2 border-white/50 animate-bounce">
             <Trash size={32} />
@@ -144,14 +144,14 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-0 xl:p-4"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-0 backdrop-blur-sm md:p-4"
       onClick={onClose}
     >
       <motion.div
         initial={{ scale: 0.95, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
-        className="bg-white w-full h-full xl:h-auto xl:max-h-[90vh] xl:max-w-4xl xl:rounded-[48px] overflow-hidden shadow-2xl relative flex flex-col"
+        className="relative flex h-full w-full flex-col overflow-hidden bg-white shadow-2xl md:h-auto md:max-h-[90dvh] md:max-w-4xl md:rounded-[40px]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center px-5 md:px-10 py-4 md:py-6 border-b border-gray-100 bg-white sticky top-0 z-30 font-sans">
