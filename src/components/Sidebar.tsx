@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { motion } from 'motion/react';
 
 interface StatCardProps {
   label: string;
@@ -14,10 +13,8 @@ interface StatCardProps {
 
 export function StatCard({ label, value, highlightColor, isWishlist }: StatCardProps) {
   return (
-    <motion.div
-      whileHover={{ y: -4, scale: 1.02 }}
-      className={`glass-card p-6 rounded-3xl shadow-sm border-2 transition-all hover:shadow-md active:scale-95 ${isWishlist ? 'border-secondary/20' : 'border-white/50'
-        } h-fit`}
+    <div
+      className={`glass-card p-6 rounded-3xl shadow-sm border-2 ${isWishlist ? 'border-secondary/20' : 'border-white/50'} h-fit`}
     >
       <div className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-2">
         {label}
@@ -28,7 +25,7 @@ export function StatCard({ label, value, highlightColor, isWishlist }: StatCardP
       >
         {value}
       </div>
-    </motion.div>
+    </div>
   );
 }
 

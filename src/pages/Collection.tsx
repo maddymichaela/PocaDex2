@@ -1,35 +1,27 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import { useState, useMemo, useEffect } from 'react';
 import { Photocard } from '../types';
 import { PhotocardGrid } from '../components/PhotocardGrid';
-import PhotocardForm from '../components/PhotocardForm';
 import BulkEditForm from '../components/BulkEditForm';
 import FilterBar, { FilterState } from '../components/FilterBar';
-import { Plus, CheckSquare, Trash2, X, LayoutGrid, User2, Sparkles, Disc3, Calendar, ChevronLeft, Edit3 } from 'lucide-react';
+import { placeholderImage } from '../lib/assets';
+import { Plus, CheckSquare, Trash2, X, LayoutGrid, User2, Sparkles, Disc3, Calendar, ChevronLeft, Edit3, ArrowUp, Search, Filter, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface CollectionProps {
   photocards: Photocard[];
-  onAdd: (pc: Photocard) => void;
-  onUpdate: (pc: Photocard) => void;
   onDelete: (id: string) => void;
   onBulkUpdate: (ids: string[], updates: Partial<Photocard>) => void;
   onCardClick: (pc: Photocard) => void;
-  triggerAdd?: number;
+  onNewCard: () => void;
 }
 
-type ViewMode = 'all' | 'member' | 'era' | 'album' | 'year';
+type ViewMode = 'all' | 'group' | 'member' | 'era' | 'album' | 'year';
 
 interface GroupTileProps {
   name: string;
   count: number;
   imageUrl?: string;
   onClick: () => void;
-  key?: string | number; // Added to satisfy TS if needed, though React consumes it
 }
 
 function GroupTile({ name, count, imageUrl, onClick }: GroupTileProps) {
@@ -37,35 +29,35 @@ function GroupTile({ name, count, imageUrl, onClick }: GroupTileProps) {
     <motion.div
       whileHover={{ y: -8, rotate: -1.5, scale: 1.02 }}
       onClick={onClick}
-      className="glass-card rounded-[32px] p-5 shadow-lg flex flex-col gap-5 relative overflow-hidden group cursor-pointer border-4 border-white transition-all hover:shadow-2xl"
+      className="glass-card rounded-[32px] shadow-xl flex flex-col relative overflow-hidden group cursor-pointer border-4 border-white transition-all hover:shadow-2xl"
     >
-      <div className="w-full aspect-[2/3] rounded-2xl bg-white overflow-hidden relative ring-1 ring-black/5 shadow-inner">
+      <div className="w-full aspect-[2/3] rounded-t-[28px] bg-white overflow-hidden relative ring-1 ring-black/5 shadow-inner">
         <img
-          src={imageUrl || "/placeholder.png"}
+          src={imageUrl || placeholderImage}
           alt={name}
           className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
           referrerPolicy="no-referrer"
         />
-        <div className="absolute bottom-4 right-4 bg-black/60 text-white text-[11px] font-black px-4 py-1.5 rounded-full backdrop-blur-md shadow-lg border border-white/20">
+        <div className="absolute bottom-4 right-4 bg-black/60 text-white text-[11px] font-black px-4 py-1.5 rounded-full backdrop-blur-md shadow-xl border border-white/20">
           {count} CARDS
         </div>
-
         {!imageUrl && (
           <div className="absolute inset-0 flex items-center justify-center opacity-10">
             <LayoutGrid size={64} />
           </div>
         )}
       </div>
-      <div className="px-1 text-center">
+      <div className="px-5 py-5 text-center">
         <h3 className="text-xl font-bold text-foreground truncate tracking-tight leading-none">{name}</h3>
       </div>
     </motion.div>
   );
 }
 
-export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBulkUpdate, onCardClick, triggerAdd }: CollectionProps) {
+export default function Collection({ photocards, onDelete, onBulkUpdate, onCardClick, onNewCard }: CollectionProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('all');
-  const [drilldownValue, setDrilldownValue] = useState<string | null>(null);
+  const [drilldownValue, setDrilldownValue] = useState<string | number | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
   const [filters, setFilters] = useState<FilterState>({
     group: 'All',
@@ -74,24 +66,28 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
     year: 'All',
     status: 'All',
     search: '',
-    sortBy: 'recently-added'
+    sortBy: 'recently-added',
   });
-  const [isAdding, setIsAdding] = useState(false);
 
-  useEffect(() => {
-    if (triggerAdd) setIsAdding(true);
-  }, [triggerAdd]);
+  const [showBackToTop, setShowBackToTop] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkEditing, setIsBulkEditing] = useState(false);
 
-  // Extract unique values for filter options
-  const uniqueGroups = useMemo(() => Array.from(new Set(photocards.map(pc => pc.group).filter(Boolean))), [photocards]);
-  const uniqueMembers = useMemo(() => Array.from(new Set(photocards.map(pc => pc.member).filter(Boolean))), [photocards]);
-  const uniqueAlbums = useMemo(() => Array.from(new Set(photocards.map(pc => pc.album).filter(Boolean))), [photocards]);
-  const uniqueYears = useMemo(() => Array.from(new Set(photocards.map(pc => pc.year).filter(Boolean))), [photocards]);
+  useEffect(() => {
+    const scrollRoot = document.querySelector('main');
+    if (!scrollRoot) return;
+    const update = () => setShowBackToTop(scrollRoot.scrollTop >= scrollRoot.clientHeight);
+    update();
+    scrollRoot.addEventListener('scroll', update, { passive: true });
+    return () => scrollRoot.removeEventListener('scroll', update);
+  }, []);
 
-  // Combinatorial filtering and sorting logic
+  const uniqueGroups = useMemo(() => Array.from(new Set(photocards.map(pc => pc.group).filter(Boolean))) as string[], [photocards]);
+  const uniqueMembers = useMemo(() => Array.from(new Set(photocards.map(pc => pc.member).filter(Boolean))) as string[], [photocards]);
+  const uniqueAlbums = useMemo(() => Array.from(new Set(photocards.map(pc => pc.album).filter(Boolean))) as string[], [photocards]);
+  const uniqueYears = useMemo(() => Array.from(new Set(photocards.map(pc => pc.year))), [photocards]);
+
   const filteredPhotocards = useMemo(() => {
     return photocards.filter(pc => {
       const matchGroup = filters.group === 'All' || pc.group === filters.group;
@@ -99,20 +95,21 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
       const matchAlbum = filters.album === 'All' || pc.album === filters.album;
       const matchYear = filters.year === 'All' || pc.year === filters.year;
       const matchStatus = filters.status === 'All' || pc.status === filters.status;
-      const matchSearch = filters.search === '' ||
-        pc.cardName.toLowerCase().includes(filters.search.toLowerCase()) ||
-        pc.version.toLowerCase().includes(filters.search.toLowerCase()) ||
-        pc.member.toLowerCase().includes(filters.search.toLowerCase()) ||
-        (pc.group?.toLowerCase().includes(filters.search.toLowerCase())) ||
-        pc.album.toLowerCase().includes(filters.search.toLowerCase());
+      const q = filters.search.toLowerCase();
+      const matchSearch = !q ||
+        pc.cardName.toLowerCase().includes(q) ||
+        pc.version.toLowerCase().includes(q) ||
+        pc.member.toLowerCase().includes(q) ||
+        (pc.group?.toLowerCase().includes(q)) ||
+        pc.album.toLowerCase().includes(q);
 
-      // If we're drilling down, apply that extra filter
       let matchDrilldown = true;
       if (drilldownValue) {
+        if (viewMode === 'group') matchDrilldown = pc.group === drilldownValue;
         if (viewMode === 'member') matchDrilldown = pc.member === drilldownValue;
         if (viewMode === 'era') matchDrilldown = pc.era === drilldownValue;
         if (viewMode === 'album') matchDrilldown = pc.album === drilldownValue;
-        if (viewMode === 'year') matchDrilldown = pc.year === drilldownValue;
+        if (viewMode === 'year') matchDrilldown = typeof drilldownValue === 'number' && pc.year === drilldownValue;
       }
 
       return matchGroup && matchMember && matchAlbum && matchYear && matchStatus && matchSearch && matchDrilldown;
@@ -122,56 +119,38 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
   const processedPhotocards = useMemo(() => {
     return [...filteredPhotocards].sort((a, b) => {
       switch (filters.sortBy) {
-        case 'newest':
-          return (Number(b.year) - Number(a.year)) || (b.createdAt - a.createdAt);
-        case 'oldest':
-          return (Number(a.year) - Number(b.year)) || (b.createdAt - a.createdAt);
-        case 'member-az':
-          return a.member.localeCompare(b.member) || (b.createdAt - a.createdAt);
-        case 'member-za':
-          return b.member.localeCompare(a.member) || (b.createdAt - a.createdAt);
-        case 'recently-added':
-        default:
-          return b.createdAt - a.createdAt;
+        case 'newest': return (Number(b.year) - Number(a.year)) || (b.createdAt - a.createdAt);
+        case 'oldest': return (Number(a.year) - Number(b.year)) || (b.createdAt - a.createdAt);
+        case 'member-az': return a.member.localeCompare(b.member) || (b.createdAt - a.createdAt);
+        case 'member-za': return b.member.localeCompare(a.member) || (b.createdAt - a.createdAt);
+        default: return b.createdAt - a.createdAt;
       }
     });
   }, [filteredPhotocards, filters.sortBy]);
 
-  // Grouped data for tiles
   const groupedData = useMemo(() => {
     if (viewMode === 'all' || drilldownValue) return [];
-
-    const groups = new Map<string, { count: number, imageUrl?: string }>();
+    const groups = new Map<string | number, { count: number; imageUrl?: string }>();
     filteredPhotocards.forEach(pc => {
-      const key = (viewMode === 'era' ? pc.era : pc[viewMode as keyof Photocard] as string) || 'Unknown';
+      let key: string | number = 'Unknown';
+      if (viewMode === 'group') key = pc.group ?? 'Unknown';
+      if (viewMode === 'member') key = pc.member;
+      if (viewMode === 'era') key = pc.era ?? 'Unknown';
+      if (viewMode === 'album') key = pc.album;
+      if (viewMode === 'year') key = pc.year;
       const existing = groups.get(key) || { count: 0 };
-      groups.set(key, {
-        count: existing.count + 1,
-        imageUrl: existing.imageUrl || pc.imageUrl
-      });
+      groups.set(key, { count: existing.count + 1, imageUrl: existing.imageUrl || pc.imageUrl });
     });
-
     return Array.from(groups.entries())
       .map(([name, data]) => ({ name, ...data }))
       .sort((a, b) => b.count - a.count);
   }, [filteredPhotocards, viewMode, drilldownValue]);
 
-  const handleCloseForm = () => {
-    setIsAdding(false);
-  };
-
-  const handleCardClick = (pc: Photocard) => {
-    onCardClick(pc);
-  };
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev =>
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  };
+  const toggleSelect = (id: string) =>
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
   const deleteSelected = () => {
-    if (window.confirm(`Are you sure you want to delete ${selectedIds.length} photocards? This cannot be undone.`)) {
+    if (window.confirm(`Delete ${selectedIds.length} photocard${selectedIds.length !== 1 ? 's' : ''}? This cannot be undone.`)) {
       selectedIds.forEach(id => onDelete(id));
       setSelectedIds([]);
       setSelectMode(false);
@@ -179,22 +158,31 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
   };
 
   const toggleSelectMode = () => {
-    if (selectMode) {
-      setSelectedIds([]);
-    }
+    if (selectMode) setSelectedIds([]);
     setSelectMode(!selectMode);
   };
 
-  const activeFilters = [
+  const scrollToTop = () => document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+
+  const hasActiveFilters =
+    filters.group !== 'All' ||
+    filters.member !== 'All' ||
+    filters.album !== 'All' ||
+    filters.year !== 'All' ||
+    filters.status !== 'All' ||
+    filters.sortBy !== 'recently-added';
+
+  const activeFilterChips = [
     { label: 'Group', value: filters.group, key: 'group' as const },
     { label: 'Member', value: filters.member, key: 'member' as const },
     { label: 'Album', value: filters.album, key: 'album' as const },
-    { label: 'Year', value: filters.year, key: 'year' as const },
+    { label: 'Year', value: String(filters.year), key: 'year' as const },
     { label: 'Status', value: filters.status, key: 'status' as const },
   ].filter(f => f.value !== 'All');
 
   const VIEW_MODES = [
     { id: 'all', label: 'View All', icon: LayoutGrid },
+    { id: 'group', label: 'Group', icon: Users },
     { id: 'member', label: 'Member', icon: User2 },
     { id: 'era', label: 'Era', icon: Sparkles },
     { id: 'album', label: 'Album', icon: Disc3 },
@@ -202,126 +190,150 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
   ] as const;
 
   return (
-    <div className="flex flex-col gap-8 w-full overflow-x-hidden pb-20">
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-          <div className="flex-1 w-full space-y-4">
-            <FilterBar
-              filters={filters}
-              onFilterChange={setFilters}
-              uniqueGroups={uniqueGroups as string[]}
-              uniqueMembers={uniqueMembers as string[]}
-              uniqueAlbums={uniqueAlbums as string[]}
-              uniqueYears={uniqueYears as string[]}
-            />
+    <div className="flex flex-col gap-6 w-full overflow-x-hidden pb-20">
 
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex bg-white border-gray-100 border-2 p-1 rounded-2xl shadow-sm h-13 items-center overflow-x-auto no-scrollbar max-w-full">
-                <div className="flex gap-1">
-                  {VIEW_MODES.map((m) => (
-                    <button
-                      key={m.id}
-                      onClick={() => { setViewMode(m.id); setDrilldownValue(null); }}
-                      className={`flex items-center gap-2 px-4 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${viewMode === m.id ? 'bg-primary text-white shadow-md' : 'text-foreground/40 hover:text-foreground'
-                        }`}
-                    >
-                      <m.icon size={14} />
-                      <span className="hidden sm:inline">{m.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+      {/* H1 + description */}
+      <div className="space-y-1">
+        <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">My Binder</h1>
+        <p className="text-sm text-foreground/45 font-medium">
+          {photocards.length} {photocards.length === 1 ? 'photocard' : 'photocards'}
+          {uniqueGroups.length > 0 && ` · ${uniqueGroups.length} ${uniqueGroups.length === 1 ? 'artist' : 'artists'}`}
+        </p>
+      </div>
 
-              {activeFilters.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {activeFilters.map((f) => (
-                    <button
-                      key={f.key}
-                      onClick={() => setFilters({ ...filters, [f.key]: 'All' })}
-                      className="bg-primary/20 text-primary text-[9px] font-black uppercase tracking-[0.1em] px-4 py-2 rounded-xl border-2 border-white shadow-sm flex items-center gap-2 hover:bg-primary/30 transition-all hover:scale-105"
-                    >
-                      {f.label}: {f.value}
-                      <X size={10} className="stroke-[4px]" />
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => setFilters({ group: 'All', member: 'All', album: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' })}
-                    className="text-[9px] font-black text-foreground/40 uppercase hover:text-red-400 p-2 italic bg-white/30 rounded-xl px-3 border border-white"
-                  >
-                    Clear All
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex gap-2 sm:gap-3 w-full md:w-auto shrink-0 mt-auto pb-[2px]">
-            <button
-              onClick={toggleSelectMode}
-              className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 h-11 rounded-[14px] text-[10px] md:text-xs font-black uppercase tracking-widest transition-all border-2 ${selectMode
-                  ? 'bg-secondary text-white border-white/20 shadow-lg shadow-secondary/20'
-                  : 'bg-white text-foreground/40 border-gray-100 shadow-sm hover:text-secondary'
-                }`}
-            >
-              <CheckSquare className="w-4 h-4 md:w-4.5 md:h-4.5" />
-              <span className="hidden xs:inline">{selectMode ? 'Cancel Selection' : 'Select'}</span>
-              <span className="xs:hidden">{selectMode ? 'Stop' : 'Select'}</span>
-            </button>
-            {!selectMode && (
+      {/* View mode + Search + Filter toggle — single row */}
+      <div className="flex items-center gap-2 w-full">
+        {/* View mode tabs */}
+        <div className="flex bg-white border-gray-100 border-2 p-1 rounded-2xl shadow-sm items-center shrink-0">
+          <div className="flex gap-0.5">
+            {VIEW_MODES.map((m) => (
               <button
-                onClick={() => setIsAdding(true)}
-                className="btn-primary-pink flex-1 md:flex-none flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-[14px] border-2 border-white/20 px-4 text-[10px] font-black uppercase tracking-widest sm:px-8 md:text-xs"
+                key={m.id}
+                onClick={() => { setViewMode(m.id); setDrilldownValue(null); }}
+                className={`flex items-center justify-center gap-2 px-2.5 md:px-4 h-9 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                  viewMode === m.id ? 'bg-primary text-white shadow-md' : 'text-foreground/40 hover:text-foreground'
+                }`}
               >
-                <Plus className="w-4.5 h-4.5 md:w-5 md:h-5" />
-                <span className="hidden xs:inline">New Card</span>
-                <span className="xs:hidden">Add</span>
+                <m.icon size={14} />
+                <span className="hidden md:inline">{m.label}</span>
               </button>
-            )}
+            ))}
           </div>
         </div>
 
-        <AnimatePresence>
-          {selectMode && (
-            <motion.div
-              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-              animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
-              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-              className="flex flex-col sm:flex-row items-center justify-between px-6 md:px-10 py-4 md:py-5 bg-secondary/10 border-2 sm:border-4 border-white rounded-[24px] md:rounded-[32px] overflow-hidden shadow-sm gap-4"
-            >
-              <div className="flex items-center gap-4 md:gap-6">
-                <span className="text-[11px] md:text-xs font-black text-secondary uppercase tracking-[0.1em] italic">
-                  {selectedIds.length} CARD{selectedIds.length !== 1 ? 'S' : ''} SELECTED
-                </span>
-                <button
-                  onClick={() => setSelectedIds(selectedIds.length === processedPhotocards.length ? [] : processedPhotocards.map(p => p.id))}
-                  className="text-[9px] md:text-[10px] font-black text-foreground/40 uppercase tracking-widest hover:text-secondary transition-colors underline decoration-dotted"
-                >
-                  {selectedIds.length === processedPhotocards.length ? 'DESELECT ALL' : 'SELECT ALL FILTERED'}
-                </button>
-              </div>
-              <div className="flex gap-2 w-full sm:w-auto">
-                <button
-                  disabled={selectedIds.length === 0}
-                  onClick={() => setIsBulkEditing(true)}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 md:px-6 py-2.5 md:py-3 bg-white text-secondary rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black uppercase tracking-widest shadow-md hover:bg-secondary hover:text-white disabled:opacity-30 transition-all border-white/20 border-2"
-                >
-                  <Edit3 className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                  Bulk Edit
-                </button>
-                <button
-                  disabled={selectedIds.length === 0}
-                  onClick={deleteSelected}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 md:px-6 py-2.5 md:py-3 bg-red-500 text-white rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black uppercase tracking-widest shadow-md hover:scale-105 active:scale-95 disabled:opacity-30 transition-all border-white/20 border-2"
-                >
-                  <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                  Burn
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Search + Filter button (flushed right) */}
+        <div className="flex items-center gap-2 ml-auto">
+          <div className="relative">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none" />
+            <input
+              type="text"
+              value={filters.search}
+              onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
+              placeholder="Search..."
+              className="pl-8 pr-3 py-2 h-11 bg-white border-2 border-gray-100 rounded-[14px] text-xs outline-none focus:border-primary/30 w-28 md:w-44 xl:w-56 transition-all"
+            />
+          </div>
+          <button
+            onClick={() => setShowFilters(v => !v)}
+            className={`h-11 w-11 rounded-[14px] border-2 flex items-center justify-center shrink-0 transition-all ${
+              showFilters || hasActiveFilters
+                ? 'bg-primary text-white border-primary shadow-md'
+                : 'bg-white text-foreground/50 border-gray-100 hover:border-primary/30 hover:text-primary'
+            }`}
+            aria-label="Toggle filters"
+          >
+            <Filter size={15} />
+          </button>
+        </div>
       </div>
 
+      {/* Collapsible filter panel */}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            key="filter-panel"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <FilterBar
+              filters={filters}
+              onFilterChange={setFilters}
+              uniqueGroups={uniqueGroups}
+              uniqueMembers={uniqueMembers}
+              uniqueAlbums={uniqueAlbums}
+              uniqueYears={uniqueYears}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Active filter chips */}
+      {activeFilterChips.length > 0 && (
+        <div className="flex flex-wrap gap-2 -mt-2">
+          {activeFilterChips.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setFilters(prev => ({ ...prev, [f.key]: 'All' }))}
+              className="bg-primary/20 text-primary text-[9px] font-black uppercase tracking-[0.1em] px-4 py-2 rounded-xl border-2 border-white shadow-sm flex items-center gap-2 hover:bg-primary/30 transition-all hover:scale-105"
+            >
+              {f.label}: {f.value}
+              <X size={10} className="stroke-[4px]" />
+            </button>
+          ))}
+          <button
+            onClick={() => setFilters({ group: 'All', member: 'All', album: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' })}
+            className="text-[9px] font-black text-foreground/40 uppercase hover:text-red-400 p-2 italic bg-white/30 rounded-xl px-3 border border-white"
+          >
+            Clear All
+          </button>
+        </div>
+      )}
+
+      {/* Select mode toolbar */}
+      <AnimatePresence>
+        {selectMode && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="flex flex-col md:flex-row items-center justify-between px-6 md:px-10 py-4 md:py-5 bg-secondary/10 border-2 md:border-4 border-white rounded-[24px] md:rounded-[32px] overflow-hidden shadow-sm gap-4"
+          >
+            <div className="flex items-center gap-4 md:gap-6">
+              <span className="text-[11px] md:text-xs font-black text-secondary uppercase tracking-[0.1em] italic">
+                {selectedIds.length} CARD{selectedIds.length !== 1 ? 'S' : ''} SELECTED
+              </span>
+              <button
+                onClick={() => setSelectedIds(selectedIds.length === processedPhotocards.length ? [] : processedPhotocards.map(p => p.id))}
+                className="text-[9px] md:text-[10px] font-black text-foreground/40 uppercase tracking-widest hover:text-secondary transition-colors underline decoration-dotted"
+              >
+                {selectedIds.length === processedPhotocards.length ? 'DESELECT ALL' : 'SELECT ALL FILTERED'}
+              </button>
+            </div>
+            <div className="flex gap-2 w-full md:w-auto">
+              <button
+                disabled={selectedIds.length === 0}
+                onClick={() => setIsBulkEditing(true)}
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 md:px-6 py-2.5 md:py-3 bg-white text-secondary rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black uppercase tracking-widest shadow-md hover:bg-secondary hover:text-white disabled:opacity-30 transition-all border-white/20 border-2"
+              >
+                <Edit3 className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                Bulk Edit
+              </button>
+              <button
+                disabled={selectedIds.length === 0}
+                onClick={deleteSelected}
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 md:px-6 py-2.5 md:py-3 bg-red-500 text-white rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black uppercase tracking-widest shadow-md hover:scale-105 active:scale-95 disabled:opacity-30 transition-all border-white/20 border-2"
+              >
+                <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                Burn
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Drilldown header */}
       {drilldownValue && (
         <motion.div
           initial={{ opacity: 0, x: -20 }}
@@ -330,7 +342,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
         >
           <button
             onClick={() => setDrilldownValue(null)}
-            className="p-4 bg-white border-4 border-white shadow-lg rounded-[24px] text-primary hover:rotate-[-10deg] transition-all hover:scale-110 active:scale-90"
+            className="p-4 bg-white border-4 border-white shadow-xl rounded-[24px] text-primary hover:rotate-[-10deg] transition-all hover:scale-110 active:scale-90"
           >
             <ChevronLeft size={24} className="stroke-[3px]" />
           </button>
@@ -344,6 +356,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
         </motion.div>
       )}
 
+      {/* Card grid / group tiles */}
       <div className="min-h-[600px] animate-in fade-in slide-in-from-bottom-4 duration-700">
         <AnimatePresence mode="wait">
           {viewMode !== 'all' && !drilldownValue ? (
@@ -352,12 +365,12 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6"
+              className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-6"
             >
               {groupedData.map((group) => (
                 <GroupTile
                   key={group.name}
-                  name={group.name}
+                  name={String(group.name)}
                   count={group.count}
                   imageUrl={group.imageUrl}
                   onClick={() => setDrilldownValue(group.name)}
@@ -373,7 +386,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
             <motion.div key="grid-view" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <PhotocardGrid
                 photocards={processedPhotocards}
-                onCardClick={handleCardClick}
+                onCardClick={onCardClick}
                 selectMode={selectMode}
                 selectedIds={selectedIds}
                 onToggle={toggleSelect}
@@ -389,7 +402,7 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
               <div className="text-8xl mb-6 grayscale opacity-30 animate-bounce">📔</div>
               <p className="font-black uppercase tracking-[0.3em] text-sm italic">Binder section is currently empty</p>
               <button
-                onClick={() => { setFilters({ group: 'All', member: 'All', album: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' }); setDrilldownValue(null); }}
+                onClick={() => setFilters({ group: 'All', member: 'All', album: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' })}
                 className="mt-8 px-8 py-4 bg-white text-primary border-2 border-primary/20 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-xl shadow-primary/10"
               >
                 Return to Full View
@@ -399,13 +412,46 @@ export default function Collection({ photocards, onAdd, onUpdate, onDelete, onBu
         </AnimatePresence>
       </div>
 
-      <AnimatePresence>
-        {isAdding && (
-          <PhotocardForm
-            onSubmit={onAdd}
-            onClose={handleCloseForm}
-          />
+      {/* Floating action buttons */}
+      <div className="fixed bottom-5 right-4 z-40 flex flex-col items-end gap-2">
+        <button
+          onClick={toggleSelectMode}
+          aria-label={selectMode ? 'Cancel selection' : 'Select cards'}
+          className={`flex h-12 w-12 items-center justify-center rounded-full border-2 shadow-xl transition-all ${
+            selectMode
+              ? 'bg-secondary text-white border-white/20 shadow-xl shadow-secondary/20'
+              : 'bg-white text-foreground/40 border-gray-100 shadow-sm hover:text-secondary'
+          }`}
+        >
+          <CheckSquare className="w-5 h-5" />
+        </button>
+        {!selectMode && (
+          <button
+            onClick={onNewCard}
+            aria-label="Add card"
+            className="btn-primary-pink flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/20 shadow-xl"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
         )}
+        <AnimatePresence>
+          {showBackToTop && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.85, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.85, y: 8 }}
+              onClick={scrollToTop}
+              aria-label="Back to top"
+              className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-gray-100 bg-white text-foreground/40 shadow-xl transition-all hover:text-primary"
+            >
+              <ArrowUp className="w-5 h-5" />
+            </motion.button>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Bulk edit modal */}
+      <AnimatePresence>
         {isBulkEditing && (
           <BulkEditForm
             selectedCount={selectedIds.length}
