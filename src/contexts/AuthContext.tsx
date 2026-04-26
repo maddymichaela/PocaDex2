@@ -26,6 +26,42 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
   return data as Profile | null;
 }
 
+function profileFromUser(user: User): Profile {
+  const metadata = user.user_metadata ?? {};
+  const username = (metadata.user_name as string | undefined)
+    || (metadata.preferred_username as string | undefined)
+    || user.email?.split('@')[0]
+    || 'you';
+  const nickname = (metadata.full_name as string | undefined)
+    || (metadata.name as string | undefined)
+    || username;
+  const avatarUrl = (metadata.avatar_url as string | undefined)
+    || (metadata.picture as string | undefined)
+    || null;
+
+  return {
+    id: user.id,
+    username,
+    nickname,
+    bio: null,
+    avatar_url: avatarUrl,
+    created_at: user.created_at,
+    updated_at: user.updated_at ?? user.created_at,
+  };
+}
+
+function mergeProfileFallback(profile: Profile | null, fallback: Profile): Profile {
+  if (!profile) return fallback;
+
+  return {
+    ...fallback,
+    ...profile,
+    username: profile.username || fallback.username,
+    nickname: profile.nickname || fallback.nickname,
+    avatar_url: profile.avatar_url || fallback.avatar_url,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -34,10 +70,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     supabase.auth.getSession()
-      .then(async ({ data: { session } }) => {
+      .then(({ data: { session } }) => {
         setSession(session);
         setUser(session?.user ?? null);
-        setProfile(session?.user ? await fetchProfile(session.user.id) : null);
       })
       .catch((error) => {
         console.error('Failed to restore auth session:', error);
@@ -49,19 +84,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
-        setProfile(await fetchProfile(session.user.id));
-      } else {
-        setProfile(null);
-      }
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    if (!user) {
+      setProfile(null);
+      return;
+    }
+
+    const fallbackProfile = profileFromUser(user);
+    setProfile((currentProfile) => mergeProfileFallback(currentProfile, fallbackProfile));
+
+    fetchProfile(user.id).then((nextProfile) => {
+      if (isCurrent) setProfile(mergeProfileFallback(nextProfile, fallbackProfile));
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [user]);
 
   const signInWithGoogle = async () => {
     await supabase.auth.signInWithOAuth({

@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { LayoutGrid, BookOpen, ScanLine, Users, Plus, LogOut, ChevronUp } from 'lucide-react';
+import { LayoutGrid, BookOpen, ScanLine, Plus, LogOut, ChevronUp } from 'lucide-react';
 import { Profile } from '../types';
+import { pocadexLogo } from '../lib/assets';
 
 interface NavbarProps {
   currentPage: string;
@@ -15,11 +16,11 @@ const NAV_ITEMS = [
   { id: 'Dashboard', label: 'Dashboard', icon: LayoutGrid },
   { id: 'Collection', label: 'My Binder', icon: BookOpen },
   { id: 'Scan', label: 'Scan', icon: ScanLine },
-  { id: 'Groups', label: 'Groups', icon: Users },
 ] as const;
 
 export default function Navbar({ currentPage, onPageChange, profile, onSignOut, onAddCard }: NavbarProps) {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
   const desktopMenuRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -36,10 +37,19 @@ export default function Navbar({ currentPage, onPageChange, profile, onSignOut, 
 
   const displayName = profile?.nickname || profile?.username || 'You';
   const avatarLetter = displayName.charAt(0).toUpperCase();
+  const avatarUrl = profile?.avatar_url && profile.avatar_url !== failedAvatarUrl
+    ? profile.avatar_url
+    : null;
 
   const renderAvatar = (className: string) =>
-    profile?.avatar_url ? (
-      <img src={profile.avatar_url} alt="Avatar" className={`object-cover ${className}`} />
+    avatarUrl ? (
+      <img
+        src={avatarUrl}
+        alt="Avatar"
+        className={`object-cover ${className}`}
+        referrerPolicy="no-referrer"
+        onError={() => setFailedAvatarUrl(avatarUrl)}
+      />
     ) : (
       <div className={`bg-primary/15 flex items-center justify-center text-primary font-black text-sm ${className}`}>
         {avatarLetter}
@@ -58,14 +68,14 @@ export default function Navbar({ currentPage, onPageChange, profile, onSignOut, 
   return (
     <>
       {/* ── Desktop / iPad landscape sidebar ── */}
-      <aside className="hidden lg:flex flex-col w-60 shrink-0 h-screen sticky top-0 bg-white/80 backdrop-blur-xl border-r border-gray-100 shadow-sm">
+      <aside className="hidden xl:flex flex-col w-60 shrink-0 h-screen sticky top-0 bg-white/80 backdrop-blur-xl border-r border-gray-100 shadow-sm">
 
         {/* Logo */}
         <div
           className="px-5 pt-6 pb-3 shrink-0 cursor-pointer"
           onClick={() => onPageChange('Dashboard')}
         >
-          <img src="/pocadex.png" alt="PocaDex" className="w-full h-auto" />
+          <img src={pocadexLogo} alt="PocaDex" className="w-full h-auto" />
         </div>
 
         {/* Nav items */}
@@ -139,10 +149,10 @@ export default function Navbar({ currentPage, onPageChange, profile, onSignOut, 
       </aside>
 
       {/* ── Mobile / tablet portrait top bar ── */}
-      <div className="lg:hidden sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-100 shadow-sm">
+      <div className="xl:hidden sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-100 shadow-sm">
         <div className="flex items-center justify-between px-4 py-2">
           <img
-            src="/pocadex.png"
+            src={pocadexLogo}
             alt="PocaDex"
             className="h-12 w-auto cursor-pointer"
             onClick={() => onPageChange('Dashboard')}

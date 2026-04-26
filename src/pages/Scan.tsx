@@ -61,7 +61,7 @@ function Field({ label, value, onChange, placeholder }: {
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder ?? label}
-        className="w-full px-2 py-1.5 rounded-lg border border-gray-100 bg-white/80 text-xs font-medium text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-primary/40 transition-colors"
+        className="w-full px-2 py-1.5 rounded-xl border border-gray-100 bg-white/80 text-xs font-medium text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-primary/40 transition-colors"
       />
     </div>
   );
@@ -81,12 +81,12 @@ function BulkField({ label, placeholder, onApply }: {
           value={val}
           onChange={e => setVal(e.target.value)}
           placeholder={placeholder ?? label}
-          className="w-24 px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-medium text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-primary/40"
+          className="w-24 px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-primary/40"
         />
       </div>
       <button
         onClick={() => { if (val.trim()) { onApply(val.trim()); setVal(''); } }}
-        className="px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-[10px] font-black uppercase tracking-tight hover:bg-primary hover:text-white transition-all"
+        className="px-2.5 py-1.5 rounded-xl bg-primary/10 text-primary text-[10px] font-black uppercase tracking-tight hover:bg-primary hover:text-white transition-all"
       >
         Fill
       </button>
@@ -434,7 +434,7 @@ export default function Scan({ onDone }: { onDone: () => void }) {
             <Loader2 size={28} className="text-primary animate-spin" />
           </div>
           <div className="text-center">
-            <p className="font-black text-foreground uppercase tracking-tight text-lg">
+            <p className="font-black text-foreground uppercase tracking-tight text-xl">
               {detectMode === 'ai' ? 'Analyzing with Gemini AI…' : 'Splicing template…'}
             </p>
             <p className="text-sm text-foreground/40 font-medium mt-1">
@@ -484,7 +484,7 @@ export default function Scan({ onDone }: { onDone: () => void }) {
           </div>
 
           {/* Card grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
             {cards.map(card => (
               <motion.div key={card.id} layout
                 className={`glass-card rounded-2xl border-2 overflow-hidden transition-all ${card.selected ? 'border-primary/40 shadow-md' : 'border-white/40 opacity-50'}`}>
@@ -509,7 +509,7 @@ export default function Scan({ onDone }: { onDone: () => void }) {
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Status</label>
                     <select value={card.status} onChange={e => updateCard(card.id, { status: e.target.value as Status })}
-                      className="w-full px-2 py-1.5 rounded-lg border border-gray-100 bg-white/80 text-xs font-medium text-foreground focus:outline-none focus:border-primary/40 transition-colors cursor-pointer">
+                      className="w-full px-2 py-1.5 rounded-xl border border-gray-100 bg-white/80 text-xs font-medium text-foreground focus:outline-none focus:border-primary/40 transition-colors cursor-pointer">
                       <option value="owned">Owned</option>
                       <option value="wishlist">Wishlist</option>
                       <option value="on_the_way">On the way</option>
@@ -522,7 +522,7 @@ export default function Scan({ onDone }: { onDone: () => void }) {
 
           {/* Save button */}
           <div className="sticky bottom-4">
-            <div className="glass-card rounded-2xl px-6 py-4 border border-white/60 flex items-center justify-between shadow-lg">
+            <div className="glass-card rounded-2xl px-6 py-4 border border-white/60 flex items-center justify-between shadow-xl">
               <p className="text-sm font-bold text-foreground/60">
                 Adding <span className="text-foreground font-black">{selectedCards.length}</span> card{selectedCards.length !== 1 ? 's' : ''} to your collection
               </p>

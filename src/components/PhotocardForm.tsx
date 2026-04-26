@@ -4,6 +4,7 @@
  */
 
 import { useState, useRef, FormEvent, ChangeEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Image as ImageIcon, Upload, Trash2, Save, Trash, Edit3, Copy } from 'lucide-react';
 import { Status, Photocard, Condition } from '../types';
@@ -99,7 +100,7 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
   ];
 
   if (showConfirmDelete) {
-    return (
+    return createPortal(
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -133,26 +134,27 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
             </button>
           </div>
         </motion.div>
-      </motion.div>
+      </motion.div>,
+      document.body
     );
   }
 
-  return (
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-0 md:p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-0 xl:p-4"
       onClick={onClose}
     >
       <motion.div
         initial={{ scale: 0.95, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
-        className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-4xl md:rounded-[48px] overflow-hidden shadow-2xl relative flex flex-col"
+        className="bg-white w-full h-full xl:h-auto xl:max-h-[90vh] xl:max-w-4xl xl:rounded-[48px] overflow-hidden shadow-2xl relative flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center px-6 md:px-10 py-5 md:py-6 border-b border-gray-100 bg-white sticky top-0 z-30 font-sans">
+        <div className="flex justify-between items-center px-5 md:px-10 py-4 md:py-6 border-b border-gray-100 bg-white sticky top-0 z-30 font-sans">
           <div className="space-y-1">
             <h2 className="text-xl md:text-2xl font-bold text-foreground tracking-tight leading-tight">
               {isEditing ? 'Edit Card' : 'New Photocard'}
@@ -171,87 +173,13 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
         </div>
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar bg-white">
-          <form id="photocard-form" onSubmit={handleSubmit} className="p-6 md:p-10 space-y-8 md:space-y-10 pb-24">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-10">
-              <div className="space-y-6 md:space-y-8">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">K-Pop Group</label>
-                    <input
-                      type="text"
-                      value={group}
-                      onChange={(e) => setGroup(e.target.value)}
-                      className="w-full px-4 md:px-6 py-3 md:py-4 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-bold focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all placeholder:text-foreground/10"
-                      placeholder="e.g. aespa"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Idol / Member</label>
-                    <input
-                      required
-                      type="text"
-                      value={member}
-                      onChange={(e) => setMember(e.target.value)}
-                      className="w-full px-4 md:px-6 py-3 md:py-4 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-bold focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all placeholder:text-foreground/10"
-                      placeholder="e.g. Karina"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Album Name</label>
-                    <input
-                      required
-                      type="text"
-                      value={album}
-                      onChange={(e) => setAlbum(e.target.value)}
-                      className="w-full px-4 md:px-6 py-3 md:py-4 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-bold focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all placeholder:text-foreground/10"
-                      placeholder="e.g. Drama"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Era / Version</label>
-                    <input
-                      type="text"
-                      value={era}
-                      onChange={(e) => setEra(e.target.value)}
-                      className="w-full px-4 md:px-6 py-3 md:py-4 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-bold focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all placeholder:text-foreground/10"
-                      placeholder="e.g. Scene Ver."
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 md:gap-6">
-                  <div className="sm:col-span-3 space-y-1.5">
-                    <label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Card Name</label>
-                    <input
-                      required
-                      type="text"
-                      value={cardName}
-                      onChange={(e) => setCardName(e.target.value)}
-                      className="w-full px-4 md:px-6 py-3 md:py-4 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-bold focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all placeholder:text-foreground/10"
-                      placeholder="e.g. Intro Selfie"
-                    />
-                  </div>
-                  <div className="sm:col-span-1 space-y-1.5">
-                    <label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Year</label>
-                    <input
-                      required
-                      type="number"
-                      value={year}
-                      onChange={(e) => setYear(Number(e.target.value))}
-                      className="w-full px-4 md:px-6 py-3 md:py-4 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-black text-center focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all appearance-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                  <label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1 text-center lg:text-left">Card Image</label>
+          <form id="photocard-form" onSubmit={handleSubmit} className="p-5 md:p-10 space-y-6 md:space-y-8 pb-24">
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(240px,0.75fr)_minmax(0,1.25fr)] gap-6 md:gap-8 xl:items-stretch">
+              <div className="flex flex-col items-center gap-3 xl:h-full xl:items-stretch">
+                  <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1 text-center xl:text-left">Card Image</label>
                   <div 
                     onClick={() => !previewUrl && fileInputRef.current?.click()}
-                    className={`flex-1 min-h-[280px] md:min-h-[320px] bg-gray-50 rounded-[32px] md:rounded-[40px] border-4 border-dashed flex flex-col items-center justify-center transition-all overflow-hidden relative group ${
+                    className={`w-full max-w-[220px] aspect-[2/3] bg-gray-50 rounded-[28px] md:max-w-[260px] md:rounded-[32px] xl:max-w-none xl:flex-1 xl:self-stretch xl:aspect-auto border-4 border-dashed flex flex-col items-center justify-center transition-all overflow-hidden relative group ${
                       previewUrl ? 'border-transparent shadow-inner' : 'border-gray-100 hover:border-primary/30 cursor-pointer'
                     }`}
                   >
@@ -310,11 +238,111 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
                   )}
                  </AnimatePresence>
               </div>
+
+              <div className="space-y-3 md:space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                  <div className="space-y-0">
+                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Group*</label>
+                    <input
+                      required
+                      type="text"
+                      value={group}
+                      onChange={(e) => setGroup(e.target.value)}
+                      className="w-full px-4 md:px-6 py-3 md:py-4 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-normal focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all placeholder:text-foreground/35"
+                      placeholder="Stray Kids"
+                    />
+                  </div>
+                  <div className="space-y-0">
+                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Member*</label>
+                    <input
+                      required
+                      type="text"
+                      value={member}
+                      onChange={(e) => setMember(e.target.value)}
+                      className="w-full px-4 md:px-6 py-3 md:py-4 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-normal focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all placeholder:text-foreground/35"
+                      placeholder="Felix"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                  <div className="space-y-0">
+                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Album</label>
+                    <input
+                      type="text"
+                      value={album}
+                      onChange={(e) => setAlbum(e.target.value)}
+                      className="w-full px-4 md:px-6 py-3 md:py-4 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-normal focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all placeholder:text-foreground/35"
+                      placeholder="DO IT"
+                    />
+                  </div>
+                  <div className="space-y-0">
+                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Era</label>
+                    <input
+                      type="text"
+                      value={era}
+                      onChange={(e) => setEra(e.target.value)}
+                      className="w-full px-4 md:px-6 py-3 md:py-4 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-normal focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all placeholder:text-foreground/35"
+                      placeholder="DO IT"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 md:gap-4">
+                  <div className="sm:col-span-3 space-y-0">
+                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Version</label>
+                    <input
+                      type="text"
+                      value={version}
+                      onChange={(e) => setVersion(e.target.value)}
+                      className="w-full px-4 md:px-6 py-3 md:py-4 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-normal focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all placeholder:text-foreground/35"
+                      placeholder="Felix Accordion ver."
+                    />
+                  </div>
+                  <div className="sm:col-span-1 space-y-0">
+                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Year</label>
+                    <input
+                      type="number"
+                      value={year}
+                      onChange={(e) => setYear(Number(e.target.value))}
+                      className="w-full px-4 md:px-6 py-3 md:py-4 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-normal text-center focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all appearance-none"
+                      placeholder="2025"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-0">
+                  <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Photocard Name*</label>
+                  <input
+                    required
+                    type="text"
+                    value={cardName}
+                    onChange={(e) => setCardName(e.target.value)}
+                    className="w-full px-4 md:px-6 py-3 md:py-4 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-normal focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all placeholder:text-foreground/35"
+                    placeholder="Felix DO IT photocard"
+                  />
+                </div>
+
+                <div className="space-y-0">
+                  <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Do you have duplicates of this card?</label>
+                  <button
+                    type="button"
+                    disabled={status === 'on_the_way' || status === 'wishlist'}
+                    onClick={() => setIsDuplicate(!isDuplicate)}
+                    className={`flex items-center justify-center gap-3 w-full px-4 md:px-6 py-3 md:py-4 rounded-xl md:rounded-[24px] border-2 transition-all text-xs md:text-sm font-medium ${
+                      isDuplicate ? 'bg-primary/10 border-primary/25 text-primary shadow-md shadow-primary/10' : 'bg-gray-50/50 border-gray-100 text-foreground/45 hover:text-foreground/60'
+                    } disabled:opacity-30`}
+                  >
+                    <Copy size={16} />
+                    {isDuplicate ? 'Yes, I have extra(s)' : "No, I don't have extras"}
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 border-t border-gray-50 pt-8 md:pt-10">
-              <div className="space-y-4">
-                <label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Binder Status</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 border-t border-gray-50 pt-6 md:pt-8">
+              <div className="space-y-0">
+                <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Status*</label>
                 <div className="flex bg-gray-50 p-1.5 md:p-2 rounded-2xl md:rounded-[24px] gap-1.5 md:gap-2">
                   {statusOptions.map((opt) => (
                     <button
@@ -331,9 +359,9 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Card Condition</label>
-                <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-2 lg:grid-cols-5 gap-1.5 md:gap-2 bg-gray-50 p-1.5 md:p-2 rounded-2xl md:rounded-[24px]">
+              <div className="space-y-0">
+                <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Condition</label>
+                <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-2 xl:grid-cols-5 gap-1.5 md:gap-2 bg-gray-50 p-1.5 md:p-2 rounded-2xl md:rounded-[24px]">
                   {(['mint', 'near_mint', 'good', 'fair', 'poor'] as Condition[]).map((c) => (
                     <button
                       key={c}
@@ -354,42 +382,13 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 items-start">
-              <div className="space-y-1.5">
-                <label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Version / Variant</label>
-                <input
-                  required
-                  type="text"
-                  value={version}
-                  onChange={(e) => setVersion(e.target.value)}
-                  className="w-full px-4 md:px-6 py-3 md:py-4 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-bold focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all placeholder:text-foreground/10"
-                  placeholder="e.g. Rare holo"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Inventory Rules</label>
-                <button
-                  type="button"
-                  disabled={status === 'on_the_way' || status === 'wishlist'}
-                  onClick={() => setIsDuplicate(!isDuplicate)}
-                  className={`flex items-center justify-center gap-3 w-full px-4 md:px-6 py-3 md:py-4 rounded-xl md:rounded-[24px] border-2 transition-all font-black text-[9px] md:text-[10px] uppercase tracking-widest ${
-                    isDuplicate ? 'bg-purple-500 border-purple-400 text-white shadow-xl shadow-purple-500/20 scale-[1.01]' : 'bg-gray-50/50 border-gray-100 text-foreground/20 hover:text-foreground/30'
-                  } disabled:opacity-30`}
-                >
-                  <Copy size={16} />
-                  Duplicate (Have Multiples)
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Personal Notes</label>
+            <div className="space-y-0">
+              <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Notes</label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-4 md:px-6 py-4 md:py-6 bg-gray-50/50 border-gray-100 border-2 rounded-2xl md:rounded-[32px] text-xs md:text-sm font-bold focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all h-28 md:h-36 resize-none placeholder:text-foreground/10 custom-scrollbar"
-                placeholder="Where you got it, price, trade plans..."
+                className="w-full px-4 md:px-6 py-4 md:py-6 bg-gray-50/50 border-gray-100 border-2 rounded-2xl md:rounded-[32px] text-xs md:text-sm font-normal focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all h-28 md:h-36 resize-none placeholder:text-foreground/35 custom-scrollbar"
+                placeholder="Pulled from DO IT album, Felix Accordion ver."
               />
             </div>
           </form>
@@ -425,6 +424,7 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
           )}
         </AnimatePresence>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 }

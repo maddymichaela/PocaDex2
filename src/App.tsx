@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { motion } from 'motion/react';
 import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
 import Collection from './pages/Collection';
 import CardDetail from './pages/CardDetail';
+import CardForm from './pages/CardForm';
 import Splash from './pages/Splash';
 import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
@@ -20,42 +20,74 @@ import {
 
 type AuthScreen = 'splash' | 'login';
 
+const collectionCacheKey = (userId: string) => `pocadex:collection:${userId}`;
+
+function readCachedPhotocards(userId: string): Photocard[] | null {
+  try {
+    const cached = window.localStorage.getItem(collectionCacheKey(userId));
+    if (!cached) return null;
+    const parsed = JSON.parse(cached);
+    return Array.isArray(parsed) ? (parsed as Photocard[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedPhotocards(userId: string, cards: Photocard[]) {
+  try {
+    window.localStorage.setItem(collectionCacheKey(userId), JSON.stringify(cards));
+  } catch {
+    // Cache writes are best-effort.
+  }
+}
+
 export default function App() {
   const { user, profile, loading: authLoading, signOut } = useAuth();
   const [authScreen, setAuthScreen] = useState<AuthScreen>('splash');
   const [currentPage, setCurrentPage] = useState('Collection');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formCard, setFormCard] = useState<Photocard | null>(null);
   const [photocards, setPhotocards] = useState<Photocard[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
-  const [addTrigger, setAddTrigger] = useState(0);
 
   const handleAddCard = useCallback(() => {
-    setCurrentPage('Collection');
-    setSelectedId(null);
-    setAddTrigger(prev => prev + 1);
+    setFormCard(null);
+    setIsFormOpen(true);
   }, []);
 
   // Handle /auth/callback route
   if (window.location.pathname === '/auth/callback') return <AuthCallback />;
 
-  // Load photocards only when the user ID changes, not on every token refresh
   const userId = user?.id;
   useEffect(() => {
     if (!userId) return;
-    setDataLoading(true);
+    let isCurrent = true;
+    const cached = readCachedPhotocards(userId);
+    if (cached) {
+      setPhotocards(cached);
+      setDataLoading(false);
+    } else {
+      setPhotocards([]);
+      setDataLoading(true);
+    }
     fetchPhotocards(userId)
-      .then(setPhotocards)
+      .then((cards) => { if (isCurrent) { setPhotocards(cards); writeCachedPhotocards(userId, cards); } })
       .catch(console.error)
-      .finally(() => setDataLoading(false));
+      .finally(() => { if (isCurrent) setDataLoading(false); });
+    return () => { isCurrent = false; };
   }, [userId]);
+
+  useEffect(() => {
+    if (!userId || dataLoading) return;
+    writeCachedPhotocards(userId, photocards);
+  }, [dataLoading, photocards, userId]);
 
   const handleAddPhotocard = useCallback(async (newPC: Photocard) => {
     if (!user) return;
-    // Optimistically add so the card appears instantly
     setPhotocards(prev => [newPC, ...prev]);
     try {
       const saved = await insertPhotocard(user.id, newPC);
-      // Replace temp entry with server version (gets real storage URL)
       setPhotocards(prev => prev.map(pc => pc.id === newPC.id ? saved : pc));
     } catch (err) {
       console.error('Failed to add photocard:', err);
@@ -87,15 +119,13 @@ export default function App() {
     if (!user) return;
     try {
       await bulkUpdatePhotocards(user.id, ids, updates);
-      setPhotocards(prev => prev.map(pc =>
-        ids.includes(pc.id) ? { ...pc, ...updates } : pc
-      ));
+      setPhotocards(prev => prev.map(pc => ids.includes(pc.id) ? { ...pc, ...updates } : pc));
     } catch (err) {
       console.error('Failed to bulk update:', err);
     }
   }, [user]);
 
-  // Auth loading spinner
+  // Auth loading
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -109,36 +139,15 @@ export default function App() {
 
   // Not authenticated
   if (!user) {
-    if (authScreen === 'login') {
-      return <Login onBack={() => setAuthScreen('splash')} />;
-    }
-    return (
-      <Splash
-        onGetStarted={() => setAuthScreen('login')}
-        onSignIn={() => setAuthScreen('login')}
-      />
-    );
+    if (authScreen === 'login') return <Login onBack={() => setAuthScreen('splash')} />;
+    return <Splash onGetStarted={() => setAuthScreen('login')} onSignIn={() => setAuthScreen('login')} />;
   }
 
-  // Authenticated — render main app
-  const renderPage = () => {
-    if (selectedId) {
-      const card = photocards.find(p => p.id === selectedId);
-      if (card) {
-        return (
-          <CardDetail
-            photocard={card}
-            onUpdate={handleUpdatePhotocard}
-            onDelete={async (id) => {
-              await handleDeletePhotocard(id);
-              setSelectedId(null);
-            }}
-            onBack={() => setSelectedId(null)}
-          />
-        );
-      }
-    }
+  // Compute card detail state
+  const currentCard = selectedId ? (photocards.find(p => p.id === selectedId) ?? null) : null;
+  const currentCardIndex = currentCard ? photocards.findIndex(p => p.id === selectedId) : -1;
 
+  const renderPage = () => {
     switch (currentPage) {
       case 'Dashboard':
         return (
@@ -150,54 +159,17 @@ export default function App() {
           />
         );
       case 'Scan':
-        return (
-          <Scan onDone={() => setCurrentPage('Collection')} />
-        );
+        return <Scan onDone={() => setCurrentPage('Collection')} />;
       case 'Collection':
         return (
           <Collection
             photocards={photocards}
-            onAdd={handleAddPhotocard}
-            onUpdate={handleUpdatePhotocard}
             onDelete={handleDeletePhotocard}
             onBulkUpdate={handleBulkUpdatePartial}
             onCardClick={(pc) => setSelectedId(pc.id)}
-            triggerAdd={addTrigger}
+            onNewCard={handleAddCard}
           />
         );
-      case 'Groups': {
-        const groupCounts = photocards.reduce((acc, pc) => {
-          const g = pc.group || 'Unknown';
-          acc[g] = (acc[g] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-        const groupStats = Object.entries(groupCounts).sort((a, b) => (b[1] as number) - (a[1] as number));
-        return (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            <h2 className="text-3xl font-bold text-foreground tracking-tight">Groups Binder</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {groupStats.map(([name, count]) => (
-                <motion.div key={name} whileHover={{ y: -8, scale: 1.02 }}
-                  className="glass-card p-10 rounded-[40px] border-4 border-white shadow-xl flex flex-col items-center text-center gap-4 group cursor-pointer"
-                  onClick={() => setCurrentPage('Collection')}>
-                  <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center text-primary font-black text-4xl shadow-inner border-2 border-white group-hover:bg-primary group-hover:text-white transition-all duration-500">
-                    {name.charAt(0)}
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-foreground tracking-tight leading-none mb-1">{name}</h3>
-                    <p className="text-xs font-black text-foreground/40 uppercase tracking-widest">{count} Photocards</p>
-                  </div>
-                </motion.div>
-              ))}
-              {groupStats.length === 0 && (
-                <div className="col-span-full py-20 text-center font-bold text-foreground/30 italic">
-                  No groups yet. Add some cards to see them here!
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      }
       default:
         return (
           <div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-4">
@@ -208,8 +180,17 @@ export default function App() {
     }
   };
 
+  const loadingSpinner = (
+    <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+        <p className="text-xs font-black uppercase tracking-widest text-foreground/40">Loading your collection…</p>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="relative h-screen flex flex-col lg:flex-row overflow-hidden bg-white">
+    <div className="relative h-screen flex flex-col xl:flex-row overflow-hidden bg-white">
       <div className="pointer-events-none absolute inset-0 app-shell-bg" />
       <div className="pointer-events-none absolute inset-0 app-shell-dots opacity-60" />
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -219,22 +200,49 @@ export default function App() {
       </div>
       <Navbar
         currentPage={currentPage}
-        onPageChange={(page) => { setCurrentPage(page); setSelectedId(null); }}
+        onPageChange={(page) => { setCurrentPage(page); setSelectedId(null); setIsFormOpen(false); }}
         profile={profile}
         onSignOut={signOut}
         onAddCard={handleAddCard}
       />
       <main className="relative z-10 flex-1 overflow-auto overflow-x-hidden">
-        <div className="px-4 py-5 lg:p-8 max-w-6xl mx-auto w-full">
-          {dataLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="flex flex-col items-center gap-4">
-                <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-                <p className="text-xs font-black uppercase tracking-widest text-foreground/40">Loading your collection…</p>
-              </div>
-            </div>
-          ) : renderPage()}
-        </div>
+        {dataLoading ? (
+          <div className="px-4 py-5 xl:p-8 max-w-6xl mx-auto w-full">{loadingSpinner}</div>
+        ) : isFormOpen ? (
+          <CardForm
+            key={formCard?.id ?? 'new'}
+            initialData={formCard}
+            onSubmit={async (pc) => {
+              if (formCard) {
+                await handleUpdatePhotocard(pc);
+              } else {
+                await handleAddPhotocard(pc);
+              }
+              setIsFormOpen(false);
+            }}
+            onDelete={formCard ? async (id) => {
+              await handleDeletePhotocard(id);
+              setSelectedId(null);
+              setIsFormOpen(false);
+            } : undefined}
+            onBack={() => setIsFormOpen(false)}
+          />
+        ) : currentCard ? (
+          <CardDetail
+            key={selectedId}
+            photocard={currentCard}
+            onBack={() => setSelectedId(null)}
+            onEdit={() => { setFormCard(currentCard); setIsFormOpen(true); }}
+            hasPrev={currentCardIndex > 0}
+            hasNext={currentCardIndex < photocards.length - 1}
+            onPrev={() => setSelectedId(photocards[currentCardIndex - 1].id)}
+            onNext={() => setSelectedId(photocards[currentCardIndex + 1].id)}
+          />
+        ) : (
+          <div className="px-4 py-5 xl:p-8 max-w-6xl mx-auto w-full">
+            {renderPage()}
+          </div>
+        )}
       </main>
     </div>
   );
