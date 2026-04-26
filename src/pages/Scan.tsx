@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useEffect, ChangeEvent, DragEvent } from 'react';
-import { Upload, Sparkles, Grid3x3, CheckSquare, Square, Loader2, AlertCircle, CheckCircle2, ChevronDown } from 'lucide-react';
+import { Upload, Grid3x3, CheckSquare, Square, Loader2, AlertCircle, CheckCircle2, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { detectPhotocardsInTemplate, GeminiCard } from '../lib/gemini';
 import { detectTemplate, cropImageFromRect, trimBackground, PHOTOCARD_TEMPLATES } from '../lib/crop-pipeline';
 import { insertPhotocard } from '../lib/db';
 import { useAuth } from '../contexts/AuthContext';
@@ -23,7 +22,6 @@ interface ReviewCard {
 }
 
 type Step = 'upload' | 'detecting' | 'review' | 'saving' | 'done';
-type DetectMode = 'ai' | 'grid';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -101,8 +99,9 @@ export default function Scan({ onDone }: { onDone: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<Step>('upload');
   const [templateUrl, setTemplateUrl] = useState<string | null>(null);
-  const [detectMode, setDetectMode] = useState<DetectMode>('ai');
   const [selectedGrid, setSelectedGrid] = useState(PHOTOCARD_TEMPLATES[4]); // 2×3 default
+  const [manualRows, setManualRows] = useState(PHOTOCARD_TEMPLATES[4].rows);
+  const [manualCols, setManualCols] = useState(PHOTOCARD_TEMPLATES[4].cols);
   const [cards, setCards] = useState<ReviewCard[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [savedCount, setSavedCount] = useState(0);
@@ -134,44 +133,6 @@ export default function Scan({ onDone }: { onDone: () => void }) {
     if (f) handleFile(f);
   };
 
-  // ── AI Detection ─────────────────────────────────────────────────────────
-
-  const runAiDetect = useCallback(async () => {
-    if (!templateUrl) return;
-    setStep('detecting');
-    setError(null);
-    try {
-      const geminiCards: GeminiCard[] = await detectPhotocardsInTemplate(templateUrl);
-      const img = await loadImage(templateUrl);
-
-      const reviewCards: ReviewCard[] = await Promise.all(
-        geminiCards.map(async (gc) => {
-          const box = gc.boundingBox;
-          const trimmed = await trimBackground(img, box);
-          const cropUrl = cropImageFromRect(img, trimmed);
-          return {
-            id: makeId(),
-            cropUrl,
-            member: gc.member ?? '',
-            group: gc.group ?? '',
-            album: gc.album ?? '',
-            era: gc.era ?? gc.album ?? '',
-            version: gc.version ?? '',
-            year: new Date().getFullYear(),
-            status: 'owned' as Status,
-            selected: true,
-          };
-        })
-      );
-
-      setCards(reviewCards);
-      setStep('review');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Detection failed. Try again.');
-      setStep('upload');
-    }
-  }, [templateUrl]);
-
   // ── Grid Detection ────────────────────────────────────────────────────────
 
   const runGridDetect = useCallback(async () => {
@@ -182,6 +143,11 @@ export default function Scan({ onDone }: { onDone: () => void }) {
       const img = await loadImage(templateUrl);
       const result = detectTemplate(img);
       const cells = result?.cells ?? [];
+      if (result) {
+        setSelectedGrid(result.template);
+        setManualRows(result.detectedRows);
+        setManualCols(result.detectedCols);
+      }
 
       const reviewCards: ReviewCard[] = await Promise.all(
         cells.flat().map(async (cell) => {
@@ -218,7 +184,8 @@ export default function Scan({ onDone }: { onDone: () => void }) {
     setError(null);
     try {
       const img = await loadImage(templateUrl);
-      const { rows, cols } = selectedGrid;
+      const rows = Math.max(1, Math.min(20, manualRows));
+      const cols = Math.max(1, Math.min(20, manualCols));
       const cellW = 1 / cols;
       const cellH = 1 / rows;
       const reviewCards: ReviewCard[] = [];
@@ -241,7 +208,7 @@ export default function Scan({ onDone }: { onDone: () => void }) {
       setError(err instanceof Error ? err.message : 'Failed to splice grid.');
       setStep('upload');
     }
-  }, [templateUrl, selectedGrid]);
+  }, [templateUrl, manualRows, manualCols]);
 
   // ── Apply global status ───────────────────────────────────────────────────
 
@@ -360,66 +327,69 @@ export default function Scan({ onDone }: { onDone: () => void }) {
                 <img src={templateUrl} alt="Template preview" className="w-full max-h-72 object-contain rounded-2xl" />
               </div>
 
-              {/* Detection mode tabs */}
+              {/* Detection controls */}
               <div className="glass-card rounded-3xl p-6 border border-white/60 space-y-4">
-                <p className="text-xs font-black uppercase tracking-widest text-foreground/40">Detection method</p>
-                <div className="flex gap-2">
-                  {(['ai', 'grid'] as DetectMode[]).map(mode => (
-                    <button key={mode} onClick={() => setDetectMode(mode)}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-tight transition-all ${detectMode === mode ? 'bg-primary text-white shadow-md' : 'bg-gray-100 text-foreground/50 hover:bg-gray-200'}`}>
-                      {mode === 'ai' ? <><Sparkles size={13} /> AI Auto-detect</> : <><Grid3x3 size={13} /> Manual Grid</>}
-                    </button>
-                  ))}
-                </div>
-
-                {detectMode === 'ai' && (
+                <div className="space-y-3">
+                  <p className="text-xs font-black uppercase tracking-widest text-foreground/40">Grid splicing</p>
                   <p className="text-xs text-foreground/40 font-medium">
-                    Gemini AI will identify each photocard and auto-fill member names, group, album, and version.
-                    Requires a Gemini API key in your <code className="bg-gray-100 px-1 rounded text-[10px]">.env.local</code>.
+                    Auto-detects white separator lines, or pick the grid manually. You'll fill in card info after.
                   </p>
-                )}
-
-                {detectMode === 'grid' && (
-                  <div className="space-y-3">
-                    <p className="text-xs text-foreground/40 font-medium">
-                      Auto-detects white separator lines, or pick the grid manually. You'll fill in card info after.
-                    </p>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="text-xs font-black uppercase tracking-widest text-foreground/40">Grid size:</span>
-                      <div className="relative">
-                        <select
-                          value={selectedGrid.name}
-                          onChange={e => setSelectedGrid(PHOTOCARD_TEMPLATES.find(t => t.name === e.target.value)!)}
-                          className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-gray-200 bg-white text-xs font-bold text-foreground focus:outline-none focus:border-primary/50 cursor-pointer"
-                        >
-                          {PHOTOCARD_TEMPLATES.map(t => (
-                            <option key={t.name} value={t.name}>{t.name} ({t.rows * t.cols} cards)</option>
-                          ))}
-                        </select>
-                        <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground/40 pointer-events-none" />
-                      </div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-xs font-black uppercase tracking-widest text-foreground/40">Preset:</span>
+                    <div className="relative">
+                      <select
+                        value={selectedGrid.name}
+                        onChange={e => {
+                          const next = PHOTOCARD_TEMPLATES.find(t => t.name === e.target.value)!;
+                          setSelectedGrid(next);
+                          setManualRows(next.rows);
+                          setManualCols(next.cols);
+                        }}
+                        className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-gray-200 bg-white text-xs font-bold text-foreground focus:outline-none focus:border-primary/50 cursor-pointer"
+                      >
+                        {PHOTOCARD_TEMPLATES.map(t => (
+                          <option key={t.name} value={t.name}>{t.name} ({t.rows * t.cols} cards)</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground/40 pointer-events-none" />
+                    </div>
+                    <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-foreground/40">
+                      Rows
+                      <input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={manualRows}
+                        onChange={e => setManualRows(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+                        className="w-16 rounded-xl border border-gray-200 bg-white px-2 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50"
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-foreground/40">
+                      Columns
+                      <input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={manualCols}
+                        onChange={e => setManualCols(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+                        className="w-16 rounded-xl border border-gray-200 bg-white px-2 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50"
+                      />
+                    </label>
+                    <div className="rounded-full bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-primary">
+                      {manualRows * manualCols} cards
                     </div>
                   </div>
-                )}
+                </div>
 
                 <div className="flex gap-2 pt-1">
-                  {detectMode === 'ai' ? (
-                    <button onClick={runAiDetect}
-                      className="btn-primary-pink flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-black uppercase tracking-tight">
-                      <Sparkles size={15} /> Detect with AI
-                    </button>
-                  ) : (
-                    <>
-                      <button onClick={runGridDetect}
-                        className="btn-primary-pink flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black uppercase tracking-tight">
-                        <Grid3x3 size={14} /> Auto-detect Grid
-                      </button>
-                      <button onClick={runManualGrid}
-                        className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gray-100 text-foreground font-black text-sm uppercase tracking-tight hover:bg-gray-200 transition-all">
-                        Use {selectedGrid.name} Grid
-                      </button>
-                    </>
-                  )}
+                  <button onClick={runGridDetect}
+                    className="btn-primary-pink flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black uppercase tracking-tight">
+                    <Grid3x3 size={14} /> Auto-detect Grid
+                  </button>
+                  <button onClick={runManualGrid}
+                    className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gray-100 text-foreground font-black text-sm uppercase tracking-tight hover:bg-gray-200 transition-all">
+                    Use {manualCols}×{manualRows} Grid
+                  </button>
                 </div>
               </div>
             </motion.div>
@@ -435,10 +405,10 @@ export default function Scan({ onDone }: { onDone: () => void }) {
           </div>
           <div className="text-center">
             <p className="font-black text-foreground uppercase tracking-tight text-xl">
-              {detectMode === 'ai' ? 'Analyzing with Gemini AI…' : 'Splicing template…'}
+              Splicing template…
             </p>
             <p className="text-sm text-foreground/40 font-medium mt-1">
-              {detectMode === 'ai' ? 'Detecting photocards and reading metadata' : 'Detecting grid lines and cropping cards'}
+              Detecting grid lines and cropping cards
             </p>
           </div>
         </div>
@@ -474,11 +444,12 @@ export default function Scan({ onDone }: { onDone: () => void }) {
             <div className="border-t border-gray-100 pt-3">
               <p className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-2">Fill selected cards:</p>
               <div className="flex flex-wrap gap-3">
-                <BulkField label="Group" placeholder="e.g. aespa" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, group: v } : c))} />
-                <BulkField label="Member" placeholder="e.g. Karina" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, member: v } : c))} />
-                <BulkField label="Album/Era" placeholder="e.g. Drama" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, album: v, era: v } : c))} />
-                <BulkField label="Version" placeholder="e.g. A ver." onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, version: v } : c))} />
-                <BulkField label="Year" placeholder="e.g. 2024" onApply={v => { const y = parseInt(v); if (!isNaN(y)) setCards(prev => prev.map(c => c.selected ? { ...c, year: y } : c)); }} />
+                <BulkField label="Group" placeholder="Stray Kids" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, group: v } : c))} />
+                <BulkField label="Member" placeholder="Felix" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, member: v } : c))} />
+                <BulkField label="Album" placeholder="DO IT" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, album: v } : c))} />
+                <BulkField label="Era" placeholder="DO IT" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, era: v } : c))} />
+                <BulkField label="Version" placeholder="Felix Accordion ver." onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, version: v } : c))} />
+                <BulkField label="Year" placeholder="2025" onApply={v => { const y = parseInt(v); if (!isNaN(y)) setCards(prev => prev.map(c => c.selected ? { ...c, year: y } : c)); }} />
               </div>
             </div>
           </div>
@@ -493,19 +464,23 @@ export default function Scan({ onDone }: { onDone: () => void }) {
                   <img src={card.cropUrl} alt="" className="w-full h-full object-cover" />
                   <button
                     onClick={() => updateCard(card.id, { selected: !card.selected })}
-                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white shadow flex items-center justify-center">
+                    aria-label={card.selected ? 'Deselect card' : 'Select card'}
+                    className="absolute inset-0 flex items-start justify-end p-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow">
                     {card.selected
                       ? <CheckSquare size={13} className="text-primary" />
                       : <Square size={13} className="text-foreground/30" />}
+                    </span>
                   </button>
                 </div>
 
                 {/* Editable fields */}
                 <div className="p-3 space-y-2">
-                  <Field label="Member" value={card.member} onChange={v => updateCard(card.id, { member: v })} />
-                  <Field label="Group" value={card.group} onChange={v => updateCard(card.id, { group: v })} />
-                  <Field label="Album/Era" value={card.album} onChange={v => updateCard(card.id, { album: v, era: v })} />
-                  <Field label="Version" value={card.version} onChange={v => updateCard(card.id, { version: v })} placeholder="e.g. A ver." />
+                  <Field label="Member" value={card.member} onChange={v => updateCard(card.id, { member: v })} placeholder="Felix" />
+                  <Field label="Group" value={card.group} onChange={v => updateCard(card.id, { group: v })} placeholder="Stray Kids" />
+                  <Field label="Album" value={card.album} onChange={v => updateCard(card.id, { album: v })} placeholder="DO IT" />
+                  <Field label="Era" value={card.era} onChange={v => updateCard(card.id, { era: v })} placeholder="DO IT" />
+                  <Field label="Version" value={card.version} onChange={v => updateCard(card.id, { version: v })} placeholder="Felix Accordion ver." />
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Status</label>
                     <select value={card.status} onChange={e => updateCard(card.id, { status: e.target.value as Status })}

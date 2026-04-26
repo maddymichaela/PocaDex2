@@ -305,11 +305,19 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
                 {selectedIds.length} CARD{selectedIds.length !== 1 ? 'S' : ''} SELECTED
               </span>
               <button
-                onClick={() => setSelectedIds(selectedIds.length === processedPhotocards.length ? [] : processedPhotocards.map(p => p.id))}
+                onClick={() => setSelectedIds(processedPhotocards.map(p => p.id))}
                 className="text-[9px] md:text-[10px] font-black text-foreground/40 uppercase tracking-widest hover:text-secondary transition-colors underline decoration-dotted"
               >
-                {selectedIds.length === processedPhotocards.length ? 'DESELECT ALL' : 'SELECT ALL FILTERED'}
+                Select all
               </button>
+              {selectedIds.length > 0 && (
+                <button
+                  onClick={() => setSelectedIds([])}
+                  className="text-[9px] md:text-[10px] font-black text-foreground/40 uppercase tracking-widest hover:text-red-400 transition-colors underline decoration-dotted"
+                >
+                  Deselect all
+                </button>
+              )}
             </div>
             <div className="flex gap-2 w-full md:w-auto">
               <button
