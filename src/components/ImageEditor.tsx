@@ -11,16 +11,17 @@ import ModalShell from './ModalShell';
 
 interface ImageEditorProps {
   image: string;
-  onSave: (croppedImage: string) => void;
-  onCancel: () => void;
+  onSave: (croppedImage: string, croppedAreaPixels?: Area) => void;
+  onCancel: (croppedAreaPixels?: Area) => void;
   aspectRatio?: number;
+  initialCroppedAreaPixels?: Area;
 }
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 10;
 const ZOOM_STEP = 0.25;
 
-export default function ImageEditor({ image, onSave, onCancel, aspectRatio = 1 / 1.5 }: ImageEditorProps) {
+export default function ImageEditor({ image, onSave, onCancel, aspectRatio = 1 / 1.5, initialCroppedAreaPixels }: ImageEditorProps) {
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -45,12 +46,14 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = 1 /
           { horizontal: false, vertical: false },
           adjustments
         );
-        onSave(croppedImage);
+        onSave(croppedImage, croppedAreaPixels);
       }
     } catch (e) {
       console.error(e);
     }
   };
+
+  const handleCancel = () => onCancel(croppedAreaPixels ?? initialCroppedAreaPixels);
 
   const resetAll = () => {
     setAdjustments({ brightness: 100, contrast: 100, saturation: 100 });
@@ -66,14 +69,14 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = 1 /
       title="Studio Editor"
       subtitle="Adjust & crop card memory"
       icon={<Sparkles className="h-5 w-5 animate-pulse" />}
-      onClose={onCancel}
+      onClose={handleCancel}
       maxWidth="md:max-w-5xl"
       overlayClassName="bg-black/80 backdrop-blur-sm"
       panelClassName="md:border-[8px] md:border-white"
       footer={(
         <div className="flex gap-3 md:gap-4">
           <button
-            onClick={onCancel}
+            onClick={handleCancel}
             className="flex-1 shrink-0 rounded-xl border-2 border-gray-50 bg-white py-3.5 text-[9px] font-black uppercase tracking-widest text-foreground/30 transition-all hover:bg-gray-50 hover:text-foreground md:rounded-2xl md:py-4 md:text-xs"
           >
             Cancel
@@ -89,10 +92,10 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = 1 /
       )}
     >
           {/* 2-column on md+, stacked on mobile */}
-          <div className="flex flex-col md:flex-row gap-5 p-5 md:gap-6 md:p-6 xl:gap-8 xl:p-8 md:items-start">
+          <div className="flex flex-col gap-4 p-3 md:flex-row md:items-start md:gap-5 md:p-4 xl:p-5">
 
             {/* Left column: portrait crop + zoom */}
-            <div className="md:w-[280px] xl:w-[320px] shrink-0 space-y-4">
+            <div className="md:w-[340px] xl:w-[400px] shrink-0 space-y-4">
 
               {/* Portrait crop area — aspect-[2/3] keeps it taller than wide */}
               <div className="relative overflow-hidden rounded-[28px] md:rounded-[40px] border border-gray-100 bg-gray-100 aspect-[2/3]">
@@ -110,6 +113,7 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = 1 /
                     zoom={zoom}
                     rotation={rotation}
                     aspect={aspectRatio}
+                    initialCroppedAreaPixels={initialCroppedAreaPixels}
                     onCropChange={setCrop}
                     onCropComplete={onCropComplete}
                     onZoomChange={setZoom}

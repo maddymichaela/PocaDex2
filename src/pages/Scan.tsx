@@ -1,6 +1,7 @@
-import { useState, useRef, useCallback, useEffect, ChangeEvent, DragEvent } from 'react';
+import { useState, useRef, useCallback, ChangeEvent, DragEvent } from 'react';
 import { Upload, Grid3x3, CheckSquare, Square, Loader2, AlertCircle, CheckCircle2, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Area } from 'react-easy-crop';
 import { detectTemplate, cropImageFromRect, trimBackground, PHOTOCARD_TEMPLATES, templateCellRects, GridTemplate } from '../lib/crop-pipeline';
 import { insertPhotocard } from '../lib/db';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,6 +13,7 @@ import ImageEditor from '../components/ImageEditor';
 interface ReviewCard {
   id: string;
   cropUrl: string;
+  cropAreaPixels: Area;
   member: string;
   group: string;
   album: string;
@@ -44,10 +46,20 @@ function makeId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-function emptyReviewCard(cropUrl: string): ReviewCard {
+function rectToArea(crop: { x: number; y: number; w: number; h: number }, img: HTMLImageElement): Area {
+  return {
+    x: Math.round(crop.x * img.naturalWidth),
+    y: Math.round(crop.y * img.naturalHeight),
+    width: Math.max(1, Math.round(crop.w * img.naturalWidth)),
+    height: Math.max(1, Math.round(crop.h * img.naturalHeight)),
+  };
+}
+
+function emptyReviewCard(cropUrl: string, cropAreaPixels: Area): ReviewCard {
   return {
     id: makeId(),
     cropUrl,
+    cropAreaPixels,
     member: '',
     group: '',
     album: '',
@@ -116,8 +128,8 @@ function BulkField({ label, placeholder, onApply, required = false }: {
 }) {
   const [val, setVal] = useState('');
   return (
-    <div className="flex items-end gap-1">
-      <div>
+    <div className="flex w-full min-w-0 items-end gap-2">
+      <div className="min-w-0 flex-1">
         <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">
           {label}{required ? ' *' : ''}
         </label>
@@ -125,7 +137,7 @@ function BulkField({ label, placeholder, onApply, required = false }: {
           value={val}
           onChange={e => setVal(e.target.value)}
           placeholder={placeholder ?? label}
-          className="w-24 px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-primary/40"
+          className="w-full px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-primary/40"
         />
       </div>
       <button
@@ -152,7 +164,6 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
   const [error, setError] = useState<string | null>(null);
   const [savedCount, setSavedCount] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [globalStatus, setGlobalStatus] = useState<Status>('owned');
   const [editingCropId, setEditingCropId] = useState<string | null>(null);
 
   const selectedCards = cards.filter(c => c.selected);
@@ -202,7 +213,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
         cells.flat().map(async (cell) => {
           const trimmed = await trimBackground(img, cell);
           const cropUrl = cropImageFromRect(img, trimmed);
-          return emptyReviewCard(cropUrl);
+          return emptyReviewCard(cropUrl, rectToArea(trimmed, img));
         })
       );
 
@@ -230,7 +241,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
         for (const box of row) {
           const trimmed = await trimBackground(img, box);
           const cropUrl = cropImageFromRect(img, trimmed);
-          reviewCards.push(emptyReviewCard(cropUrl));
+          reviewCards.push(emptyReviewCard(cropUrl, rectToArea(trimmed, img)));
         }
       }
 
@@ -241,12 +252,6 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
       setStep('upload');
     }
   }, [templateUrl, manualRows, manualCols, selectedGrid]);
-
-  // ── Apply global status ───────────────────────────────────────────────────
-
-  useEffect(() => {
-    setCards(prev => prev.map(c => ({ ...c, status: globalStatus })));
-  }, [globalStatus]);
 
   // ── Card field update ─────────────────────────────────────────────────────
 
@@ -259,9 +264,19 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
     setCards(prev => prev.map(c => ({ ...c, selected: !allSelected })));
   };
 
-  const handleSaveEditedCrop = (croppedImage: string) => {
+  const handleSaveEditedCrop = (croppedImage: string, cropAreaPixels?: Area) => {
     if (!editingCropId) return;
-    updateCard(editingCropId, { cropUrl: croppedImage });
+    updateCard(editingCropId, {
+      cropUrl: croppedImage,
+      ...(cropAreaPixels ? { cropAreaPixels } : {}),
+    });
+    setEditingCropId(null);
+  };
+
+  const handleCancelCropEdit = (cropAreaPixels?: Area) => {
+    if (editingCropId && cropAreaPixels) {
+      updateCard(editingCropId, { cropAreaPixels });
+    }
     setEditingCropId(null);
   };
 
@@ -460,22 +475,11 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
         <div className="space-y-5">
           {/* Controls */}
           <div className="glass-card rounded-2xl px-5 py-4 border border-white/60 space-y-3">
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-wrap items-center gap-3">
               <button onClick={toggleAll} className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-foreground/50 hover:text-foreground transition-colors">
                 {cards.every(c => c.selected) ? <CheckSquare size={14} className="text-primary" /> : <Square size={14} />}
                 {cards.every(c => c.selected) ? 'Deselect all' : 'Select all'}
               </button>
-
-              <div className="flex items-center gap-2 ml-auto">
-                <span className="text-xs font-black uppercase tracking-widest text-foreground/40">Status *:</span>
-                <select value={globalStatus} onChange={e => setGlobalStatus(e.target.value as Status)}
-                  className="appearance-none px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-bold text-foreground focus:outline-none focus:border-primary/50 cursor-pointer">
-                  <option value="owned">Owned</option>
-                  <option value="wishlist">Wishlist</option>
-                  <option value="on_the_way">On the way</option>
-                </select>
-              </div>
-
               <span className="text-xs font-bold text-foreground/40">
                 {selectedCards.length} / {cards.length} selected
               </span>
@@ -484,16 +488,16 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
             {/* Bulk fill row */}
             <div className="border-t border-gray-100 pt-3">
               <p className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-2">Fill selected cards:</p>
-              <div className="flex flex-wrap gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <BulkField label="Group" placeholder="Stray Kids" required onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, group: v } : c))} />
                 <BulkField label="Album" placeholder="DO IT" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, album: v } : c))} />
                 <BulkField label="Era" placeholder="DO IT" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, era: v } : c))} />
                 <BulkField label="Year" placeholder="2025" onApply={v => { const y = parseInt(v); if (!isNaN(y)) setCards(prev => prev.map(c => c.selected ? { ...c, year: y } : c)); }} />
-                <div>
+                <div className="min-w-0">
                   <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Status *</label>
                   <select
                     onChange={e => setCards(prev => prev.map(c => c.selected ? { ...c, status: e.target.value as Status } : c))}
-                    className="w-28 px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground focus:outline-none focus:border-primary/40"
+                    className="w-full px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground focus:outline-none focus:border-primary/40"
                     defaultValue=""
                   >
                     <option value="" disabled>Choose</option>
@@ -502,11 +506,11 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
                     <option value="on_the_way">On the way</option>
                   </select>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Condition</label>
                   <select
                     onChange={e => setCards(prev => prev.map(c => c.selected ? { ...c, condition: e.target.value as Condition } : c))}
-                    className="w-28 px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground focus:outline-none focus:border-primary/40"
+                    className="w-full px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground focus:outline-none focus:border-primary/40"
                     defaultValue=""
                   >
                     <option value="" disabled>Choose</option>
@@ -517,11 +521,11 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
                     <option value="poor">Poor</option>
                   </select>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Duplicates</label>
                   <select
                     onChange={e => setCards(prev => prev.map(c => c.selected ? { ...c, isDuplicate: e.target.value === 'true' } : c))}
-                    className="w-24 px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground focus:outline-none focus:border-primary/40"
+                    className="w-full px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground focus:outline-none focus:border-primary/40"
                     defaultValue=""
                   >
                     <option value="" disabled>Choose</option>
@@ -679,8 +683,9 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
         {editingCropId && templateUrl && (
           <ImageEditor
             image={templateUrl}
+            initialCroppedAreaPixels={cards.find(card => card.id === editingCropId)?.cropAreaPixels}
             onSave={handleSaveEditedCrop}
-            onCancel={() => setEditingCropId(null)}
+            onCancel={handleCancelCropEdit}
           />
         )}
       </AnimatePresence>
