@@ -242,7 +242,7 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
               <div className="space-y-3 md:space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                   <div className="space-y-0">
-                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Group*</label>
+                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Group *</label>
                     <input
                       required
                       type="text"
@@ -253,7 +253,7 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
                     />
                   </div>
                   <div className="space-y-0">
-                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Member*</label>
+                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Member *</label>
                     <input
                       required
                       type="text"
@@ -312,7 +312,7 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
                 </div>
 
                 <div className="space-y-0">
-                  <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Photocard Name*</label>
+                  <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Photocard Name *</label>
                   <input
                     required
                     type="text"
@@ -342,7 +342,7 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 border-t border-gray-50 pt-6 md:pt-8">
               <div className="space-y-0">
-                <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Status*</label>
+                <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Status *</label>
                 <div className="flex bg-gray-50 p-1.5 md:p-2 rounded-2xl md:rounded-[24px] gap-1.5 md:gap-2">
                   {statusOptions.map((opt) => (
                     <button

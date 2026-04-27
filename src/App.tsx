@@ -125,6 +125,13 @@ export default function App() {
     }
   }, [user]);
 
+  const handleScanImported = useCallback((savedCards: Photocard[]) => {
+    setPhotocards(prev => {
+      const savedIds = new Set(savedCards.map(card => card.id));
+      return [...savedCards, ...prev.filter(card => !savedIds.has(card.id))];
+    });
+  }, []);
+
   // Auth loading
   if (authLoading) {
     return (
@@ -159,7 +166,7 @@ export default function App() {
           />
         );
       case 'Scan':
-        return <Scan onDone={() => setCurrentPage('Collection')} />;
+        return <Scan onDone={() => setCurrentPage('Collection')} onImported={handleScanImported} />;
       case 'Collection':
         return (
           <Collection

@@ -1,10 +1,11 @@
 import { useState, useRef, useCallback, useEffect, ChangeEvent, DragEvent } from 'react';
 import { Upload, Grid3x3, CheckSquare, Square, Loader2, AlertCircle, CheckCircle2, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { detectTemplate, cropImageFromRect, trimBackground, PHOTOCARD_TEMPLATES } from '../lib/crop-pipeline';
+import { detectTemplate, cropImageFromRect, trimBackground, PHOTOCARD_TEMPLATES, templateCellRects, GridTemplate } from '../lib/crop-pipeline';
 import { insertPhotocard } from '../lib/db';
 import { useAuth } from '../contexts/AuthContext';
-import { Status, Condition } from '../types';
+import { Status, Condition, Photocard } from '../types';
+import ImageEditor from '../components/ImageEditor';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -15,13 +16,18 @@ interface ReviewCard {
   group: string;
   album: string;
   era: string;
+  cardName: string;
   version: string;
   year: number;
   status: Status;
+  condition: Condition;
+  isDuplicate: boolean;
+  notes: string;
   selected: boolean;
 }
 
 type Step = 'upload' | 'detecting' | 'review' | 'saving' | 'done';
+const DEFAULT_TEMPLATE = PHOTOCARD_TEMPLATES[5]; // 2×4 is the most reliable common fan-template layout.
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -38,6 +44,41 @@ function makeId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+function emptyReviewCard(cropUrl: string): ReviewCard {
+  return {
+    id: makeId(),
+    cropUrl,
+    member: '',
+    group: '',
+    album: '',
+    era: '',
+    cardName: '',
+    version: '',
+    year: new Date().getFullYear(),
+    status: 'owned',
+    condition: 'mint',
+    isDuplicate: false,
+    notes: '',
+    selected: true,
+  };
+}
+
+function manualTemplate(rows: number, cols: number, selectedGrid: GridTemplate): GridTemplate {
+  const safeRows = Math.max(1, Math.min(20, rows));
+  const safeCols = Math.max(1, Math.min(20, cols));
+  if (selectedGrid.rows === safeRows && selectedGrid.cols === safeCols) return selectedGrid;
+  return {
+    name: `${safeCols}×${safeRows}`,
+    rows: safeRows,
+    cols: safeCols,
+    margin: { top: 0.02, bottom: 0.02, left: 0.02, right: 0.02 },
+    gap: {
+      row: safeRows > 1 ? 0.012 : 0,
+      col: safeCols > 1 ? 0.012 : 0,
+    },
+  };
+}
+
 function fieldClass(label: string) {
   return (
     <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">
@@ -49,17 +90,20 @@ void fieldClass; // used inline below
 
 // ── Editable field ─────────────────────────────────────────────────────────
 
-function Field({ label, value, onChange, placeholder }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder?: string;
+function Field({ label, value, onChange, placeholder, required = false, invalid = false }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean; invalid?: boolean;
 }) {
   return (
     <div>
-      <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">{label}</label>
+      <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">
+        {label}{required ? ' *' : ''}
+      </label>
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder ?? label}
-        className="w-full px-2 py-1.5 rounded-xl border border-gray-100 bg-white/80 text-xs font-medium text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-primary/40 transition-colors"
+        aria-required={required}
+        className={`w-full px-2 py-1.5 rounded-xl border bg-white/80 text-xs font-medium text-foreground placeholder:text-foreground/25 focus:outline-none transition-colors ${invalid ? 'border-red-200 focus:border-red-400' : 'border-gray-100 focus:border-primary/40'}`}
       />
     </div>
   );
@@ -67,14 +111,16 @@ function Field({ label, value, onChange, placeholder }: {
 
 // ── Bulk field (apply one value to all selected cards) ─────────────────────
 
-function BulkField({ label, placeholder, onApply }: {
-  label: string; placeholder?: string; onApply: (v: string) => void;
+function BulkField({ label, placeholder, onApply, required = false }: {
+  label: string; placeholder?: string; onApply: (v: string) => void; required?: boolean;
 }) {
   const [val, setVal] = useState('');
   return (
     <div className="flex items-end gap-1">
       <div>
-        <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">{label}</label>
+        <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">
+          {label}{required ? ' *' : ''}
+        </label>
         <input
           value={val}
           onChange={e => setVal(e.target.value)}
@@ -94,21 +140,24 @@ function BulkField({ label, placeholder, onApply }: {
 
 // ── Main component ─────────────────────────────────────────────────────────
 
-export default function Scan({ onDone }: { onDone: () => void }) {
+export default function Scan({ onDone, onImported }: { onDone: () => void; onImported?: (cards: Photocard[]) => void }) {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<Step>('upload');
   const [templateUrl, setTemplateUrl] = useState<string | null>(null);
-  const [selectedGrid, setSelectedGrid] = useState(PHOTOCARD_TEMPLATES[4]); // 2×3 default
-  const [manualRows, setManualRows] = useState(PHOTOCARD_TEMPLATES[4].rows);
-  const [manualCols, setManualCols] = useState(PHOTOCARD_TEMPLATES[4].cols);
+  const [selectedGrid, setSelectedGrid] = useState(DEFAULT_TEMPLATE);
+  const [manualRows, setManualRows] = useState(DEFAULT_TEMPLATE.rows);
+  const [manualCols, setManualCols] = useState(DEFAULT_TEMPLATE.cols);
   const [cards, setCards] = useState<ReviewCard[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [savedCount, setSavedCount] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [globalStatus, setGlobalStatus] = useState<Status>('owned');
+  const [editingCropId, setEditingCropId] = useState<string | null>(null);
 
   const selectedCards = cards.filter(c => c.selected);
+  const missingRequiredCount = selectedCards.filter(c => !c.group.trim() || !c.member.trim() || !c.cardName.trim()).length;
+  const canSaveSelectedCards = selectedCards.length > 0 && missingRequiredCount === 0;
 
   // ── File handling ────────────────────────────────────────────────────────
 
@@ -153,18 +202,7 @@ export default function Scan({ onDone }: { onDone: () => void }) {
         cells.flat().map(async (cell) => {
           const trimmed = await trimBackground(img, cell);
           const cropUrl = cropImageFromRect(img, trimmed);
-          return {
-            id: makeId(),
-            cropUrl,
-            member: '',
-            group: '',
-            album: '',
-            era: '',
-            version: '',
-            year: new Date().getFullYear(),
-            status: 'owned' as Status,
-            selected: true,
-          };
+          return emptyReviewCard(cropUrl);
         })
       );
 
@@ -184,21 +222,15 @@ export default function Scan({ onDone }: { onDone: () => void }) {
     setError(null);
     try {
       const img = await loadImage(templateUrl);
-      const rows = Math.max(1, Math.min(20, manualRows));
-      const cols = Math.max(1, Math.min(20, manualCols));
-      const cellW = 1 / cols;
-      const cellH = 1 / rows;
+      const template = manualTemplate(manualRows, manualCols, selectedGrid);
+      const cells = templateCellRects(template);
       const reviewCards: ReviewCard[] = [];
 
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          const box = { x: c * cellW, y: r * cellH, w: cellW, h: cellH };
+      for (const row of cells) {
+        for (const box of row) {
           const trimmed = await trimBackground(img, box);
           const cropUrl = cropImageFromRect(img, trimmed);
-          reviewCards.push({
-            id: makeId(), cropUrl, member: '', group: '', album: '', era: '', version: '',
-            year: new Date().getFullYear(), status: 'owned', selected: true,
-          });
+          reviewCards.push(emptyReviewCard(cropUrl));
         }
       }
 
@@ -208,7 +240,7 @@ export default function Scan({ onDone }: { onDone: () => void }) {
       setError(err instanceof Error ? err.message : 'Failed to splice grid.');
       setStep('upload');
     }
-  }, [templateUrl, manualRows, manualCols]);
+  }, [templateUrl, manualRows, manualCols, selectedGrid]);
 
   // ── Apply global status ───────────────────────────────────────────────────
 
@@ -227,35 +259,44 @@ export default function Scan({ onDone }: { onDone: () => void }) {
     setCards(prev => prev.map(c => ({ ...c, selected: !allSelected })));
   };
 
+  const handleSaveEditedCrop = (croppedImage: string) => {
+    if (!editingCropId) return;
+    updateCard(editingCropId, { cropUrl: croppedImage });
+    setEditingCropId(null);
+  };
+
   // ── Save ──────────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
-    if (!user || selectedCards.length === 0) return;
+    if (!user || !canSaveSelectedCards) return;
     setStep('saving');
     let count = 0;
+    const savedCards: Photocard[] = [];
     for (const card of selectedCards) {
       try {
-        await insertPhotocard(user.id, {
+        const saved = await insertPhotocard(user.id, {
           id: card.id,
           group: card.group || undefined,
-          member: card.member || 'Unknown',
-          album: card.album || 'Unknown',
+          member: card.member,
+          album: card.album,
           era: card.era || undefined,
           year: card.year,
-          cardName: `${card.member} ${card.album}`.trim(),
+          cardName: card.cardName,
           version: card.version || '',
           status: card.status,
-          condition: undefined as Condition | undefined,
-          isDuplicate: false,
-          notes: undefined,
+          condition: card.status === 'owned' ? card.condition : undefined as Condition | undefined,
+          isDuplicate: card.isDuplicate,
+          notes: card.notes || undefined,
           imageUrl: card.cropUrl,
           createdAt: Date.now(),
         });
+        savedCards.push(saved);
         count++;
       } catch (err) {
         console.error('Failed to save card:', err);
       }
     }
+    if (savedCards.length > 0) onImported?.(savedCards);
     setSavedCount(count);
     setStep('done');
   };
@@ -426,7 +467,7 @@ export default function Scan({ onDone }: { onDone: () => void }) {
               </button>
 
               <div className="flex items-center gap-2 ml-auto">
-                <span className="text-xs font-black uppercase tracking-widest text-foreground/40">Status:</span>
+                <span className="text-xs font-black uppercase tracking-widest text-foreground/40">Status *:</span>
                 <select value={globalStatus} onChange={e => setGlobalStatus(e.target.value as Status)}
                   className="appearance-none px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-bold text-foreground focus:outline-none focus:border-primary/50 cursor-pointer">
                   <option value="owned">Owned</option>
@@ -444,12 +485,50 @@ export default function Scan({ onDone }: { onDone: () => void }) {
             <div className="border-t border-gray-100 pt-3">
               <p className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-2">Fill selected cards:</p>
               <div className="flex flex-wrap gap-3">
-                <BulkField label="Group" placeholder="Stray Kids" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, group: v } : c))} />
-                <BulkField label="Member" placeholder="Felix" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, member: v } : c))} />
+                <BulkField label="Group" placeholder="Stray Kids" required onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, group: v } : c))} />
                 <BulkField label="Album" placeholder="DO IT" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, album: v } : c))} />
                 <BulkField label="Era" placeholder="DO IT" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, era: v } : c))} />
-                <BulkField label="Version" placeholder="Felix Accordion ver." onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, version: v } : c))} />
                 <BulkField label="Year" placeholder="2025" onApply={v => { const y = parseInt(v); if (!isNaN(y)) setCards(prev => prev.map(c => c.selected ? { ...c, year: y } : c)); }} />
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Status *</label>
+                  <select
+                    onChange={e => setCards(prev => prev.map(c => c.selected ? { ...c, status: e.target.value as Status } : c))}
+                    className="w-28 px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground focus:outline-none focus:border-primary/40"
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Choose</option>
+                    <option value="owned">Owned</option>
+                    <option value="wishlist">Wishlist</option>
+                    <option value="on_the_way">On the way</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Condition</label>
+                  <select
+                    onChange={e => setCards(prev => prev.map(c => c.selected ? { ...c, condition: e.target.value as Condition } : c))}
+                    className="w-28 px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground focus:outline-none focus:border-primary/40"
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Choose</option>
+                    <option value="mint">Mint</option>
+                    <option value="near_mint">Near mint</option>
+                    <option value="good">Good</option>
+                    <option value="fair">Fair</option>
+                    <option value="poor">Poor</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Duplicates</label>
+                  <select
+                    onChange={e => setCards(prev => prev.map(c => c.selected ? { ...c, isDuplicate: e.target.value === 'true' } : c))}
+                    className="w-24 px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground focus:outline-none focus:border-primary/40"
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Choose</option>
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -460,35 +539,75 @@ export default function Scan({ onDone }: { onDone: () => void }) {
               <motion.div key={card.id} layout
                 className={`glass-card rounded-2xl border-2 overflow-hidden transition-all ${card.selected ? 'border-primary/40 shadow-md' : 'border-white/40 opacity-50'}`}>
                 {/* Crop preview */}
-                <div className="relative aspect-[54/86] bg-gray-50 overflow-hidden">
+                <div
+                  className="relative aspect-[54/86] bg-gray-50 overflow-hidden"
+                  onClick={() => updateCard(card.id, { selected: !card.selected })}
+                >
                   <img src={card.cropUrl} alt="" className="w-full h-full object-cover" />
-                  <button
-                    onClick={() => updateCard(card.id, { selected: !card.selected })}
-                    aria-label={card.selected ? 'Deselect card' : 'Select card'}
-                    className="absolute inset-0 flex items-start justify-end p-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow">
-                    {card.selected
-                      ? <CheckSquare size={13} className="text-primary" />
-                      : <Square size={13} className="text-foreground/30" />}
-                    </span>
-                  </button>
+                  <div className="absolute inset-0 flex flex-col justify-between p-2">
+                    <div className="flex justify-end">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); updateCard(card.id, { selected: !card.selected }); }}
+                        aria-label={card.selected ? 'Deselect card' : 'Select card'}
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow"
+                      >
+                        {card.selected
+                          ? <CheckSquare size={13} className="text-primary" />
+                          : <Square size={13} className="text-foreground/30" />}
+                      </button>
+                    </div>
+                    {templateUrl && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setEditingCropId(card.id); }}
+                        className="rounded-xl bg-white/90 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-primary shadow transition-all hover:bg-primary hover:text-white"
+                      >
+                        Edit Crop
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Editable fields */}
                 <div className="p-3 space-y-2">
-                  <Field label="Member" value={card.member} onChange={v => updateCard(card.id, { member: v })} placeholder="Felix" />
-                  <Field label="Group" value={card.group} onChange={v => updateCard(card.id, { group: v })} placeholder="Stray Kids" />
-                  <Field label="Album" value={card.album} onChange={v => updateCard(card.id, { album: v })} placeholder="DO IT" />
-                  <Field label="Era" value={card.era} onChange={v => updateCard(card.id, { era: v })} placeholder="DO IT" />
+                  <Field label="Member" required invalid={card.selected && !card.member.trim()} value={card.member} onChange={v => updateCard(card.id, { member: v })} placeholder="Felix" />
                   <Field label="Version" value={card.version} onChange={v => updateCard(card.id, { version: v })} placeholder="Felix Accordion ver." />
+                  <Field label="Photocard Name" required invalid={card.selected && !card.cardName.trim()} value={card.cardName} onChange={v => updateCard(card.id, { cardName: v })} placeholder="Felix DO IT photocard" />
                   <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Status</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Status *</label>
                     <select value={card.status} onChange={e => updateCard(card.id, { status: e.target.value as Status })}
                       className="w-full px-2 py-1.5 rounded-xl border border-gray-100 bg-white/80 text-xs font-medium text-foreground focus:outline-none focus:border-primary/40 transition-colors cursor-pointer">
                       <option value="owned">Owned</option>
                       <option value="wishlist">Wishlist</option>
                       <option value="on_the_way">On the way</option>
                     </select>
+                  </div>
+                  <div className={card.status !== 'owned' ? 'opacity-40 pointer-events-none' : ''}>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Condition</label>
+                    <select value={card.condition} onChange={e => updateCard(card.id, { condition: e.target.value as Condition })}
+                      className="w-full px-2 py-1.5 rounded-xl border border-gray-100 bg-white/80 text-xs font-medium text-foreground focus:outline-none focus:border-primary/40 transition-colors cursor-pointer">
+                      <option value="mint">Mint</option>
+                      <option value="near_mint">Near mint</option>
+                      <option value="good">Good</option>
+                      <option value="fair">Fair</option>
+                      <option value="poor">Poor</option>
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => updateCard(card.id, { isDuplicate: !card.isDuplicate })}
+                    className={`w-full rounded-xl border px-2 py-1.5 text-xs font-medium transition-all ${card.isDuplicate ? 'border-primary/25 bg-primary/10 text-primary' : 'border-gray-100 bg-white/80 text-foreground/45'}`}
+                  >
+                    {card.isDuplicate ? 'Duplicate: Yes' : 'Duplicate: No'}
+                  </button>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Notes</label>
+                    <textarea
+                      value={card.notes}
+                      onChange={e => updateCard(card.id, { notes: e.target.value })}
+                      placeholder="Pulled from DO IT album, Felix Accordion ver."
+                      className="h-16 w-full resize-none rounded-xl border border-gray-100 bg-white/80 px-2 py-1.5 text-xs font-medium text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-primary/40"
+                    />
                   </div>
                 </div>
               </motion.div>
@@ -499,11 +618,19 @@ export default function Scan({ onDone }: { onDone: () => void }) {
           <div className="sticky bottom-4">
             <div className="glass-card rounded-2xl px-6 py-4 border border-white/60 flex items-center justify-between shadow-xl">
               <p className="text-sm font-bold text-foreground/60">
-                Adding <span className="text-foreground font-black">{selectedCards.length}</span> card{selectedCards.length !== 1 ? 's' : ''} to your collection
+                {missingRequiredCount > 0 ? (
+                  <span className="text-red-500">
+                    Fill required fields on <span className="font-black">{missingRequiredCount}</span> selected card{missingRequiredCount !== 1 ? 's' : ''}
+                  </span>
+                ) : (
+                  <>
+                    Adding <span className="text-foreground font-black">{selectedCards.length}</span> card{selectedCards.length !== 1 ? 's' : ''} to your collection
+                  </>
+                )}
               </p>
               <button
                 onClick={handleSave}
-                disabled={selectedCards.length === 0}
+                disabled={!canSaveSelectedCards}
                 className="btn-primary-pink flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-black uppercase tracking-tight disabled:cursor-not-allowed disabled:opacity-40">
                 Add to Collection →
               </button>
@@ -547,6 +674,16 @@ export default function Scan({ onDone }: { onDone: () => void }) {
           </div>
         </motion.div>
       )}
+
+      <AnimatePresence>
+        {editingCropId && templateUrl && (
+          <ImageEditor
+            image={templateUrl}
+            onSave={handleSaveEditedCrop}
+            onCancel={() => setEditingCropId(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

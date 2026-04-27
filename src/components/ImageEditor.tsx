@@ -16,6 +16,10 @@ interface ImageEditorProps {
   aspectRatio?: number;
 }
 
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 10;
+const ZOOM_STEP = 0.25;
+
 export default function ImageEditor({ image, onSave, onCancel, aspectRatio = 1 / 1.5 }: ImageEditorProps) {
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -132,19 +136,19 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = 1 /
                     <span className="text-primary bg-primary/5 px-2 py-0.5 rounded-full">{Math.round(zoom * 100)}%</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <button onClick={() => setZoom(Math.max(1, zoom - 0.2))} className="p-1 text-foreground/30 hover:text-primary transition-colors">
+                    <button onClick={() => setZoom(Math.max(MIN_ZOOM, zoom - ZOOM_STEP))} className="p-1 text-foreground/30 hover:text-primary transition-colors">
                       <ZoomOut size={15} />
                     </button>
                     <input
                       type="range"
                       value={zoom}
-                      min={1}
-                      max={4}
+                      min={MIN_ZOOM}
+                      max={MAX_ZOOM}
                       step={0.01}
                       onChange={(e) => setZoom(Number(e.target.value))}
                       className="w-full h-1.5 md:h-2 bg-gray-100 rounded-full appearance-none cursor-pointer accent-primary"
                     />
-                    <button onClick={() => setZoom(Math.min(4, zoom + 0.2))} className="p-1 text-foreground/30 hover:text-primary transition-colors">
+                    <button onClick={() => setZoom(Math.min(MAX_ZOOM, zoom + ZOOM_STEP))} className="p-1 text-foreground/30 hover:text-primary transition-colors">
                       <ZoomIn size={15} />
                     </button>
                   </div>

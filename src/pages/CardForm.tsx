@@ -221,7 +221,7 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
                 {/* Status + Duplicates row */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
-                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40">Status</label>
+                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40">Status *</label>
                     <div className="flex gap-1 bg-gray-50 p-1 rounded-xl h-10">
                       {([['owned', 'Owned'], ['on_the_way', 'On the Way'], ['wishlist', 'Wishlist']] as const).map(([val, label]) => (
                         <button

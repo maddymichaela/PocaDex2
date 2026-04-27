@@ -15,15 +15,17 @@ interface BulkEditFormProps {
 }
 
 export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEditFormProps) {
-  const [group, setGroup] = useState<string | undefined>(undefined);
-  const [member, setMember] = useState<string | undefined>(undefined);
-  const [album, setAlbum] = useState<string | undefined>(undefined);
-  const [era, setEra] = useState<string | undefined>(undefined);
+  const [group, setGroup] = useState('');
+  const [member, setMember] = useState('');
+  const [album, setAlbum] = useState('');
+  const [era, setEra] = useState('');
+  const [version, setVersion] = useState('');
+  const [cardName, setCardName] = useState('');
   const [year, setYear] = useState<number | undefined>(undefined);
-  const [status, setStatus] = useState<Status | undefined>(undefined);
-  const [condition, setCondition] = useState<Condition | undefined>(undefined);
-  const [isDuplicate, setIsDuplicate] = useState<boolean | undefined>(undefined);
-  const [notes, setNotes] = useState<string | undefined>(undefined);
+  const [status, setStatus] = useState<Status>('owned');
+  const [condition, setCondition] = useState<Condition>('mint');
+  const [isDuplicate, setIsDuplicate] = useState(false);
+  const [notes, setNotes] = useState('');
 
   const [activeFields, setActiveFields] = useState<Set<string>>(new Set());
 
@@ -43,6 +45,8 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
     if (activeFields.has('member')) updates.member = member;
     if (activeFields.has('album')) updates.album = album;
     if (activeFields.has('era')) updates.era = era;
+    if (activeFields.has('version')) updates.version = version;
+    if (activeFields.has('cardName')) updates.cardName = cardName;
     if (activeFields.has('year')) updates.year = year;
     if (activeFields.has('status')) updates.status = status;
     if (activeFields.has('condition')) updates.condition = condition;
@@ -101,7 +105,6 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
     >
         <div className="space-y-6 p-5 md:p-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Group */}
             <div className={fieldClass('group')}>
               <div className="flex items-center justify-between">
                 <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40">Group</label>
@@ -110,13 +113,12 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
               <input
                 disabled={!activeFields.has('group')}
                 type="text"
-                placeholder="New group name..."
+                placeholder="Stray Kids"
                 onChange={(e) => setGroup(e.target.value)}
                 className="bg-transparent text-sm font-bold outline-none border-b border-black/5 pb-1 disabled:opacity-30"
               />
             </div>
 
-            {/* Member */}
             <div className={fieldClass('member')}>
               <div className="flex items-center justify-between">
                 <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40">Member</label>
@@ -125,13 +127,12 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
               <input
                 disabled={!activeFields.has('member')}
                 type="text"
-                placeholder="New member name..."
+                placeholder="Felix"
                 onChange={(e) => setMember(e.target.value)}
                 className="bg-transparent text-sm font-bold outline-none border-b border-black/5 pb-1 disabled:opacity-30"
               />
             </div>
 
-            {/* Album */}
             <div className={fieldClass('album')}>
               <div className="flex items-center justify-between">
                 <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40">Album</label>
@@ -140,13 +141,68 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
               <input
                 disabled={!activeFields.has('album')}
                 type="text"
-                placeholder="New album..."
+                placeholder="DO IT"
                 onChange={(e) => setAlbum(e.target.value)}
                 className="bg-transparent text-sm font-bold outline-none border-b border-black/5 pb-1 disabled:opacity-30"
               />
             </div>
 
-            {/* Status */}
+            <div className={fieldClass('era')}>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40">Era</label>
+                <Checkbox id="era" />
+              </div>
+              <input
+                disabled={!activeFields.has('era')}
+                type="text"
+                placeholder="DO IT"
+                onChange={(e) => setEra(e.target.value)}
+                className="bg-transparent text-sm font-bold outline-none border-b border-black/5 pb-1 disabled:opacity-30"
+              />
+            </div>
+
+            <div className={fieldClass('version')}>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40">Version</label>
+                <Checkbox id="version" />
+              </div>
+              <input
+                disabled={!activeFields.has('version')}
+                type="text"
+                placeholder="Felix Accordion ver."
+                onChange={(e) => setVersion(e.target.value)}
+                className="bg-transparent text-sm font-bold outline-none border-b border-black/5 pb-1 disabled:opacity-30"
+              />
+            </div>
+
+            <div className={fieldClass('year')}>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40">Year</label>
+                <Checkbox id="year" />
+              </div>
+              <input
+                disabled={!activeFields.has('year')}
+                type="number"
+                placeholder="2025"
+                onChange={(e) => setYear(Number(e.target.value))}
+                className="bg-transparent text-sm font-bold outline-none border-b border-black/5 pb-1 disabled:opacity-30"
+              />
+            </div>
+
+            <div className={fieldClass('cardName')}>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40">Photocard Name</label>
+                <Checkbox id="cardName" />
+              </div>
+              <input
+                disabled={!activeFields.has('cardName')}
+                type="text"
+                placeholder="Felix DO IT photocard"
+                onChange={(e) => setCardName(e.target.value)}
+                className="bg-transparent text-sm font-bold outline-none border-b border-black/5 pb-1 disabled:opacity-30"
+              />
+            </div>
+
             <div className={fieldClass('status')}>
               <div className="flex items-center justify-between">
                 <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40">Status</label>
@@ -160,6 +216,39 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
                 <option value="owned">Owned</option>
                 <option value="on_the_way">On The Way</option>
                 <option value="wishlist">Wishlist</option>
+              </select>
+            </div>
+
+            <div className={fieldClass('condition')}>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40">Condition</label>
+                <Checkbox id="condition" />
+              </div>
+              <select
+                disabled={!activeFields.has('condition')}
+                onChange={(e) => setCondition(e.target.value as Condition)}
+                className="bg-transparent text-sm font-black outline-none cursor-pointer disabled:opacity-30"
+              >
+                <option value="mint">Mint</option>
+                <option value="near_mint">Near Mint</option>
+                <option value="good">Good</option>
+                <option value="fair">Fair</option>
+                <option value="poor">Poor</option>
+              </select>
+            </div>
+
+            <div className={fieldClass('isDuplicate')}>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40">Duplicates</label>
+                <Checkbox id="isDuplicate" />
+              </div>
+              <select
+                disabled={!activeFields.has('isDuplicate')}
+                onChange={(e) => setIsDuplicate(e.target.value === 'true')}
+                className="bg-transparent text-sm font-black outline-none cursor-pointer disabled:opacity-30"
+              >
+                <option value="false">No</option>
+                <option value="true">Yes</option>
               </select>
             </div>
           </div>
