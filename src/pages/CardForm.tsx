@@ -1,10 +1,9 @@
 import { useState, useRef, FormEvent, ChangeEvent } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { Image as ImageIcon, Save, Upload, Trash2, Edit3 } from 'lucide-react';
+import { ChevronLeft, Image as ImageIcon, Save, Upload, Trash2, Edit3 } from 'lucide-react';
 import { Status, Photocard, Condition } from '../types';
 import { useImageUpload } from '../hooks/useImageUpload';
 import ImageEditor from '../components/ImageEditor';
-import ModalShell from '../components/ModalShell';
 import { placeholderImage } from '../lib/assets';
 
 interface CardFormProps {
@@ -74,33 +73,38 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
   };
 
   return (
-    <ModalShell
-      title={isEditing ? 'Edit Card' : 'New Photocard'}
-      subtitle={isEditing ? 'Updating entry' : 'Adding to binder'}
-      icon={isEditing ? <Edit3 size={19} /> : <ImageIcon size={19} />}
-      onClose={onBack}
-      maxWidth="md:max-w-5xl xl:max-w-6xl"
-      bodyClassName="bg-gray-50/30"
-      footer={(
-        <div className="mx-auto flex w-full max-w-md gap-3">
+    <div className="min-h-full bg-gray-50/30">
+      <div className="sticky top-0 z-40 border-b border-gray-100 bg-white/90 shadow-sm backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
           <button
             type="button"
             onClick={onBack}
-            className="flex-1 rounded-xl border-2 border-gray-50 bg-white py-3.5 text-[10px] font-black uppercase tracking-widest text-foreground/35 transition-all hover:bg-gray-50 hover:text-foreground md:py-4 md:text-xs"
+            className="group flex items-center gap-2 rounded-2xl px-4 py-2 transition-all hover:bg-gray-100"
           >
-            Cancel
+            <ChevronLeft className="text-foreground/40 transition-colors group-hover:text-primary" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/40 group-hover:text-foreground">
+              {isEditing ? 'Back to Card' : 'Back to Binder'}
+            </span>
           </button>
+          <div className="min-w-0 text-center">
+            <h2 className="truncate text-xl font-bold tracking-tight text-foreground md:text-2xl">
+              {isEditing ? 'Edit Card' : 'New Photocard'}
+            </h2>
+            <p className="hidden text-[9px] font-black uppercase tracking-[0.2em] text-foreground/30 sm:block">
+              {isEditing ? 'Updating entry' : 'Adding to binder'}
+            </p>
+          </div>
           <button
             type="submit"
             form="card-form"
-            className="btn-primary-pink flex flex-1 items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-[10px] font-black uppercase tracking-widest md:rounded-2xl md:py-4 md:text-xs"
+            className="btn-primary-pink flex items-center gap-2 rounded-xl px-4 py-2.5 text-[10px] font-black uppercase tracking-widest md:px-6"
           >
-            {isEditing ? <Save size={16} /> : <Upload size={16} />}
+            {isEditing ? <Save size={14} /> : <Upload size={14} />}
             {isEditing ? 'Save Changes' : 'Add to Collection'}
           </button>
         </div>
-      )}
-    >
+      </div>
+
       <form id="card-form" onSubmit={handleSubmit}>
         <div className="max-w-6xl mx-auto p-4 pb-8 md:px-6 md:py-5 xl:p-8">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-5 xl:gap-8 items-start">
@@ -108,7 +112,7 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
             {/* Left Column: Image */}
             <div className="mx-auto w-full max-w-[320px] space-y-3 md:sticky md:top-5 md:col-span-4 md:max-w-[300px] xl:max-w-[340px]">
               <div
-                className={`relative aspect-[1/1.5] w-full rounded-[48px] overflow-hidden shadow-md border-[6px] border-white ring-1 ring-black/5 ${!previewUrl ? 'cursor-pointer' : ''}`}
+                className={`relative aspect-[650/1000] w-full rounded-[48px] overflow-hidden shadow-md border-[6px] border-white ring-1 ring-black/5 ${!previewUrl ? 'cursor-pointer' : ''}`}
                 onClick={() => !previewUrl && fileInputRef.current?.click()}
               >
                 <img
@@ -326,6 +330,6 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
           />
         )}
       </AnimatePresence>
-    </ModalShell>
+    </div>
   );
 }
