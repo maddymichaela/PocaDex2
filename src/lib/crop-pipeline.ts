@@ -1,5 +1,9 @@
 export type CropRect = { x: number; y: number; w: number; h: number };
 
+const CARD_OUTPUT_WIDTH = 650;
+const CARD_OUTPUT_HEIGHT = 1000;
+const CARD_ASPECT_RATIO = CARD_OUTPUT_WIDTH / CARD_OUTPUT_HEIGHT;
+
 export type GridTemplate = {
   name: string;
   rows: number;
@@ -192,15 +196,46 @@ export async function trimBackground(
   }
 }
 
+export function fitCropRectToCardAspect(img: HTMLImageElement, crop: CropRect): CropRect {
+  const imageAspect = img.naturalWidth / img.naturalHeight;
+  const normalizedAspect = CARD_ASPECT_RATIO / imageAspect;
+  let w = crop.w;
+  let h = crop.h;
+
+  if (w / h > normalizedAspect) {
+    h = w / normalizedAspect;
+  } else {
+    w = h * normalizedAspect;
+  }
+
+  if (w > 1) {
+    w = 1;
+    h = w / normalizedAspect;
+  }
+  if (h > 1) {
+    h = 1;
+    w = h * normalizedAspect;
+  }
+
+  const centerX = crop.x + crop.w / 2;
+  const centerY = crop.y + crop.h / 2;
+  const x = Math.max(0, Math.min(1 - w, centerX - w / 2));
+  const y = Math.max(0, Math.min(1 - h, centerY - h / 2));
+
+  return { x, y, w, h };
+}
+
 export function cropImageFromRect(img: HTMLImageElement, crop: CropRect): string {
   const iW = img.naturalWidth, iH = img.naturalHeight;
-  const sx = Math.round(crop.x * iW);
-  const sy = Math.round(crop.y * iH);
-  const sw = Math.max(1, Math.round(crop.w * iW));
-  const sh = Math.max(1, Math.round(crop.h * iH));
+  const fittedCrop = fitCropRectToCardAspect(img, crop);
+  const sx = fittedCrop.x * iW;
+  const sy = fittedCrop.y * iH;
+  const sw = Math.max(1, fittedCrop.w * iW);
+  const sh = Math.max(1, fittedCrop.h * iH);
   const canvas = document.createElement('canvas');
-  canvas.width = sw; canvas.height = sh;
+  canvas.width = CARD_OUTPUT_WIDTH;
+  canvas.height = CARD_OUTPUT_HEIGHT;
   const ctx = canvas.getContext('2d')!;
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, CARD_OUTPUT_WIDTH, CARD_OUTPUT_HEIGHT);
   return canvas.toDataURL('image/jpeg', 0.92);
 }

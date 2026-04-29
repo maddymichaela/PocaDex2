@@ -179,7 +179,7 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
                   <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1 text-center xl:text-left">Card Image</label>
                   <div 
                     onClick={() => !previewUrl && fileInputRef.current?.click()}
-                    className={`w-full max-w-[220px] aspect-[2/3] bg-gray-50 rounded-[28px] md:max-w-[260px] md:rounded-[32px] xl:max-w-none xl:flex-1 xl:self-stretch xl:aspect-auto border-4 border-dashed flex flex-col items-center justify-center transition-all overflow-hidden relative group ${
+                    className={`w-full max-w-[220px] aspect-[650/1000] bg-gray-50 rounded-[28px] md:max-w-[260px] md:rounded-[32px] xl:max-w-none xl:flex-1 border-4 border-dashed flex flex-col items-center justify-center transition-all overflow-hidden relative group ${
                       previewUrl ? 'border-transparent shadow-inner' : 'border-gray-100 hover:border-primary/30 cursor-pointer'
                     }`}
                   >

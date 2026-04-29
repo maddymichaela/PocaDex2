@@ -31,7 +31,7 @@ function GroupTile({ name, count, imageUrl, onClick }: GroupTileProps) {
       onClick={onClick}
       className="glass-card rounded-[32px] shadow-xl flex flex-col relative overflow-hidden group cursor-pointer border-4 border-white transition-all hover:shadow-2xl"
     >
-      <div className="w-full aspect-[2/3] rounded-t-[28px] bg-white overflow-hidden relative ring-1 ring-black/5 shadow-inner">
+      <div className="w-full aspect-[650/1000] rounded-t-[28px] bg-white overflow-hidden relative ring-1 ring-black/5 shadow-inner">
         <img
           src={imageUrl || placeholderImage}
           alt={name}

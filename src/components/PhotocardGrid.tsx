@@ -100,7 +100,7 @@ export function PhotocardCard({
 
       {/* Photo Stage */}
       <div
-        className="w-full aspect-[1/1.5] rounded-t-[26px] flex items-center justify-center text-gray-400 text-xs uppercase tracking-widest font-medium overflow-hidden relative bg-white ring-1 ring-black/5"
+        className="w-full aspect-[650/1000] rounded-t-[26px] flex items-center justify-center text-gray-400 text-xs uppercase tracking-widest font-medium overflow-hidden relative bg-white ring-1 ring-black/5"
       >
         <img
           src={showPlaceholder ? placeholderImage : photocard.imageUrl}

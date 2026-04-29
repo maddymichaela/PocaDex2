@@ -68,7 +68,7 @@ export default function Dashboard({ photocards, onEdit, onDelete, onImport }: Da
                   <img
                     src={g.imageUrl}
                     alt={g.name}
-                    className="w-8 h-11 rounded-lg object-cover shrink-0 ring-1 ring-black/5"
+                    className="w-8 aspect-[650/1000] rounded-lg object-cover shrink-0 ring-1 ring-black/5"
                     referrerPolicy="no-referrer"
                   />
                 )}

@@ -2,11 +2,11 @@ import { useState, useRef, useCallback, ChangeEvent, DragEvent } from 'react';
 import { Upload, Grid3x3, CheckSquare, Square, Loader2, AlertCircle, CheckCircle2, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Area } from 'react-easy-crop';
-import { detectTemplate, cropImageFromRect, trimBackground, PHOTOCARD_TEMPLATES, templateCellRects, GridTemplate } from '../lib/crop-pipeline';
+import { detectTemplate, cropImageFromRect, fitCropRectToCardAspect, trimBackground, PHOTOCARD_TEMPLATES, templateCellRects, GridTemplate } from '../lib/crop-pipeline';
 import { insertPhotocard } from '../lib/db';
 import { useAuth } from '../contexts/AuthContext';
 import { Status, Condition, Photocard } from '../types';
-import ImageEditor from '../components/ImageEditor';
+import ImageEditor, { ImageEditorState } from '../components/ImageEditor';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -14,6 +14,7 @@ interface ReviewCard {
   id: string;
   cropUrl: string;
   cropAreaPixels: Area;
+  cropperState: ImageEditorState;
   member: string;
   group: string;
   album: string;
@@ -60,6 +61,13 @@ function emptyReviewCard(cropUrl: string, cropAreaPixels: Area): ReviewCard {
     id: makeId(),
     cropUrl,
     cropAreaPixels,
+    cropperState: {
+      crop: { x: 0, y: 0 },
+      zoom: 1,
+      rotation: 0,
+      croppedAreaPixels: cropAreaPixels,
+      hasUserPosition: false,
+    },
     member: '',
     group: '',
     album: '',
@@ -212,8 +220,9 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
       const reviewCards: ReviewCard[] = await Promise.all(
         cells.flat().map(async (cell) => {
           const trimmed = await trimBackground(img, cell);
-          const cropUrl = cropImageFromRect(img, trimmed);
-          return emptyReviewCard(cropUrl, rectToArea(trimmed, img));
+          const fitted = fitCropRectToCardAspect(img, trimmed);
+          const cropUrl = cropImageFromRect(img, fitted);
+          return emptyReviewCard(cropUrl, rectToArea(fitted, img));
         })
       );
 
@@ -240,8 +249,9 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
       for (const row of cells) {
         for (const box of row) {
           const trimmed = await trimBackground(img, box);
-          const cropUrl = cropImageFromRect(img, trimmed);
-          reviewCards.push(emptyReviewCard(cropUrl, rectToArea(trimmed, img)));
+          const fitted = fitCropRectToCardAspect(img, trimmed);
+          const cropUrl = cropImageFromRect(img, fitted);
+          reviewCards.push(emptyReviewCard(cropUrl, rectToArea(fitted, img)));
         }
       }
 
@@ -264,18 +274,22 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
     setCards(prev => prev.map(c => ({ ...c, selected: !allSelected })));
   };
 
-  const handleSaveEditedCrop = (croppedImage: string, cropAreaPixels?: Area) => {
+  const handleSaveEditedCrop = (croppedImage: string, editorState?: ImageEditorState) => {
     if (!editingCropId) return;
     updateCard(editingCropId, {
       cropUrl: croppedImage,
-      ...(cropAreaPixels ? { cropAreaPixels } : {}),
+      ...(editorState ? { cropperState: editorState } : {}),
+      ...(editorState?.croppedAreaPixels ? { cropAreaPixels: editorState.croppedAreaPixels } : {}),
     });
     setEditingCropId(null);
   };
 
-  const handleCancelCropEdit = (cropAreaPixels?: Area) => {
-    if (editingCropId && cropAreaPixels) {
-      updateCard(editingCropId, { cropAreaPixels });
+  const handleCancelCropEdit = (editorState?: ImageEditorState) => {
+    if (editingCropId && editorState) {
+      updateCard(editingCropId, {
+        cropperState: editorState,
+        ...(editorState.croppedAreaPixels ? { cropAreaPixels: editorState.croppedAreaPixels } : {}),
+      });
     }
     setEditingCropId(null);
   };
@@ -544,7 +558,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
                 className={`glass-card rounded-2xl border-2 overflow-hidden transition-all ${card.selected ? 'border-primary/40 shadow-md' : 'border-white/40 opacity-50'}`}>
                 {/* Crop preview */}
                 <div
-                  className="relative aspect-[54/86] bg-gray-50 overflow-hidden"
+                  className="relative aspect-[650/1000] bg-gray-50 overflow-hidden"
                   onClick={() => updateCard(card.id, { selected: !card.selected })}
                 >
                   <img src={card.cropUrl} alt="" className="w-full h-full object-cover" />
@@ -683,7 +697,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
         {editingCropId && templateUrl && (
           <ImageEditor
             image={templateUrl}
-            initialCroppedAreaPixels={cards.find(card => card.id === editingCropId)?.cropAreaPixels}
+            initialState={cards.find(card => card.id === editingCropId)?.cropperState}
             onSave={handleSaveEditedCrop}
             onCancel={handleCancelCropEdit}
           />

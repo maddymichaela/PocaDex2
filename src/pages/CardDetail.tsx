@@ -65,7 +65,7 @@ export default function CardDetail({ photocard, onBack, onEdit, hasPrev, hasNext
 
           {/* Left Column: Image */}
           <div className="md:col-span-5 md:sticky md:top-32">
-            <div className="relative aspect-[1/1.5] w-full rounded-[48px] overflow-hidden shadow-2xl border-[12px] border-white ring-1 ring-black/5 group">
+            <div className="relative aspect-[650/1000] w-full rounded-[48px] overflow-hidden shadow-2xl border-[12px] border-white ring-1 ring-black/5 group">
               <img
                 src={photocard.imageUrl || placeholderImage}
                 className={`w-full h-full object-cover transition-all duration-500 ${!photocard.imageUrl ? 'scale-[1.02] opacity-20 blur-[1px]' : 'group-hover:scale-[1.03]'}`}
