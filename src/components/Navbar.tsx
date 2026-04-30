@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { LayoutGrid, BookOpen, ScanLine, Plus, LogOut, ChevronUp } from 'lucide-react';
+import { LayoutGrid, BookOpen, ScanLine, Plus, LogOut, ChevronUp, Settings } from 'lucide-react';
 import { Profile } from '../types';
 import { pocadexLogo } from '../lib/assets';
 
@@ -10,6 +10,7 @@ interface NavbarProps {
   profile?: Profile | null;
   onSignOut?: () => void;
   onAddCard?: () => void;
+  onOpenSettings?: () => void;
 }
 
 const NAV_ITEMS = [
@@ -18,7 +19,7 @@ const NAV_ITEMS = [
   { id: 'Scan', label: 'Scan', icon: ScanLine },
 ] as const;
 
-export default function Navbar({ currentPage, onPageChange, profile, onSignOut, onAddCard }: NavbarProps) {
+export default function Navbar({ currentPage, onPageChange, profile, onSignOut, onAddCard, onOpenSettings }: NavbarProps) {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
   const desktopMenuRef = useRef<HTMLDivElement>(null);
@@ -51,18 +52,29 @@ export default function Navbar({ currentPage, onPageChange, profile, onSignOut, 
         onError={() => setFailedAvatarUrl(avatarUrl)}
       />
     ) : (
-      <div className={`bg-primary/15 flex items-center justify-center text-primary font-black text-sm ${className}`}>
-        {avatarLetter}
+      <div className={`bg-primary/15 flex items-center justify-center text-center text-primary font-black leading-none ${className}`}>
+        <span className="block translate-y-0 text-sm leading-none">{avatarLetter}</span>
       </div>
     );
 
-  const signOutButton = (
-    <button
-      onClick={onSignOut}
-      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 text-sm font-semibold text-red-500 transition-colors"
-    >
-      <LogOut size={15} /> Sign out
-    </button>
+  const userMenu = (
+    <>
+      <button
+        onClick={() => {
+          onOpenSettings?.();
+          setShowUserMenu(false);
+        }}
+        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-primary/5 text-sm font-semibold text-foreground/70 transition-colors"
+      >
+        <Settings size={15} /> Account settings
+      </button>
+      <button
+        onClick={onSignOut}
+        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 text-sm font-semibold text-red-500 transition-colors"
+      >
+        <LogOut size={15} /> Sign out
+      </button>
+    </>
   );
 
   return (
@@ -140,7 +152,7 @@ export default function Navbar({ currentPage, onPageChange, profile, onSignOut, 
                   exit={{ opacity: 0, y: 6 }}
                   className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-gray-100 rounded-2xl shadow-xl overflow-hidden z-50"
                 >
-                  {signOutButton}
+                  {userMenu}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -160,7 +172,7 @@ export default function Navbar({ currentPage, onPageChange, profile, onSignOut, 
           <div className="relative" ref={mobileMenuRef}>
             <button
               onClick={() => setShowUserMenu(v => !v)}
-              className="w-10 h-10 rounded-2xl overflow-hidden border-2 border-gray-100 hover:border-primary/40 transition-colors"
+              className="w-10 h-10 rounded-2xl overflow-hidden border-2 border-gray-100 hover:border-primary/40 transition-colors flex items-center justify-center"
             >
               {renderAvatar('w-10 h-10 rounded-2xl')}
             </button>
@@ -172,7 +184,7 @@ export default function Navbar({ currentPage, onPageChange, profile, onSignOut, 
                   exit={{ opacity: 0, y: -6 }}
                   className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-100 rounded-2xl shadow-xl overflow-hidden z-50"
                 >
-                  {signOutButton}
+                  {userMenu}
                 </motion.div>
               )}
             </AnimatePresence>

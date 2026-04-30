@@ -8,6 +8,7 @@ import Splash from './pages/Splash';
 import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
 import Scan from './pages/Scan';
+import AccountSettings from './pages/AccountSettings';
 import { Photocard } from './types';
 import { useAuth } from './contexts/AuthContext';
 import {
@@ -42,7 +43,7 @@ function writeCachedPhotocards(userId: string, cards: Photocard[]) {
 }
 
 export default function App() {
-  const { user, profile, loading: authLoading, signOut } = useAuth();
+  const { user, profile, loading: authLoading, signOut, cancelAccountDeletion } = useAuth();
   const [authScreen, setAuthScreen] = useState<AuthScreen>('splash');
   const [currentPage, setCurrentPage] = useState('Collection');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -132,6 +133,14 @@ export default function App() {
     });
   }, []);
 
+  const handleImportPhotocards = useCallback((newData: Photocard[], mode: 'replace' | 'merge') => {
+    setPhotocards(prev => {
+      if (mode === 'replace') return newData;
+      const existingIds = new Set(prev.map(card => card.id));
+      return [...newData.filter(card => !existingIds.has(card.id)), ...prev];
+    });
+  }, []);
+
   // Auth loading
   if (authLoading) {
     return (
@@ -164,11 +173,13 @@ export default function App() {
             photocards={photocards}
             onEdit={(pc) => setSelectedId(pc.id)}
             onDelete={handleDeletePhotocard}
-            onImport={() => {}}
+            onImport={handleImportPhotocards}
           />
         );
       case 'Scan':
         return <Scan onDone={() => setCurrentPage('Collection')} onImported={handleScanImported} />;
+      case 'Account':
+        return <AccountSettings photocards={photocards} />;
       case 'Collection':
         return (
           <Collection
@@ -213,8 +224,21 @@ export default function App() {
         profile={profile}
         onSignOut={signOut}
         onAddCard={handleAddCard}
+        onOpenSettings={() => { setCurrentPage('Account'); setSelectedId(null); setIsFormOpen(false); }}
       />
       <main className="relative z-10 flex-1 overflow-auto overflow-x-hidden">
+        {profile?.deletion_requested_at && (
+          <div className="mx-auto mt-4 flex w-[calc(100%-2rem)] max-w-6xl flex-col gap-3 rounded-[24px] border-2 border-amber-100 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 shadow-sm md:flex-row md:items-center md:justify-between">
+            <span>Your account will be deleted in 30 days.</span>
+            <button
+              type="button"
+              onClick={cancelAccountDeletion}
+              className="rounded-2xl bg-white px-4 py-2 text-[10px] font-black uppercase tracking-widest text-amber-700 transition-all hover:bg-amber-100"
+            >
+              Restore Account
+            </button>
+          </div>
+        )}
         {dataLoading ? (
           <div className="px-4 py-5 xl:p-8 max-w-6xl mx-auto w-full">{loadingSpinner}</div>
         ) : isFormOpen ? (

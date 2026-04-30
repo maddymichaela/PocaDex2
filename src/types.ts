@@ -41,6 +41,8 @@ export interface Profile {
   nickname: string | null;
   bio: string | null;
   avatar_url: string | null;
+  has_password?: boolean | null;
+  deletion_requested_at?: string | null;
   created_at: string;
   updated_at: string;
 }
