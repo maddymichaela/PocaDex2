@@ -377,11 +377,6 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
           <h2 className="text-3xl font-bold text-foreground tracking-tight">Scan Template</h2>
           <p className="text-sm text-foreground/40 font-medium mt-1">Upload a fan template to auto-splice and import photocards</p>
         </div>
-        {step !== 'upload' && step !== 'done' && (
-          <button onClick={resetDetection} className="flex items-center gap-2 text-xs font-bold text-foreground/40 hover:text-foreground uppercase tracking-widest transition-colors">
-            <RotateCcw size={13} /> Start over
-          </button>
-        )}
       </div>
 
       {/* Error banner */}
