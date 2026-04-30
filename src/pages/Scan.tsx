@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, ChangeEvent, DragEvent } from 'react';
-import { Upload, Grid3x3, CheckSquare, Square, Loader2, AlertCircle, CheckCircle2, ChevronDown } from 'lucide-react';
+import { Upload, Grid3x3, CheckSquare, Square, Loader2, AlertCircle, CheckCircle2, ChevronDown, Plus, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Area } from 'react-easy-crop';
 import { detectTemplate, cropImageFromRect, fitCropRectToCardAspect, trimBackground, PHOTOCARD_TEMPLATES, templateCellRects, GridTemplate } from '../lib/crop-pipeline';
@@ -173,6 +173,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
   const [savedCount, setSavedCount] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [editingCropId, setEditingCropId] = useState<string | null>(null);
+  const [isAddingManualCrop, setIsAddingManualCrop] = useState(false);
 
   const selectedCards = cards.filter(c => c.selected);
   const missingRequiredCount = selectedCards.filter(c => !c.group.trim() || !c.member.trim() || !c.cardName.trim()).length;
@@ -184,6 +185,11 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
     if (!file.type.startsWith('image/')) { setError('Please upload an image file.'); return; }
     if (file.size > 15 * 1024 * 1024) { setError('Image must be under 15MB.'); return; }
     setError(null);
+    setCards([]);
+    setSavedCount(0);
+    setEditingCropId(null);
+    setIsAddingManualCrop(false);
+    setStep('upload');
     const reader = new FileReader();
     reader.onload = e => setTemplateUrl(e.target?.result as string);
     reader.readAsDataURL(file);
@@ -203,6 +209,13 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
 
   // ── Grid Detection ────────────────────────────────────────────────────────
 
+  const makeReviewCardFromCrop = useCallback(async (img: HTMLImageElement, crop: { x: number; y: number; w: number; h: number }) => {
+    const trimmed = await trimBackground(img, crop);
+    const fitted = fitCropRectToCardAspect(img, trimmed);
+    const cropUrl = cropImageFromRect(img, fitted);
+    return emptyReviewCard(cropUrl, rectToArea(fitted, img));
+  }, []);
+
   const runGridDetect = useCallback(async () => {
     if (!templateUrl) return;
     setStep('detecting');
@@ -218,12 +231,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
       }
 
       const reviewCards: ReviewCard[] = await Promise.all(
-        cells.flat().map(async (cell) => {
-          const trimmed = await trimBackground(img, cell);
-          const fitted = fitCropRectToCardAspect(img, trimmed);
-          const cropUrl = cropImageFromRect(img, fitted);
-          return emptyReviewCard(cropUrl, rectToArea(fitted, img));
-        })
+        cells.flat().map(cell => makeReviewCardFromCrop(img, cell))
       );
 
       setCards(reviewCards);
@@ -232,7 +240,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
       setError(err instanceof Error ? err.message : 'Grid detection failed.');
       setStep('upload');
     }
-  }, [templateUrl]);
+  }, [makeReviewCardFromCrop, templateUrl]);
 
   // ── Manual grid (no image analysis) ──────────────────────────────────────
 
@@ -248,10 +256,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
 
       for (const row of cells) {
         for (const box of row) {
-          const trimmed = await trimBackground(img, box);
-          const fitted = fitCropRectToCardAspect(img, trimmed);
-          const cropUrl = cropImageFromRect(img, fitted);
-          reviewCards.push(emptyReviewCard(cropUrl, rectToArea(fitted, img)));
+          reviewCards.push(await makeReviewCardFromCrop(img, box));
         }
       }
 
@@ -261,7 +266,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
       setError(err instanceof Error ? err.message : 'Failed to splice grid.');
       setStep('upload');
     }
-  }, [templateUrl, manualRows, manualCols, selectedGrid]);
+  }, [makeReviewCardFromCrop, templateUrl, manualRows, manualCols, selectedGrid]);
 
   // ── Card field update ─────────────────────────────────────────────────────
 
@@ -292,6 +297,21 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
       });
     }
     setEditingCropId(null);
+  };
+
+  const handleSaveManualCrop = (croppedImage: string, editorState?: ImageEditorState) => {
+    const cropAreaPixels = editorState?.croppedAreaPixels;
+    if (!cropAreaPixels) {
+      setIsAddingManualCrop(false);
+      return;
+    }
+    setCards(prev => [...prev, emptyReviewCard(croppedImage, cropAreaPixels)]);
+    setStep('review');
+    setIsAddingManualCrop(false);
+  };
+
+  const handleCancelManualCrop = () => {
+    setIsAddingManualCrop(false);
   };
 
   // ── Save ──────────────────────────────────────────────────────────────────
@@ -332,12 +352,18 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
 
   // ── Reset ─────────────────────────────────────────────────────────────────
 
-  const reset = () => {
+  const resetDetection = () => {
     setStep('upload');
-    setTemplateUrl(null);
     setCards([]);
     setError(null);
     setSavedCount(0);
+    setEditingCropId(null);
+    setIsAddingManualCrop(false);
+  };
+
+  const uploadNewTemplate = () => {
+    resetDetection();
+    setTemplateUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -345,14 +371,15 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onFileInput} />
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold text-foreground tracking-tight">Scan Template</h2>
           <p className="text-sm text-foreground/40 font-medium mt-1">Upload a fan template to auto-splice and import photocards</p>
         </div>
         {step !== 'upload' && step !== 'done' && (
-          <button onClick={reset} className="text-xs font-bold text-foreground/40 hover:text-foreground uppercase tracking-widest transition-colors">
-            ← Start over
+          <button onClick={resetDetection} className="flex items-center gap-2 text-xs font-bold text-foreground/40 hover:text-foreground uppercase tracking-widest transition-colors">
+            <RotateCcw size={13} /> Start over
           </button>
         )}
       </div>
@@ -387,7 +414,6 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
               <p className="text-sm text-foreground/40 font-medium mt-1">or click to browse · PNG, JPG, WEBP · max 15MB</p>
             </div>
             <p className="text-xs text-foreground/30 font-medium">Works with fan templates from Twitter/X, Discord, etc.</p>
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onFileInput} />
           </div>
 
           {/* Preview + detection options */}
@@ -487,6 +513,54 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
       {/* ── STEP: Review ── */}
       {step === 'review' && (
         <div className="space-y-5">
+          {templateUrl && (
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(260px,0.75fr)_minmax(0,1.25fr)]">
+              <div className="glass-card rounded-2xl border border-white/60 p-4">
+                <img src={templateUrl} alt="Template preview" className="max-h-80 w-full rounded-xl object-contain" />
+              </div>
+              <div className="glass-card rounded-2xl border border-white/60 p-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingManualCrop(true)}
+                    className="btn-primary-pink flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black uppercase tracking-tight"
+                  >
+                    <Plus size={14} /> Add Card Manually
+                  </button>
+                  <button
+                    type="button"
+                    onClick={runGridDetect}
+                    className="flex items-center gap-2 rounded-2xl bg-primary/10 px-5 py-3 text-sm font-black uppercase tracking-tight text-primary transition-all hover:bg-primary hover:text-white"
+                  >
+                    <Grid3x3 size={14} /> Auto-detect Again
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetDetection}
+                    className="flex items-center gap-2 rounded-2xl bg-gray-100 px-5 py-3 text-sm font-black uppercase tracking-tight text-foreground transition-all hover:bg-gray-200"
+                  >
+                    <RotateCcw size={14} /> Start Over
+                  </button>
+                  <button
+                    type="button"
+                    onClick={uploadNewTemplate}
+                    className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-black uppercase tracking-tight text-foreground/55 transition-all hover:border-primary/30 hover:text-primary"
+                  >
+                    <Upload size={14} /> Upload New Template
+                  </button>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <div className="rounded-full bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-primary">
+                    {cards.length} crop{cards.length !== 1 ? 's' : ''}
+                  </div>
+                  <div className="rounded-full bg-gray-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-foreground/45">
+                    Output 650×1000
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Controls */}
           <div className="glass-card rounded-2xl px-5 py-4 border border-white/60 space-y-3">
             <div className="flex flex-wrap items-center gap-3">
@@ -685,7 +759,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
               className="btn-primary-pink rounded-2xl px-6 py-3 text-sm font-black uppercase tracking-tight">
               View Collection
             </button>
-            <button onClick={reset}
+            <button onClick={uploadNewTemplate}
               className="px-6 py-3 rounded-2xl bg-gray-100 text-foreground font-black text-sm uppercase tracking-tight hover:bg-gray-200 transition-all">
               Scan Another
             </button>
@@ -700,6 +774,13 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
             initialState={cards.find(card => card.id === editingCropId)?.cropperState}
             onSave={handleSaveEditedCrop}
             onCancel={handleCancelCropEdit}
+          />
+        )}
+        {isAddingManualCrop && templateUrl && (
+          <ImageEditor
+            image={templateUrl}
+            onSave={handleSaveManualCrop}
+            onCancel={handleCancelManualCrop}
           />
         )}
       </AnimatePresence>

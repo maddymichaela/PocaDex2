@@ -5,6 +5,7 @@ const CARD_OUTPUT_HEIGHT = 1000;
 const CARD_ASPECT_RATIO = CARD_OUTPUT_WIDTH / CARD_OUTPUT_HEIGHT;
 const AUTO_MAX_ROWS = 24;
 const AUTO_COL_COUNTS = [1, 2, 3, 4, 8];
+const DETECTED_CELL_PAD = 0.003;
 
 export type GridTemplate = {
   name: string;
@@ -294,9 +295,16 @@ export function detectTemplate(img: HTMLImageElement, whiteThr = 220, minBandFra
       fitRegularSeparators(contentColBands, dW, AUTO_COL_COUNTS) ??
       contentBandFallback(colContent, dW, isDarkBackground ? 0.12 : 0.08);
     const darkColGrid = darkBandFallback(colBr, dW);
+    const shouldUseContentCols =
+      !isDarkBackground &&
+      contentColGrid &&
+      contentColGrid.count >= 4 &&
+      (!separatorColGrid || separatorColGrid.count < 4 || darkColGrid.count <= 1);
     const colGrid = isDarkBackground
       ? contentColGrid ?? separatorColGrid ?? darkColGrid
-      : separatorColGrid ?? (darkColGrid.count <= 1 ? contentColGrid : null) ?? darkColGrid;
+      : shouldUseContentCols
+        ? contentColGrid
+        : separatorColGrid ?? (darkColGrid.count <= 1 ? contentColGrid : null) ?? darkColGrid;
     const contentRowGrid = rowGridFromOccupiedBands(colGrid, findContentBands(rowContent, dH));
     const darkRowGrid = rowGridFromOccupiedBands(colGrid, filterDarkBands(rowBr, dH));
     const rowGrid =
@@ -315,7 +323,7 @@ export function detectTemplate(img: HTMLImageElement, whiteThr = 220, minBandFra
 
     let cells: CropRect[][];
     if (rowGrid.bounds.length >= detectedRows + 1 && colGrid.bounds.length >= detectedCols + 1) {
-      const PAD = 0.008;
+      const PAD = DETECTED_CELL_PAD;
       cells = Array.from({ length: detectedRows }, (_, r) =>
         Array.from({ length: detectedCols }, (_, c) => {
           const rs = rowGrid.bounds[r];
@@ -343,8 +351,8 @@ export function detectTemplate(img: HTMLImageElement, whiteThr = 220, minBandFra
 export async function trimBackground(
   img: HTMLImageElement,
   crop: CropRect,
-  threshold = 22,
-  marginPx = 5,
+  threshold = 20,
+  marginPx = 2,
 ): Promise<CropRect> {
   try {
     const iW = img.naturalWidth, iH = img.naturalHeight;
