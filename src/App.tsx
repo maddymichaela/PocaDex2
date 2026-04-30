@@ -18,7 +18,7 @@ import {
   bulkUpdatePhotocards,
 } from './lib/db';
 
-type AuthScreen = 'splash' | 'login';
+type AuthScreen = 'splash' | 'login' | 'signup';
 
 const collectionCacheKey = (userId: string) => `pocadex:collection:${userId}`;
 
@@ -146,8 +146,10 @@ export default function App() {
 
   // Not authenticated
   if (!user) {
-    if (authScreen === 'login') return <Login onBack={() => setAuthScreen('splash')} />;
-    return <Splash onGetStarted={() => setAuthScreen('login')} onSignIn={() => setAuthScreen('login')} />;
+    if (authScreen === 'login' || authScreen === 'signup') {
+      return <Login initialMode={authScreen === 'signup' ? 'signup' : 'signin'} onBack={() => setAuthScreen('splash')} />;
+    }
+    return <Splash onGetStarted={() => setAuthScreen('signup')} onSignIn={() => setAuthScreen('login')} />;
   }
 
   // Compute card detail state

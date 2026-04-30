@@ -6,9 +6,10 @@ type Mode = 'signin' | 'signup';
 
 interface Props {
   onBack: () => void;
+  initialMode?: Mode;
 }
 
-export default function Login({ onBack }: Props) {
+export default function Login({ onBack, initialMode = 'signin' }: Props) {
   const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
   const decorations = [
     { icon: Cloud, size: 76, className: 'top-[8%] left-[6%] rotate-[-8deg]' },
@@ -20,7 +21,7 @@ export default function Login({ onBack }: Props) {
     { icon: Heart, size: 18, className: 'bottom-[24%] left-[12%] rotate-[-12deg]' },
     { icon: Sparkles, size: 20, className: 'bottom-[28%] right-[24%]' },
   ];
-  const [mode, setMode] = useState<Mode>('signin');
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

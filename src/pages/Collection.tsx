@@ -189,6 +189,9 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
     { id: 'year', label: 'Year', icon: Calendar },
   ] as const;
 
+  const selectedViewLabel = VIEW_MODES.find(mode => mode.id === viewMode)?.label ?? 'Dimension';
+  const showReturnToFullView = !(photocards.length === 0 && viewMode === 'all' && !drilldownValue);
+
   return (
     <div className="flex flex-col gap-6 w-full overflow-x-hidden pb-20">
 
@@ -201,36 +204,36 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
         </p>
       </div>
 
-      {/* View mode + Search + Filter toggle — single row */}
-      <div className="flex items-center gap-2 w-full">
+      {/* View mode + Search + Filter toggle */}
+      <div className="flex w-full min-w-0 flex-col gap-2 xl:flex-row xl:items-center">
         {/* View mode tabs */}
-        <div className="flex bg-white border-gray-100 border-2 p-1 rounded-2xl shadow-sm items-center shrink-0">
-          <div className="flex gap-0.5">
+        <div className="w-full min-w-0 overflow-x-auto rounded-2xl pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden xl:w-auto xl:shrink-0 xl:pb-0">
+          <div className="inline-flex min-w-max items-center gap-0.5 rounded-2xl border-2 border-gray-100 bg-white p-1 shadow-sm">
             {VIEW_MODES.map((m) => (
               <button
                 key={m.id}
                 onClick={() => { setViewMode(m.id); setDrilldownValue(null); }}
-                className={`flex items-center justify-center gap-2 px-2.5 md:px-4 h-9 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                className={`flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 text-[10px] font-black uppercase tracking-widest transition-all md:px-4 ${
                   viewMode === m.id ? 'bg-primary text-white shadow-md' : 'text-foreground/40 hover:text-foreground'
                 }`}
               >
                 <m.icon size={14} />
-                <span className="hidden md:inline">{m.label}</span>
+                <span>{m.label}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* Search + Filter button (flushed right) */}
-        <div className="flex items-center gap-2 ml-auto">
-          <div className="relative">
+        <div className="flex w-full min-w-0 items-center gap-2 xl:ml-auto xl:w-auto">
+          <div className="relative min-w-0 flex-1 xl:flex-none">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none" />
             <input
               type="text"
               value={filters.search}
               onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
               placeholder="Search..."
-              className="pl-8 pr-3 py-2 h-11 bg-white border-2 border-gray-100 rounded-[14px] text-xs outline-none focus:border-primary/30 w-28 md:w-44 xl:w-56 transition-all"
+              className="h-11 w-full min-w-0 rounded-[14px] border-2 border-gray-100 bg-white py-2 pl-8 pr-3 text-xs outline-none transition-all focus:border-primary/30 xl:w-56"
             />
           </div>
           <button
@@ -386,7 +389,7 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
               ))}
               {groupedData.length === 0 && (
                 <div className="col-span-full py-32 text-center text-foreground/20 font-black uppercase tracking-widest text-sm italic">
-                  Nothing grouped yet in this dimension
+                  Nothing grouped yet in {selectedViewLabel}
                 </div>
               )}
             </motion.div>
@@ -405,16 +408,18 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
               key="empty-view"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col items-center justify-center py-32 glass-card border-white border-8 rounded-[48px] shadow-sm text-foreground/20"
+              className="flex flex-col items-center justify-center px-6 py-32 text-center md:px-10 glass-card border-white border-8 rounded-[48px] shadow-sm text-foreground/20"
             >
               <div className="text-8xl mb-6 grayscale opacity-30 animate-bounce">📔</div>
               <p className="font-black uppercase tracking-[0.3em] text-sm italic">Binder section is currently empty</p>
-              <button
-                onClick={() => setFilters({ group: 'All', member: 'All', album: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' })}
-                className="mt-8 px-8 py-4 bg-white text-primary border-2 border-primary/20 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-xl shadow-primary/10"
-              >
-                Return to Full View
-              </button>
+              {showReturnToFullView && (
+                <button
+                  onClick={() => setFilters({ group: 'All', member: 'All', album: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' })}
+                  className="mt-8 px-8 py-4 bg-white text-primary border-2 border-primary/20 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-xl shadow-primary/10"
+                >
+                  Return to Full View
+                </button>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
