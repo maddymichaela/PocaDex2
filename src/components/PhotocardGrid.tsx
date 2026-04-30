@@ -184,10 +184,10 @@ export function PhotocardGrid({
 
   return (
     <div
-      className={`grid gap-3 md:gap-6 animate-in fade-in duration-500 fill-mode-both ${layout === 'auto-fit'
+      className={`grid gap-3 md:max-lg:gap-4 lg:gap-6 animate-in fade-in duration-500 fill-mode-both ${layout === 'auto-fit'
         ? 'grid-cols-1 md:grid-cols-2'
         : layout === 'four-up'
-          ? 'grid-cols-2 xl:grid-cols-4'
+          ? 'grid-cols-2 md:max-lg:grid-cols-4 xl:grid-cols-4'
           : 'grid-cols-2 md:grid-cols-4 xl:grid-cols-5'
         }`}
       style={gridStyle}

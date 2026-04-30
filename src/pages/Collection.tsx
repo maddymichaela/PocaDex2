@@ -376,7 +376,7 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-6"
+              className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-6 md:max-lg:gap-4"
             >
               {groupedData.map((group) => (
                 <GroupTile
