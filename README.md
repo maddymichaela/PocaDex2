@@ -143,4 +143,3 @@ Before deploying, configure:
 - `VITE_SUPABASE_ANON_KEY`
 - Supabase auth redirect URLs for the deployed domain
 - Supabase storage policies for `photocard-images`
-
