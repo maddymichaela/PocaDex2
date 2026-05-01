@@ -30,19 +30,18 @@ export default function FilterBar({ filters, onFilterChange, uniqueGroups, uniqu
     onFilterChange({ ...filters, [key]: value });
 
   const reset = () =>
-    onFilterChange({ group: 'All', member: 'All', category: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' });
+    onFilterChange({ ...filters, group: 'All', member: 'All', category: 'All', year: 'All', search: '', sortBy: 'recently-added' });
 
   const hasActive =
     filters.group !== 'All' ||
     filters.member !== 'All' ||
     filters.category !== 'All' ||
     filters.year !== 'All' ||
-    filters.status !== 'All' ||
     filters.sortBy !== 'recently-added';
 
   return (
     <div className="bg-white rounded-3xl border-2 border-gray-50 shadow-sm p-4 md:p-5 space-y-3">
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 md:gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2 md:gap-3">
         <div className="space-y-1">
           <label className="text-[9px] font-black uppercase tracking-widest text-foreground/40 ml-1">Sort</label>
           <select value={filters.sortBy} onChange={e => update('sortBy', e.target.value as SortOption)} className={selectClass}>
@@ -83,16 +82,6 @@ export default function FilterBar({ filters, onFilterChange, uniqueGroups, uniqu
           <select value={String(filters.year)} onChange={e => update('year', e.target.value === 'All' ? 'All' : Number(e.target.value))} className={selectClass}>
             <option value="All">All Years</option>
             {[...uniqueYears].filter(Boolean).sort((a, b) => b - a).map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-[9px] font-black uppercase tracking-widest text-foreground/40 ml-1">Status</label>
-          <select value={filters.status} onChange={e => update('status', e.target.value as Status | 'All')} className={selectClass}>
-            <option value="All">All Status</option>
-            <option value="owned">Owned</option>
-            <option value="on_the_way">On The Way</option>
-            <option value="wishlist">Wishlist</option>
           </select>
         </div>
       </div>

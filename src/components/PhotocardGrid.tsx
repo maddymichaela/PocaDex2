@@ -55,6 +55,11 @@ export function PhotocardCard({
   };
 
   const conditionLabel = photocard.status === 'owned' ? getConditionLabel(photocard.condition) : null;
+  const statusCardClass = isWishlist
+    ? 'border-[var(--wishlist-red)]/25 bg-white/55 opacity-85 grayscale-[0.18] shadow-[0_8px_24px_rgba(248,113,113,0.08)]'
+    : isOnTheWay
+      ? 'border-accent-blue/40 bg-[color-mix(in_srgb,var(--accent-blue)_12%,white)] shadow-[0_8px_24px_rgba(125,190,220,0.14)]'
+      : 'border-white/50';
 
   return (
     <motion.div
@@ -70,8 +75,7 @@ export function PhotocardCard({
           onClick(photocard);
         }
       }}
-      className={`glass-card rounded-[28px] shadow-md flex flex-col relative overflow-hidden group cursor-pointer border-2 transition-all hover:shadow-xl hover:shadow-primary/5 ${selectMode && isSelected ? 'border-primary ring-4 ring-primary/10' : 'border-white/50'
-        } ${isWishlist ? 'opacity-90 grayscale-[0.2]' : ''}`}
+      className={`glass-card rounded-[28px] shadow-md flex flex-col relative overflow-hidden group cursor-pointer border-2 transition-all hover:shadow-xl hover:shadow-primary/5 ${selectMode && isSelected ? 'border-primary ring-4 ring-primary/10' : statusCardClass}`}
     >
       {/* Selection UI */}
       {selectMode && (
@@ -88,12 +92,12 @@ export function PhotocardCard({
       {/* Status Badges Overlay */}
       <div className="absolute top-3 right-3 z-10 flex flex-col gap-2">
         {isWishlist && (
-          <div className={`${STATUS_COLORS.wishlist.bgClass} text-white p-2 rounded-full shadow-xl scale-90 md:scale-100`}>
+          <div className={`${STATUS_COLORS.wishlist.bgClass} text-white p-2 rounded-full shadow-xl shadow-red-300/20 scale-90 md:scale-100`} title="Wishlist">
             <Heart size={14} className="fill-current" />
           </div>
         )}
         {isOnTheWay && (
-          <div className={`${STATUS_COLORS.onTheWay.bgClass} text-white p-2 rounded-full shadow-xl scale-90 md:scale-100`}>
+          <div className={`${STATUS_COLORS.onTheWay.bgClass} text-white p-2 rounded-full shadow-xl shadow-sky-300/20 scale-90 md:scale-100`} title="On the Way">
             <Truck size={14} />
           </div>
         )}

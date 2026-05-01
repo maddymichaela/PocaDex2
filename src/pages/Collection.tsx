@@ -4,7 +4,7 @@ import { PhotocardGrid } from '../components/PhotocardGrid';
 import BulkEditForm from '../components/BulkEditForm';
 import FilterBar, { FilterState } from '../components/FilterBar';
 import { placeholderImage } from '../lib/assets';
-import { Plus, CheckSquare, Trash2, X, LayoutGrid, User2, Sparkles, Calendar, ChevronLeft, Edit3, ArrowUp, Search, Filter, Users, Tags } from 'lucide-react';
+import { Plus, CheckSquare, Trash2, X, LayoutGrid, ChevronLeft, Edit3, ArrowUp, Search, Filter, Heart, Truck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface CollectionProps {
@@ -16,6 +16,7 @@ interface CollectionProps {
 }
 
 type ViewMode = 'all' | 'group' | 'member' | 'era' | 'category' | 'year';
+type StatusFilter = FilterState['status'];
 
 const GROUP_FALLBACK_LABELS = {
   era: 'No Era',
@@ -154,6 +155,12 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
     });
   }, [filteredPhotocards, filters.sortBy]);
 
+  useEffect(() => {
+    if (!selectMode || selectedIds.length === 0) return;
+    const visibleIds = new Set(processedPhotocards.map(pc => pc.id));
+    setSelectedIds(prev => prev.filter(id => visibleIds.has(id)));
+  }, [processedPhotocards, selectMode, selectedIds.length]);
+
   const groupedData = useMemo(() => {
     if (viewMode === 'all' || drilldownValue) return [];
     const groups = new Map<string | number, { count: number; imageUrl?: string }>();
@@ -179,7 +186,11 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
   };
 
   const toggleSelectMode = () => {
-    if (selectMode) setSelectedIds([]);
+    setSelectedIds([]);
+    if (!selectMode) {
+      setViewMode('all');
+      setDrilldownValue(null);
+    }
     setSelectMode(!selectMode);
   };
 
@@ -190,7 +201,6 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
     filters.member !== 'All' ||
     filters.category !== 'All' ||
     filters.year !== 'All' ||
-    filters.status !== 'All' ||
     filters.sortBy !== 'recently-added';
 
   const activeFilterChips = [
@@ -198,20 +208,32 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
     { label: 'Member', value: filters.member, key: 'member' as const },
     { label: 'Category', value: filters.category, key: 'category' as const },
     { label: 'Year', value: String(filters.year), key: 'year' as const },
-    { label: 'Status', value: filters.status, key: 'status' as const },
   ].filter(f => f.value !== 'All');
 
   const VIEW_MODES = [
-    { id: 'all', label: 'View All', icon: LayoutGrid },
-    { id: 'group', label: 'Group', icon: Users },
-    { id: 'member', label: 'Member', icon: User2 },
-    { id: 'era', label: 'Era', icon: Sparkles },
-    { id: 'category', label: 'Category', icon: Tags },
-    { id: 'year', label: 'Year', icon: Calendar },
+    { id: 'all', label: 'None' },
+    { id: 'member', label: 'Member' },
+    { id: 'group', label: 'Group' },
+    { id: 'era', label: 'Era' },
+    { id: 'category', label: 'Category' },
+    { id: 'year', label: 'Year' },
   ] as const;
 
   const selectedViewLabel = VIEW_MODES.find(mode => mode.id === viewMode)?.label ?? 'Dimension';
   const showReturnToFullView = !(photocards.length === 0 && viewMode === 'all' && !drilldownValue);
+  const statusCounts = useMemo(() => ({
+    All: photocards.length,
+    owned: photocards.filter(pc => pc.status === 'owned').length,
+    on_the_way: photocards.filter(pc => pc.status === 'on_the_way').length,
+    wishlist: photocards.filter(pc => pc.status === 'wishlist').length,
+  }), [photocards]);
+
+  const STATUS_FILTERS: { id: StatusFilter; label: string; icon?: typeof Heart; activeClass: string; inactiveClass: string }[] = [
+    { id: 'All', label: 'All', activeClass: 'bg-primary/10 text-primary border-primary/25 shadow-sm', inactiveClass: 'bg-white text-foreground/45 border-gray-100 hover:text-primary hover:border-primary/20' },
+    { id: 'owned', label: 'Owned', activeClass: 'bg-primary text-white border-primary shadow-md', inactiveClass: 'bg-white text-foreground/45 border-gray-100 hover:text-primary hover:border-primary/20' },
+    { id: 'on_the_way', label: 'On the Way', icon: Truck, activeClass: 'bg-accent-blue text-white border-accent-blue shadow-md', inactiveClass: 'bg-white text-foreground/45 border-gray-100 hover:text-accent-blue hover:border-accent-blue/30' },
+    { id: 'wishlist', label: 'Wishlist', icon: Heart, activeClass: 'bg-[var(--wishlist-red)] text-white border-[var(--wishlist-red)] shadow-md', inactiveClass: 'bg-white text-foreground/45 border-gray-100 hover:text-[var(--wishlist-red)] hover:border-[var(--wishlist-red)]/30' },
+  ];
 
   return (
     <div className="flex flex-col gap-6 w-full overflow-x-hidden pb-20">
@@ -225,40 +247,64 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
         </p>
       </div>
 
-      {/* View mode + Search + Filter toggle */}
-      <div className="flex w-full min-w-0 flex-col gap-2 xl:flex-row xl:items-center">
-        {/* View mode tabs */}
-        <div className="w-full min-w-0 overflow-x-auto rounded-2xl pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden xl:w-auto xl:shrink-0 xl:pb-0">
-          <div className="inline-flex min-w-max items-center gap-0.5 rounded-2xl border-2 border-gray-100 bg-white p-1 shadow-sm">
-            {VIEW_MODES.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => { setViewMode(m.id); setDrilldownValue(null); }}
-                className={`flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 text-[10px] font-black uppercase tracking-widest transition-all md:px-4 ${viewMode === m.id ? 'bg-primary text-white shadow-md' : 'text-foreground/40 hover:text-foreground'
-                  }`}
-              >
-                <m.icon size={14} />
-                <span>{m.label}</span>
-              </button>
-            ))}
+      {/* Binder navigation + controls */}
+      <div className="mx-auto flex w-full max-w-[1040px] min-w-0 flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="w-full min-w-0 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:w-auto lg:shrink-0 lg:pb-0">
+          <div className="inline-flex min-w-max items-center gap-1 rounded-2xl border-2 border-gray-100 bg-white/70 p-1 shadow-sm">
+            {STATUS_FILTERS.map((statusFilter) => {
+              const Icon = statusFilter.icon;
+              const isActive = filters.status === statusFilter.id;
+
+              return (
+                <button
+                  key={statusFilter.id}
+                  onClick={() => setFilters(prev => ({ ...prev, status: statusFilter.id }))}
+                  className={`flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border px-3 text-[10px] font-black uppercase tracking-widest transition-all md:h-9 md:px-4 ${isActive ? statusFilter.activeClass : statusFilter.inactiveClass}`}
+                  aria-pressed={isActive}
+                >
+                  {Icon && <Icon size={13} className={statusFilter.id === 'wishlist' ? 'fill-current' : undefined} />}
+                  <span>{statusFilter.label}</span>
+                  <span className={`rounded-full px-1.5 py-0.5 text-[9px] leading-none ${isActive ? 'bg-white/30 text-current' : 'bg-foreground/5 text-foreground/35'}`}>
+                    {statusCounts[statusFilter.id]}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Search + Filter button (flushed right) */}
-        <div className="flex w-full min-w-0 items-center gap-2 xl:ml-auto xl:w-auto">
-          <div className="relative min-w-0 flex-1 xl:flex-none">
+        <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_140px_auto] gap-1.5 md:grid-cols-[minmax(0,1fr)_160px_auto] lg:ml-auto lg:w-[480px] lg:shrink xl:w-[520px]">
+          <div className="relative min-w-0">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none" />
             <input
               type="text"
               value={filters.search}
               onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
               placeholder="Search..."
-              className="h-11 w-full min-w-0 rounded-[14px] border-2 border-gray-100 bg-white py-2 pl-8 pr-3 text-xs outline-none transition-all focus:border-primary/30 xl:w-56"
+              className="h-10 w-full min-w-0 rounded-[13px] border-2 border-gray-100 bg-white py-1.5 pl-8 pr-3 text-xs outline-none transition-all focus:border-primary/30 lg:h-9"
             />
           </div>
+
+          <label className="flex h-10 min-w-0 items-center overflow-hidden rounded-[13px] border-2 border-gray-100 bg-white focus-within:border-primary/30 lg:h-9">
+            <span className="shrink-0 border-r border-gray-100 px-2.5 text-[8px] font-black uppercase tracking-widest text-foreground/40">Group By</span>
+            <select
+              value={viewMode}
+              onChange={e => {
+                setViewMode(e.target.value as ViewMode);
+                setDrilldownValue(null);
+                setSelectedIds([]);
+              }}
+              className="h-full min-w-0 flex-1 bg-white px-1.5 text-[10px] font-black uppercase tracking-widest text-foreground/60 outline-none transition-all focus:text-primary"
+            >
+              {VIEW_MODES.map(mode => (
+                <option key={mode.id} value={mode.id}>{mode.label}</option>
+              ))}
+            </select>
+          </label>
+
           <button
             onClick={() => setShowFilters(v => !v)}
-            className={`h-11 w-11 rounded-[14px] border-2 flex items-center justify-center shrink-0 transition-all ${showFilters || hasActiveFilters
+            className={`h-10 w-10 rounded-[13px] border-2 flex items-center justify-center shrink-0 transition-all lg:h-9 lg:w-9 ${showFilters || hasActiveFilters
                 ? 'bg-primary text-white border-primary shadow-md'
                 : 'bg-white text-foreground/50 border-gray-100 hover:border-primary/30 hover:text-primary'
               }`}
@@ -305,7 +351,7 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
             </button>
           ))}
           <button
-            onClick={() => setFilters({ group: 'All', member: 'All', category: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' })}
+            onClick={() => setFilters(prev => ({ ...prev, group: 'All', member: 'All', category: 'All', year: 'All', search: '', sortBy: 'recently-added' }))}
             className="text-[9px] font-black text-foreground/40 uppercase hover:text-red-400 p-2 italic bg-white/30 rounded-xl px-3 border border-white"
           >
             Clear All
