@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Image as ImageIcon, Edit3, Copy, Heart, Truck } from 'lucide-react';
 import { formatPhotocardMembers, getPhotocardCategory, Photocard } from '../types';
 import { placeholderImage } from '../lib/assets';
+import { fetchWishlistCountForCard } from '../lib/social';
 
 interface CardDetailProps {
   photocard: Photocard;
@@ -15,6 +17,21 @@ interface CardDetailProps {
 export default function CardDetail({ photocard, onBack, onEdit, hasPrev, hasNext, onPrev, onNext }: CardDetailProps) {
   const category = getPhotocardCategory(photocard);
   const memberLabel = formatPhotocardMembers(photocard);
+  const [wishlistCount, setWishlistCount] = useState(0);
+
+  useEffect(() => {
+    let isCurrent = true;
+    fetchWishlistCountForCard(photocard)
+      .then((count) => {
+        if (isCurrent) setWishlistCount(count);
+      })
+      .catch(() => {
+        if (isCurrent) setWishlistCount(0);
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [photocard]);
 
   return (
     <div className="bg-gray-50/30">
@@ -114,6 +131,11 @@ export default function CardDetail({ photocard, onBack, onEdit, hasPrev, hasNext
               {photocard.status === 'wishlist' && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-secondary/15 px-3 py-1 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-secondary">
                   <Heart className="h-3 w-3 fill-current" /> Wishlist
+                </span>
+              )}
+              {wishlistCount > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--wishlist-red)]/10 px-3 py-1 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-[var(--wishlist-red)]">
+                  <Heart className="h-3 w-3 fill-current" /> Wishlisted by {wishlistCount} {wishlistCount === 1 ? 'collector' : 'collectors'}
                 </span>
               )}
               {photocard.isDuplicate && (

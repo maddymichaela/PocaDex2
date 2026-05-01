@@ -134,10 +134,18 @@ export interface Profile {
   id: string;
   username: string;
   nickname: string | null;
+  display_name?: string | null;
   bio: string | null;
   avatar_url: string | null;
+  is_collection_public?: boolean | null;
+  is_wishlist_public?: boolean | null;
+  is_bio_public?: boolean | null;
   has_password?: boolean | null;
   deletion_requested_at?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export function getProfileDisplayName(profile: Pick<Profile, 'username' | 'nickname' | 'display_name'>): string {
+  return profile.display_name || profile.nickname || profile.username;
 }

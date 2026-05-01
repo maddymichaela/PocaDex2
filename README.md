@@ -14,6 +14,7 @@ The app is built with React, Vite, Tailwind CSS, and Supabase.
 - Personal photocard collection stored per user
 - Binder views grouped by artist, member, era, category, or year
 - Search, filters, sorting, and collection status tracking
+- Public collector profiles, follow/following lists, and user discovery
 - Add and edit photocards with image upload, crop, rotation, and zoom tools
 - Bulk select and bulk edit for collection cleanup
 - Scan/import flow for splitting grid template images into individual card crops
@@ -78,7 +79,28 @@ For existing projects, add the new optional columns:
 ```sql
 alter table photocards add column if not exists category text default 'Album';
 alter table photocards add column if not exists source text;
+
+alter table profiles add column if not exists display_name text;
+alter table profiles add column if not exists bio text;
+alter table profiles add column if not exists avatar_url text;
+alter table profiles add column if not exists is_collection_public boolean not null default true;
+alter table profiles add column if not exists is_wishlist_public boolean not null default true;
+alter table profiles add column if not exists is_bio_public boolean not null default true;
+create unique index if not exists profiles_username_key on profiles (username);
+
+create table if not exists follows (
+  id uuid primary key default gen_random_uuid(),
+  follower_id uuid not null references profiles(id) on delete cascade,
+  following_id uuid not null references profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  constraint follows_no_self_follow check (follower_id <> following_id),
+  constraint follows_unique_pair unique (follower_id, following_id)
+);
+create index if not exists follows_follower_id_idx on follows (follower_id);
+create index if not exists follows_following_id_idx on follows (following_id);
 ```
+
+For public profile sharing, add Row Level Security policies that allow authenticated users to read public profile rows, public/shared photocard rows, and follow records. Keep insert/update/delete policies scoped to the signed-in owner's `auth.uid()`.
 
 Statuses used by the app are:
 

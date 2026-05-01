@@ -3,7 +3,7 @@ import { getPhotocardMembers, normalizePhotocardForSave, normalizePhotocardUpdat
 
 // ── Row ↔ Photocard mappers ────────────────────────────────────────────────
 
-function rowToPhotocard(row: Record<string, unknown>): Photocard {
+export function rowToPhotocard(row: Record<string, unknown>): Photocard {
   return {
     id: row.id as string,
     group: (row.group_name as string) ?? undefined,

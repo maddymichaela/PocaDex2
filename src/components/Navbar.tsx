@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { LayoutGrid, BookOpen, ScanLine, Plus, LogOut, ChevronUp, Settings } from 'lucide-react';
+import { LayoutGrid, BookOpen, ScanLine, Plus, LogOut, ChevronUp, Settings, UsersRound, UserRound, Search } from 'lucide-react';
 import { Profile } from '../types';
 import { pocadexLogo } from '../lib/assets';
 
@@ -16,7 +16,10 @@ interface NavbarProps {
 const NAV_ITEMS = [
   { id: 'Dashboard', label: 'Dashboard', icon: LayoutGrid },
   { id: 'Collection', label: 'My Binder', icon: BookOpen },
+  { id: 'FindCards', label: 'Find Cards', icon: Search },
   { id: 'Scan', label: 'Import', icon: ScanLine },
+  { id: 'Profile', label: 'My Profile', icon: UserRound },
+  { id: 'Friends', label: 'Friends', icon: UsersRound },
 ] as const;
 
 export default function Navbar({ currentPage, onPageChange, profile, onSignOut, onAddCard, onOpenSettings }: NavbarProps) {
@@ -36,7 +39,7 @@ export default function Navbar({ currentPage, onPageChange, profile, onSignOut, 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const displayName = profile?.nickname || profile?.username || 'You';
+  const displayName = profile?.display_name || profile?.nickname || profile?.username || 'You';
   const avatarLetter = displayName.charAt(0).toUpperCase();
   const avatarUrl = profile?.avatar_url && profile.avatar_url !== failedAvatarUrl
     ? profile.avatar_url

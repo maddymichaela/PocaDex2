@@ -2,7 +2,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 're
 import { AnimatePresence, motion } from 'motion/react';
 import { AlertCircle, CheckCircle2, Download, KeyRound, Mail, ShieldAlert, Unlink, UserRound, Upload } from 'lucide-react';
 import ModalShell from '../components/ModalShell';
-import { useAuth } from '../contexts/AuthContext';
+import { BIO_MAX_LENGTH, useAuth } from '../contexts/AuthContext';
 import { exportCollection } from '../lib/backup';
 import { supabase } from '../lib/supabase';
 import { Photocard } from '../types';
@@ -68,8 +68,12 @@ export default function AccountSettings({ photocards }: AccountSettingsProps) {
     cancelAccountDeletion,
   } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [displayName, setDisplayName] = useState(profile?.nickname || profile?.username || '');
+  const [displayName, setDisplayName] = useState(profile?.display_name || profile?.nickname || profile?.username || '');
   const [username, setUsername] = useState(profile?.username || '');
+  const [bio, setBio] = useState(profile?.bio || '');
+  const [isCollectionPublic, setIsCollectionPublic] = useState(profile?.is_collection_public ?? true);
+  const [isWishlistPublic, setIsWishlistPublic] = useState(profile?.is_wishlist_public ?? true);
+  const [isBioPublic, setIsBioPublic] = useState(profile?.is_bio_public ?? true);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(profile?.avatar_url ?? null);
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
   const [email, setEmail] = useState(user?.email ?? '');
@@ -95,8 +99,12 @@ export default function AccountSettings({ photocards }: AccountSettingsProps) {
   const [accountPasswordSetAt, setAccountPasswordSetAt] = useState<string | null>(null);
 
   useEffect(() => {
-    setDisplayName(profile?.nickname || profile?.username || '');
+    setDisplayName(profile?.display_name || profile?.nickname || profile?.username || '');
     setUsername(profile?.username || '');
+    setBio(profile?.bio || '');
+    setIsCollectionPublic(profile?.is_collection_public ?? true);
+    setIsWishlistPublic(profile?.is_wishlist_public ?? true);
+    setIsBioPublic(profile?.is_bio_public ?? true);
     setAvatarPreview(profile?.avatar_url ?? null);
     setAvatarDataUrl(null);
   }, [profile]);
@@ -154,8 +162,8 @@ export default function AccountSettings({ photocards }: AccountSettingsProps) {
       setUsernameCheck({ state: 'idle', message: '' });
       return;
     }
-    if (!/^[a-z0-9_]{3,24}$/.test(inputUsername)) {
-      setUsernameCheck({ state: 'invalid', message: 'Use 3-24 letters, numbers, or underscores.' });
+    if (!/^[a-z0-9_-]{3,24}$/.test(inputUsername)) {
+      setUsernameCheck({ state: 'invalid', message: 'Use 3-24 letters, numbers, underscores, or hyphens.' });
       return;
     }
 
@@ -224,7 +232,19 @@ export default function AccountSettings({ photocards }: AccountSettingsProps) {
       return;
     }
     setSavingProfile(true);
-    const { error } = await updateProfile({ nickname: displayName, username, avatarDataUrl });
+    if (bio.trim().length > BIO_MAX_LENGTH) {
+      setProfileStatus({ type: 'error', message: `Bio must be ${BIO_MAX_LENGTH} characters or fewer.` });
+      return;
+    }
+    const { error } = await updateProfile({
+      nickname: displayName,
+      username,
+      bio,
+      avatarDataUrl,
+      isCollectionPublic,
+      isWishlistPublic,
+      isBioPublic,
+    });
     setSavingProfile(false);
     setProfileStatus(error ? { type: 'error', message: error } : { type: 'success', message: 'Profile updated.' });
   };
@@ -350,7 +370,7 @@ export default function AccountSettings({ photocards }: AccountSettingsProps) {
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 pb-16">
       <div className="space-y-1">
         <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Account Settings</h1>
-        <p className="text-sm font-medium text-foreground/45">Manage your profile, login details, and account status.</p>
+        <p className="text-sm font-medium text-foreground/45">Manage your profile, sharing, login details, and account status.</p>
       </div>
 
       {profile?.deletion_requested_at && (
@@ -428,6 +448,40 @@ export default function AccountSettings({ photocards }: AccountSettingsProps) {
                 </p>
               )}
             </label>
+            <div className="md:col-span-2">
+              <label className="space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-foreground/35">Bio</span>
+                <textarea
+                  className={`${inputClass} min-h-28 resize-none leading-6`}
+                  value={bio}
+                  maxLength={BIO_MAX_LENGTH}
+                  onChange={(e) => setBio(e.target.value)}
+                  placeholder="A tiny note for collectors who visit your profile"
+                />
+                <p className={`text-right text-[10px] font-black uppercase tracking-widest ${bio.length > BIO_MAX_LENGTH ? 'text-red-500' : 'text-foreground/30'}`}>
+                  {bio.length}/{BIO_MAX_LENGTH}
+                </p>
+              </label>
+            </div>
+
+            <div className="md:col-span-2 grid gap-3 rounded-[24px] border-2 border-gray-100 bg-white/70 p-4 md:grid-cols-3">
+              {[
+                { label: 'Public Collection', checked: isCollectionPublic, onChange: setIsCollectionPublic },
+                { label: 'Public Wishlist', checked: isWishlistPublic, onChange: setIsWishlistPublic },
+                { label: 'Public Bio', checked: isBioPublic, onChange: setIsBioPublic },
+              ].map((item) => (
+                <label key={item.label} className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm">
+                  <span className="text-xs font-black uppercase tracking-widest text-foreground/50">{item.label}</span>
+                  <input
+                    type="checkbox"
+                    checked={item.checked}
+                    onChange={(e) => item.onChange(e.target.checked)}
+                    className="h-5 w-5 accent-primary"
+                  />
+                </label>
+              ))}
+            </div>
+
             <div className="md:col-span-2">
               <AnimatePresence><StatusMessage status={profileStatus} /></AnimatePresence>
             </div>

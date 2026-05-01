@@ -9,6 +9,9 @@ import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
 import Scan from './pages/Scan';
 import AccountSettings from './pages/AccountSettings';
+import PublicProfile from './pages/PublicProfile';
+import Social from './pages/Social';
+import FindCards from './pages/FindCards';
 import { normalizePhotocardForSave, normalizePhotocardUpdates, Photocard } from './types';
 import { useAuth } from './contexts/AuthContext';
 import {
@@ -18,8 +21,10 @@ import {
   deletePhotocard,
   bulkUpdatePhotocards,
 } from './lib/db';
+import { getCardIdentity } from './lib/social';
 
 type AuthScreen = 'splash' | 'login' | 'signup';
+type RouteState = { page: string; username?: string; socialTab?: 'people' | 'following' | 'followers' };
 
 const collectionCacheKey = (userId: string) => `pocadex:collection:${userId}`;
 
@@ -42,10 +47,33 @@ function writeCachedPhotocards(userId: string, cards: Photocard[]) {
   }
 }
 
+function readRouteState(): RouteState {
+  const path = window.location.pathname;
+  if (path.startsWith('/u/')) {
+    const username = decodeURIComponent(path.replace('/u/', '').split('/')[0] || '');
+    return username ? { page: 'Profile', username } : { page: 'Collection' };
+  }
+  if (path === '/discover') return { page: 'Friends', socialTab: 'people' };
+  if (path === '/friends' || path === '/social') return { page: 'Friends' };
+  if (path === '/find-cards') return { page: 'FindCards' };
+  return { page: 'Collection' };
+}
+
+function routeForPage(page: string, username?: string) {
+  if (page === 'Profile' && username) return `/u/${encodeURIComponent(username)}`;
+  if (page === 'Friends') return '/friends';
+  if (page === 'FindCards') return '/find-cards';
+  if (page === 'Dashboard') return '/';
+  return '/';
+}
+
 export default function App() {
   const { user, profile, loading: authLoading, signOut, cancelAccountDeletion } = useAuth();
   const [authScreen, setAuthScreen] = useState<AuthScreen>('splash');
-  const [currentPage, setCurrentPage] = useState('Collection');
+  const initialRoute = readRouteState();
+  const [currentPage, setCurrentPage] = useState(initialRoute.page);
+  const [routeUsername, setRouteUsername] = useState(initialRoute.username ?? '');
+  const [socialTab, setSocialTab] = useState(initialRoute.socialTab ?? 'people');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formCard, setFormCard] = useState<Photocard | null>(null);
@@ -55,6 +83,28 @@ export default function App() {
   const handleAddCard = useCallback(() => {
     setFormCard(null);
     setIsFormOpen(true);
+  }, []);
+
+  const navigateToPage = useCallback((page: string, username?: string) => {
+    setCurrentPage(page);
+    setRouteUsername(username ?? '');
+    if (page === 'Friends') setSocialTab('people');
+    setSelectedId(null);
+    setIsFormOpen(false);
+    window.history.pushState({}, '', routeForPage(page, username));
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const nextRoute = readRouteState();
+      setCurrentPage(nextRoute.page);
+      setRouteUsername(nextRoute.username ?? '');
+      setSocialTab(nextRoute.socialTab ?? 'people');
+      setSelectedId(null);
+      setIsFormOpen(false);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   // Handle /auth/callback route
@@ -147,6 +197,24 @@ export default function App() {
     });
   }, []);
 
+  const handleCopyPublicCard = useCallback(async (sourceCard: Photocard, status: 'owned' | 'wishlist') => {
+    if (!user) return;
+    const sourceIdentity = getCardIdentity(sourceCard);
+    if (photocards.some((card) => card.status === status && getCardIdentity(card) === sourceIdentity)) return;
+
+    const copiedCard = normalizePhotocardForSave({
+      ...sourceCard,
+      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      status,
+      condition: status === 'owned' ? sourceCard.condition : undefined,
+      isDuplicate: false,
+      notes: '',
+      createdAt: Date.now(),
+    });
+
+    await handleAddPhotocard(copiedCard);
+  }, [handleAddPhotocard, photocards, user]);
+
   // Auth loading
   if (authLoading) {
     return (
@@ -161,6 +229,23 @@ export default function App() {
 
   // Not authenticated
   if (!user) {
+    if (currentPage === 'Profile' && routeUsername) {
+      return (
+        <div className="relative min-h-screen overflow-auto bg-white">
+          <div className="pointer-events-none absolute inset-0 app-shell-bg" />
+          <div className="pointer-events-none absolute inset-0 app-shell-dots opacity-60" />
+          <main className="relative z-10 px-4 py-5 xl:p-8">
+            <PublicProfile
+              username={routeUsername}
+              currentUserId={null}
+              ownPhotocards={[]}
+              onEditProfile={() => setAuthScreen('login')}
+              onCopyCard={handleCopyPublicCard}
+            />
+          </main>
+        </div>
+      );
+    }
     if (authScreen === 'login' || authScreen === 'signup') {
       return <Login initialMode={authScreen === 'signup' ? 'signup' : 'signin'} onBack={() => setAuthScreen('splash')} />;
     }
@@ -186,6 +271,33 @@ export default function App() {
         return <Scan onDone={() => setCurrentPage('Collection')} onImported={handleScanImported} />;
       case 'Account':
         return <AccountSettings photocards={photocards} />;
+      case 'Profile':
+        return (
+          <PublicProfile
+            username={routeUsername || profile?.username || ''}
+            currentUserId={user.id}
+            ownProfile={profile}
+            ownPhotocards={photocards}
+            onEditProfile={() => navigateToPage('Account')}
+            onOpenCard={(pc) => setSelectedId(pc.id)}
+            onCopyCard={handleCopyPublicCard}
+          />
+        );
+      case 'FindCards':
+        return (
+          <FindCards
+            ownPhotocards={photocards}
+            onCopyCard={handleCopyPublicCard}
+          />
+        );
+      case 'Friends':
+        return (
+          <Social
+            currentUserId={user.id}
+            initialTab={socialTab}
+            onOpenProfile={(nextProfile) => navigateToPage('Profile', nextProfile.username)}
+          />
+        );
       case 'Collection':
         return (
           <Collection
@@ -226,7 +338,7 @@ export default function App() {
       </div>
       <Navbar
         currentPage={currentPage}
-        onPageChange={(page) => { setCurrentPage(page); setSelectedId(null); setIsFormOpen(false); }}
+        onPageChange={(page) => navigateToPage(page, page === 'Profile' ? profile?.username : undefined)}
         profile={profile}
         onSignOut={signOut}
         onAddCard={handleAddCard}

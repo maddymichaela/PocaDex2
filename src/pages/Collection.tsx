@@ -248,7 +248,7 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
       </div>
 
       {/* Binder navigation + controls */}
-      <div className="mx-auto flex w-full max-w-[1040px] min-w-0 flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mx-auto flex w-full min-w-0 flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
         <div className="w-full min-w-0 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:w-auto lg:shrink-0 lg:pb-0">
           <div className="inline-flex min-w-max items-center gap-1 rounded-2xl border-2 border-gray-100 bg-white/70 p-1 shadow-sm">
             {STATUS_FILTERS.map((statusFilter) => {
@@ -273,19 +273,19 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
           </div>
         </div>
 
-        <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_140px_auto] gap-1.5 md:grid-cols-[minmax(0,1fr)_160px_auto] lg:ml-auto lg:w-[480px] lg:shrink xl:w-[520px]">
-          <div className="relative min-w-0">
+        <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_140px_auto] gap-1.5 md:grid-cols-[minmax(0,1fr)_160px_auto] lg:ml-auto lg:flex lg:w-auto lg:shrink-0 lg:items-center lg:justify-end lg:gap-2 xl:gap-3">
+          <div className="relative min-w-0 lg:w-[220px] xl:w-[230px]">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none" />
             <input
               type="text"
               value={filters.search}
               onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
-              placeholder="Search..."
+              placeholder="Search your binder…"
               className="h-10 w-full min-w-0 rounded-[13px] border-2 border-gray-100 bg-white py-1.5 pl-8 pr-3 text-xs outline-none transition-all focus:border-primary/30 lg:h-9"
             />
           </div>
 
-          <label className="flex h-10 min-w-0 items-center overflow-hidden rounded-[13px] border-2 border-gray-100 bg-white focus-within:border-primary/30 lg:h-9">
+          <label className="flex h-10 min-w-0 items-center overflow-hidden rounded-[13px] border-2 border-gray-100 bg-white focus-within:border-primary/30 lg:h-9 lg:w-[190px] xl:w-[205px]">
             <span className="shrink-0 border-r border-gray-100 px-2.5 text-[8px] font-black uppercase tracking-widest text-foreground/40">Group By</span>
             <select
               value={viewMode}

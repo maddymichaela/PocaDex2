@@ -3,6 +3,18 @@ import { Session, User, UserIdentity } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Profile } from '../types';
 
+export const BIO_MAX_LENGTH = 240;
+
+interface ProfileUpdates {
+  nickname: string;
+  username: string;
+  bio?: string;
+  avatarDataUrl?: string | null;
+  isCollectionPublic?: boolean;
+  isWishlistPublic?: boolean;
+  isBioPublic?: boolean;
+}
+
 interface AuthContextType {
   session: Session | null;
   user: User | null;
@@ -11,7 +23,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
   signUpWithEmail: (email: string, password: string, nickname: string) => Promise<{ error: string | null }>;
-  updateProfile: (updates: { nickname: string; username: string; avatarDataUrl?: string | null }) => Promise<{ error: string | null }>;
+  updateProfile: (updates: ProfileUpdates) => Promise<{ error: string | null }>;
   checkUsernameAvailability: (username: string) => Promise<{ available: boolean; error: string | null; normalized: string }>;
   updateEmail: (email: string) => Promise<{ error: string | null }>;
   updatePassword: (password: string) => Promise<{ error: string | null }>;
@@ -29,7 +41,7 @@ function normalizeUsername(username: string) {
 }
 
 function isValidUsername(username: string) {
-  return /^[a-z0-9_]{3,24}$/.test(username);
+  return /^[a-z0-9_-]{3,24}$/.test(username);
 }
 
 async function fetchProfile(userId: string): Promise<Profile | null> {
@@ -61,6 +73,17 @@ async function uploadAvatar(userId: string, dataUrl: string): Promise<string> {
   return data.publicUrl;
 }
 
+function isMissingProfileColumnError(error: unknown) {
+  if (!error || typeof error !== 'object' || !('message' in error)) return false;
+  const message = String((error as { message: unknown }).message);
+  return (
+    message.includes("Could not find the 'display_name' column") ||
+    message.includes("Could not find the 'is_collection_public' column") ||
+    message.includes("Could not find the 'is_wishlist_public' column") ||
+    message.includes("Could not find the 'is_bio_public' column")
+  );
+}
+
 function profileFromUser(user: User): Profile {
   const metadata = user.user_metadata ?? {};
   const username = (metadata.user_name as string | undefined)
@@ -78,8 +101,12 @@ function profileFromUser(user: User): Profile {
     id: user.id,
     username,
     nickname,
+    display_name: nickname,
     bio: null,
     avatar_url: avatarUrl,
+    is_collection_public: true,
+    is_wishlist_public: true,
+    is_bio_public: true,
     has_password: Boolean(metadata.has_password || metadata.password_set_at),
     deletion_requested_at: (metadata.deletion_requested_at as string | undefined) ?? null,
     created_at: user.created_at,
@@ -96,6 +123,9 @@ function mergeProfileFallback(profile: Profile | null, fallback: Profile): Profi
     username: profile.username || fallback.username,
     nickname: profile.nickname || fallback.nickname,
     avatar_url: profile.avatar_url || fallback.avatar_url,
+    is_collection_public: profile.is_collection_public ?? true,
+    is_wishlist_public: profile.is_wishlist_public ?? true,
+    is_bio_public: profile.is_bio_public ?? true,
     has_password: profile.has_password ?? fallback.has_password ?? null,
     deletion_requested_at: profile.deletion_requested_at ?? fallback.deletion_requested_at ?? null,
   };
@@ -176,15 +206,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   };
 
-  const updateProfile = async (updates: { nickname: string; username: string; avatarDataUrl?: string | null }) => {
+  const updateProfile = async (updates: ProfileUpdates) => {
     if (!user) return { error: 'You need to be signed in to update your profile.' };
 
     const username = normalizeUsername(updates.username);
     const nickname = updates.nickname.trim();
     if (!isValidUsername(username)) {
-      return { error: 'Usernames must be 3-24 characters and can only use letters, numbers, and underscores.' };
+      return { error: 'Usernames must be 3-24 characters and can only use letters, numbers, underscores, or hyphens.' };
     }
     if (nickname.length < 2) return { error: 'Display name must be at least 2 characters.' };
+    const bio = updates.bio?.trim() ?? profile?.bio ?? '';
+    if (bio.length > BIO_MAX_LENGTH) return { error: `Bio must be ${BIO_MAX_LENGTH} characters or fewer.` };
 
     const { data: duplicate, error: duplicateError } = await supabase
       .from('profiles')
@@ -203,22 +235,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         id: user.id,
         username,
         nickname,
-        bio: profile?.bio ?? null,
+        display_name: nickname,
+        bio: bio || null,
         avatar_url: avatarUrl,
+        is_collection_public: updates.isCollectionPublic ?? profile?.is_collection_public ?? true,
+        is_wishlist_public: updates.isWishlistPublic ?? profile?.is_wishlist_public ?? true,
+        is_bio_public: updates.isBioPublic ?? profile?.is_bio_public ?? true,
         has_password: profile?.has_password ?? null,
         deletion_requested_at: profile?.deletion_requested_at ?? null,
         created_at: profile?.created_at ?? user.created_at,
         updated_at: new Date().toISOString(),
       };
 
-      const { error: profileError } = await supabase.from('profiles').upsert({
+      const profileRow = {
         id: user.id,
         username,
         nickname,
+        display_name: nickname,
+        bio: nextProfile.bio,
         avatar_url: avatarUrl,
+        is_collection_public: nextProfile.is_collection_public,
+        is_wishlist_public: nextProfile.is_wishlist_public,
+        is_bio_public: nextProfile.is_bio_public,
         updated_at: nextProfile.updated_at,
-      });
-      if (profileError) return { error: profileError.message };
+      };
+
+      const { error: profileError } = await supabase.from('profiles').upsert(profileRow);
+      if (profileError && isMissingProfileColumnError(profileError)) {
+        const { error: legacyProfileError } = await supabase.from('profiles').upsert({
+          id: user.id,
+          username,
+          nickname,
+          bio: nextProfile.bio,
+          avatar_url: avatarUrl,
+          updated_at: nextProfile.updated_at,
+        });
+        if (legacyProfileError) return { error: legacyProfileError.message };
+      } else if (profileError) {
+        return { error: profileError.message };
+      }
 
       const { error: authError } = await supabase.auth.updateUser({
         data: { full_name: nickname, name: nickname, user_name: username, preferred_username: username, avatar_url: avatarUrl },
@@ -236,7 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return { available: false, error: 'You need to be signed in to update your profile.', normalized: normalizeUsername(nextUsername) };
     const normalized = normalizeUsername(nextUsername);
     if (!isValidUsername(normalized)) {
-      return { available: false, error: 'Use 3-24 letters, numbers, or underscores.', normalized };
+      return { available: false, error: 'Use 3-24 letters, numbers, underscores, or hyphens.', normalized };
     }
     if (normalized === normalizeUsername(profile?.username ?? '')) {
       return { available: true, error: null, normalized };
