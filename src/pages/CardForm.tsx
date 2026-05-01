@@ -92,7 +92,7 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
               {isEditing ? 'Back to Card' : 'Back to Binder'}
             </span>
           </button>
-          <div className="min-w-0 text-center">
+          <div className={`${isEditing ? 'hidden md:block' : ''} min-w-0 text-center`}>
             <h2 className="truncate text-xl font-bold tracking-tight text-foreground md:text-2xl">
               {isEditing ? 'Edit Card' : 'New Photocard'}
             </h2>

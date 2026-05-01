@@ -359,6 +359,9 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
   const [editingDetailsId, setEditingDetailsId] = useState<string | null>(null);
   const [isAddingManualCrop, setIsAddingManualCrop] = useState(false);
   const [bulkDraft, setBulkDraft] = useState<BulkDraft>(emptyBulkDraft);
+  const [isBulkEditExpanded, setIsBulkEditExpanded] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches
+  ));
   const [detectionStrategyIndex, setDetectionStrategyIndex] = useState(0);
   const [detectionFeedback, setDetectionFeedback] = useState<string | null>(null);
   const [isTemplateLightboxOpen, setIsTemplateLightboxOpen] = useState(false);
@@ -390,6 +393,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
     setEditingCropId(null);
     setEditingDetailsId(null);
     setIsAddingManualCrop(false);
+    setBulkDraft(emptyBulkDraft);
     setDetectionStrategyIndex(0);
     setDetectionFeedback(null);
     setStep('upload');
@@ -688,7 +692,6 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
 
   const startOver = () => {
     setStep('upload');
-    setTemplateUrl(null);
     setCards([]);
     setSelectedIds(new Set());
     setError(null);
@@ -696,10 +699,10 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
     setEditingCropId(null);
     setEditingDetailsId(null);
     setIsAddingManualCrop(false);
+    setBulkDraft(emptyBulkDraft);
     setDetectionStrategyIndex(0);
     setDetectionFeedback(null);
     setIsTemplateLightboxOpen(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const uploadNewTemplate = () => {
@@ -980,52 +983,80 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
             </div>
 
             <div className="min-w-0">
-              <div className="mb-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-foreground/45">Batch edit selected</p>
-                <p className="text-xs font-medium text-foreground/40">Fill any fields here, then apply them together.</p>
-              </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                <input value={bulkDraft.group} onChange={e => updateBulkDraft({ group: e.target.value })} placeholder="Group" className={bulkInputClass} />
-                <select value={bulkDraft.category} onChange={e => updateBulkDraft({ category: e.target.value as BulkDraft['category'] })} className={softSelectClass}>
-                  <option value="">Category</option>
-                  {PHOTOCARD_CATEGORIES.map(option => <option key={option} value={option}>{option}</option>)}
-                </select>
-                {bulkCategoryForFields === 'Album' ? (
-                  <input value={bulkDraft.album} onChange={e => updateBulkDraft({ album: e.target.value })} placeholder="Album" className={bulkInputClass} />
-                ) : (
-                  <input value={bulkDraft.source} onChange={e => updateBulkDraft({ source: e.target.value })} placeholder="Source" className={bulkInputClass} />
-                )}
-                <input value={bulkDraft.era} onChange={e => updateBulkDraft({ era: e.target.value })} placeholder="Era" className={bulkInputClass} />
-                <input value={bulkDraft.year} onChange={e => updateBulkDraft({ year: e.target.value })} placeholder="Year" inputMode="numeric" className={bulkInputClass} />
-                <select value={bulkDraft.status} onChange={e => updateBulkDraft({ status: e.target.value as BulkDraft['status'] })} className={softSelectClass}>
-                  <option value="">Status</option>
-                  <option value="owned">Owned</option>
-                  <option value="wishlist">Wishlist</option>
-                  <option value="on_the_way">On the way</option>
-                </select>
-                <select value={bulkDraft.condition} onChange={e => updateBulkDraft({ condition: e.target.value as BulkDraft['condition'] })} className={softSelectClass}>
-                  <option value="">Condition</option>
-                  <option value="mint">Mint</option>
-                  <option value="near_mint">Near mint</option>
-                  <option value="good">Good</option>
-                  <option value="fair">Fair</option>
-                  <option value="poor">Poor</option>
-                </select>
-                <select value={bulkDraft.isDuplicate} onChange={e => updateBulkDraft({ isDuplicate: e.target.value as BulkDraft['isDuplicate'] })} className={softSelectClass}>
-                  <option value="">Duplicate</option>
-                  <option value="false">Not duplicate</option>
-                  <option value="true">Duplicate</option>
-                </select>
-              </div>
-              <div className="mt-3 md:hidden">
-                <button
-                  type="button"
-                  onClick={applyBulkDraft}
-                  disabled={!selectedCards.length || !hasBulkDraftValues}
-                  className={`${secondaryButtonClass} w-full`}
-                >
-                  Apply to selected
-                </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.matchMedia('(min-width: 768px)').matches) return;
+                  setIsBulkEditExpanded(prev => !prev);
+                }}
+                className="flex w-full items-center justify-between gap-3 text-left md:cursor-default"
+                aria-expanded={isBulkEditExpanded}
+                aria-controls="batch-edit-fields"
+              >
+                <span className="min-w-0">
+                  <h3 className="block font-serif text-[12px] font-black uppercase tracking-widest text-foreground/45">Batch Edit Selected</h3>
+                  <span className="block text-xs font-medium text-foreground/40">Fill any fields here, then apply them together.</span>
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <span className="rounded-full bg-primary/5 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-primary/60">
+                    {selectedCards.length} selected
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className={`text-foreground/35 transition-transform duration-300 md:hidden ${isBulkEditExpanded ? 'rotate-180' : ''}`}
+                  />
+                </span>
+              </button>
+
+              <div
+                id="batch-edit-fields"
+                className={`grid transition-[grid-template-rows] duration-300 ease-out md:grid-rows-[1fr] ${isBulkEditExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+              >
+                <div className="min-h-0 overflow-hidden md:overflow-visible">
+                  <div className="grid grid-cols-1 gap-2 pt-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <input value={bulkDraft.group} onChange={e => updateBulkDraft({ group: e.target.value })} placeholder="Group" className={bulkInputClass} />
+                    <select value={bulkDraft.category} onChange={e => updateBulkDraft({ category: e.target.value as BulkDraft['category'] })} className={softSelectClass}>
+                      <option value="">Category</option>
+                      {PHOTOCARD_CATEGORIES.map(option => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                    {bulkCategoryForFields === 'Album' ? (
+                      <input value={bulkDraft.album} onChange={e => updateBulkDraft({ album: e.target.value })} placeholder="Album" className={bulkInputClass} />
+                    ) : (
+                      <input value={bulkDraft.source} onChange={e => updateBulkDraft({ source: e.target.value })} placeholder="Source" className={bulkInputClass} />
+                    )}
+                    <input value={bulkDraft.era} onChange={e => updateBulkDraft({ era: e.target.value })} placeholder="Era" className={bulkInputClass} />
+                    <input value={bulkDraft.year} onChange={e => updateBulkDraft({ year: e.target.value })} placeholder="Year" inputMode="numeric" className={bulkInputClass} />
+                    <select value={bulkDraft.status} onChange={e => updateBulkDraft({ status: e.target.value as BulkDraft['status'] })} className={softSelectClass}>
+                      <option value="">Status</option>
+                      <option value="owned">Owned</option>
+                      <option value="wishlist">Wishlist</option>
+                      <option value="on_the_way">On the way</option>
+                    </select>
+                    <select value={bulkDraft.condition} onChange={e => updateBulkDraft({ condition: e.target.value as BulkDraft['condition'] })} className={softSelectClass}>
+                      <option value="">Condition</option>
+                      <option value="mint">Mint</option>
+                      <option value="near_mint">Near mint</option>
+                      <option value="good">Good</option>
+                      <option value="fair">Fair</option>
+                      <option value="poor">Poor</option>
+                    </select>
+                    <select value={bulkDraft.isDuplicate} onChange={e => updateBulkDraft({ isDuplicate: e.target.value as BulkDraft['isDuplicate'] })} className={softSelectClass}>
+                      <option value="">Duplicate</option>
+                      <option value="false">Not duplicate</option>
+                      <option value="true">Duplicate</option>
+                    </select>
+                  </div>
+                  <div className="mt-3 md:hidden">
+                    <button
+                      type="button"
+                      onClick={applyBulkDraft}
+                      disabled={!selectedCards.length || !hasBulkDraftValues}
+                      className={`${secondaryButtonClass} w-full`}
+                    >
+                      Apply to selected
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1075,9 +1106,8 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
                       <MemberTagInput
                         members={card.members}
                         onChange={members => updateCard(card.id, { members })}
-                        className={`rounded-xl border bg-white/70 px-3 py-1.5 text-xs font-semibold transition-colors focus-within:border-primary/40 ${
-                          selectedIds.has(card.id) && card.members.length === 0 ? 'border-red-300' : 'border-primary/10'
-                        }`}
+                        className={`rounded-xl border bg-white/70 px-3 py-1.5 text-xs font-semibold transition-colors focus-within:border-primary/40 ${selectedIds.has(card.id) && card.members.length === 0 ? 'border-red-300' : 'border-primary/10'
+                          }`}
                         inputClassName="placeholder:text-foreground/25"
                         placeholder="Felix"
                       />
