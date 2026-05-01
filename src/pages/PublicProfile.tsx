@@ -3,7 +3,7 @@ import { CheckCircle2, Edit3, Heart, Lock, Plus, Sparkles, UserCheck, UserPlus, 
 import { AnimatePresence, motion } from 'motion/react';
 import { PhotocardCard, PhotocardGrid } from '../components/PhotocardGrid';
 import { getProfileDisplayName, Photocard, Profile } from '../types';
-import { fetchPublicProfileBundle, followUser, getCardIdentity, PublicProfileBundle, unfollowUser } from '../lib/social';
+import { fetchPublicProfileBundle, followUser, getCardTemplateId, getProfileUserId, PublicProfileBundle, unfollowUser } from '../lib/social';
 
 type ProfileTab = 'collection' | 'wishlist' | 'about';
 
@@ -53,6 +53,8 @@ export default function PublicProfile({
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ProfileTab>('collection');
   const [followBusy, setFollowBusy] = useState(false);
+  const [copiedOwnedIdentities, setCopiedOwnedIdentities] = useState<Set<string>>(() => new Set());
+  const [copiedWishlistIdentities, setCopiedWishlistIdentities] = useState<Set<string>>(() => new Set());
 
   const isOwnProfile = ownProfile?.username?.toLowerCase() === username.toLowerCase();
 
@@ -95,14 +97,22 @@ export default function PublicProfile({
     return () => {
       isCurrent = false;
     };
-  }, [currentUserId, isOwnProfile, ownPhotocards, ownProfile, username]);
+  }, [currentUserId, isOwnProfile, ownProfile, username]);
+
+  useEffect(() => {
+    if (!isOwnProfile || !ownProfile) return;
+    setBundle((current) => current ? { ...current, profile: ownProfile, cards: ownPhotocards } : current);
+  }, [isOwnProfile, ownPhotocards, ownProfile]);
+
+  useEffect(() => {
+    setCopiedOwnedIdentities(new Set(ownPhotocards.filter((card) => card.status === 'owned').map(getCardTemplateId)));
+    setCopiedWishlistIdentities(new Set(ownPhotocards.filter((card) => card.status === 'wishlist').map(getCardTemplateId)));
+  }, [ownPhotocards]);
 
   const cards = bundle?.cards ?? [];
   const ownedCards = useMemo(() => cards.filter((card) => card.status === 'owned'), [cards]);
   const wishlistCards = useMemo(() => cards.filter((card) => card.status === 'wishlist'), [cards]);
   const onTheWayCount = useMemo(() => cards.filter((card) => card.status === 'on_the_way').length, [cards]);
-  const ownedIdentitySet = useMemo(() => new Set(ownPhotocards.filter((card) => card.status === 'owned').map(getCardIdentity)), [ownPhotocards]);
-  const wishlistIdentitySet = useMemo(() => new Set(ownPhotocards.filter((card) => card.status === 'wishlist').map(getCardIdentity)), [ownPhotocards]);
   const [copyingCardId, setCopyingCardId] = useState<string | null>(null);
 
   const handleFollowToggle = async () => {
@@ -111,6 +121,8 @@ export default function PublicProfile({
       setError('Sign in to follow collectors.');
       return;
     }
+    const profileUserId = getProfileUserId(bundle.profile);
+    if (currentUserId === profileUserId) return;
     setFollowBusy(true);
     const wasFollowing = bundle.counts.isFollowing;
     setBundle((current) => current ? {
@@ -122,8 +134,8 @@ export default function PublicProfile({
       },
     } : current);
     try {
-      if (wasFollowing) await unfollowUser(currentUserId, bundle.profile.id);
-      else await followUser(currentUserId, bundle.profile.id);
+      if (wasFollowing) await unfollowUser(currentUserId, profileUserId);
+      else await followUser(currentUserId, profileUserId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Follow action failed.');
       setBundle((current) => current ? {
@@ -157,6 +169,7 @@ export default function PublicProfile({
   }
 
   const { profile, counts } = bundle;
+  const isViewingSelf = currentUserId === getProfileUserId(profile);
   const displayName = getProfileDisplayName(profile);
   const showBio = profile.is_bio_public !== false && Boolean(profile.bio);
   const tabs: { id: ProfileTab; label: string }[] = [
@@ -169,23 +182,36 @@ export default function PublicProfile({
     if (isOwnProfile) return <PhotocardGrid photocards={nextCards} onCardClick={onOpenCard} />;
 
     return (
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:max-lg:gap-4 xl:grid-cols-5 lg:gap-6">
+      <div className="grid grid-cols-2 items-stretch gap-3 md:grid-cols-4 md:max-lg:gap-4 xl:grid-cols-5 lg:gap-6">
         {nextCards.map((card, index) => {
-          const identity = getCardIdentity(card);
-          const inCollection = ownedIdentitySet.has(identity);
-          const inWishlist = wishlistIdentitySet.has(identity);
+          const identity = getCardTemplateId(card);
+          const inCollection = copiedOwnedIdentities.has(identity);
+          const inWishlist = copiedWishlistIdentities.has(identity);
+          const alreadySaved = inCollection || inWishlist;
+          const collecting = copyingCardId === `${identity}:owned`;
+          const wishlisting = copyingCardId === `${identity}:wishlist`;
           return (
-            <div key={card.id} className="flex flex-col gap-2">
-              <PhotocardCard photocard={card} index={index} />
+            <div key={card.id} className="flex h-full flex-col gap-2">
+              <PhotocardCard photocard={card} index={index} infoMode="public-profile" className="flex-1" />
               {currentUserId && onCopyCard && (
                 <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                   <button
                     type="button"
-                    disabled={inCollection || copyingCardId === `${card.id}:owned`}
-                    onClick={async () => {
-                      setCopyingCardId(`${card.id}:owned`);
+                    disabled={alreadySaved || collecting}
+                    onClick={async (event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setCopyingCardId(`${identity}:owned`);
+                      setCopiedOwnedIdentities((current) => new Set(current).add(identity));
                       try {
                         await onCopyCard(card, 'owned');
+                      } catch (err) {
+                        setCopiedOwnedIdentities((current) => {
+                          const next = new Set(current);
+                          next.delete(identity);
+                          return next;
+                        });
+                        setError(err instanceof Error ? err.message : 'Could not add card to your collection.');
                       } finally {
                         setCopyingCardId(null);
                       }
@@ -193,15 +219,25 @@ export default function PublicProfile({
                     className="flex h-10 items-center justify-center gap-1.5 rounded-2xl bg-primary px-2 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all disabled:bg-white disabled:text-primary disabled:ring-2 disabled:ring-primary/15"
                   >
                     {inCollection ? <CheckCircle2 size={13} /> : <Plus size={13} />}
-                    {inCollection ? 'In Collection' : 'Collect'}
+                    {collecting ? 'Adding...' : inCollection ? 'In Collection' : inWishlist ? 'Wishlisted' : 'Collect'}
                   </button>
                   <button
                     type="button"
-                    disabled={inWishlist || copyingCardId === `${card.id}:wishlist`}
-                    onClick={async () => {
-                      setCopyingCardId(`${card.id}:wishlist`);
+                    disabled={alreadySaved || wishlisting}
+                    onClick={async (event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setCopyingCardId(`${identity}:wishlist`);
+                      setCopiedWishlistIdentities((current) => new Set(current).add(identity));
                       try {
                         await onCopyCard(card, 'wishlist');
+                      } catch (err) {
+                        setCopiedWishlistIdentities((current) => {
+                          const next = new Set(current);
+                          next.delete(identity);
+                          return next;
+                        });
+                        setError(err instanceof Error ? err.message : 'Could not add card to your wishlist.');
                       } finally {
                         setCopyingCardId(null);
                       }
@@ -209,7 +245,7 @@ export default function PublicProfile({
                     className="flex h-10 items-center justify-center gap-1.5 rounded-2xl bg-[var(--wishlist-red)] px-2 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all disabled:bg-white disabled:text-[var(--wishlist-red)] disabled:ring-2 disabled:ring-red-100"
                   >
                     <Heart size={13} className={inWishlist ? 'fill-current' : undefined} />
-                    {inWishlist ? 'Wishlisted' : 'Wishlist'}
+                    {wishlisting ? 'Adding...' : inWishlist ? 'Wishlisted' : inCollection ? 'In Collection' : 'Wishlist'}
                   </button>
                 </div>
               )}
@@ -251,7 +287,7 @@ export default function PublicProfile({
           </div>
 
           <div className="flex flex-col gap-3 md:items-end">
-            {isOwnProfile ? (
+            {isOwnProfile || isViewingSelf ? (
               <button
                 type="button"
                 onClick={onEditProfile}
@@ -272,7 +308,7 @@ export default function PublicProfile({
                 }`}
               >
                 {counts.isFollowing ? <UserCheck size={16} /> : <UserPlus size={16} />}
-                {counts.isFollowing ? 'Following' : 'Follow'}
+                {counts.isFollowing ? '- Unfollow' : '+ Follow'}
               </button>
             ) : (
               <div className="rounded-[22px] bg-white px-5 py-4 text-center text-xs font-black uppercase tracking-widest text-foreground/35 shadow-sm ring-2 ring-primary/10">

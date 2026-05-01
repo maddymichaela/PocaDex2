@@ -1,5 +1,6 @@
 import { UserPlus, UserCheck } from 'lucide-react';
 import { getProfileDisplayName, Profile } from '../types';
+import { getProfileUserId } from '../lib/social';
 
 interface UserCardProps {
   profile: Profile & { is_following?: boolean };
@@ -12,7 +13,7 @@ interface UserCardProps {
 export default function UserCard({ profile, currentUserId, onOpen, onFollowToggle, busy }: UserCardProps) {
   const displayName = getProfileDisplayName(profile);
   const avatarLetter = displayName.charAt(0).toUpperCase();
-  const isSelf = currentUserId === profile.id;
+  const isSelf = currentUserId === getProfileUserId(profile);
 
   return (
     <article className="glass-card flex flex-col gap-4 rounded-[28px] border-2 border-white p-4 shadow-sm md:flex-row md:items-center">

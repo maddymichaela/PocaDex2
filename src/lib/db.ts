@@ -4,8 +4,12 @@ import { getPhotocardMembers, normalizePhotocardForSave, normalizePhotocardUpdat
 // ── Row ↔ Photocard mappers ────────────────────────────────────────────────
 
 export function rowToPhotocard(row: Record<string, unknown>): Photocard {
+  const id = row.id as string;
+  const ownerUserId = (row.user_id as string) ?? undefined;
   return {
-    id: row.id as string,
+    id,
+    cardTemplateId: (row.card_template_id as string) || id,
+    ownerUserId,
     group: (row.group_name as string) ?? undefined,
     members: getPhotocardMembers({ members: row.members as string[] | undefined, member: row.member as string | undefined }),
     category: (row.category as Photocard['category']) ?? 'Album',
@@ -24,10 +28,11 @@ export function rowToPhotocard(row: Record<string, unknown>): Photocard {
   };
 }
 
-function photocardToRow(pc: Omit<Photocard, 'id' | 'createdAt'>, userId: string) {
-  const normalized = normalizePhotocardForSave({ ...pc, id: '', createdAt: 0 });
+function photocardToRow(pc: Photocard, userId: string) {
+  const normalized = normalizePhotocardForSave(pc);
   return {
     user_id: userId,
+    card_template_id: normalized.cardTemplateId || normalized.id,
     group_name: normalized.group ?? null,
     members: normalized.members,
     category: normalized.category ?? 'Album',
@@ -46,7 +51,7 @@ function photocardToRow(pc: Omit<Photocard, 'id' | 'createdAt'>, userId: string)
 }
 
 function withoutNewSchemaColumns(row: Record<string, unknown>) {
-  const { category: _category, source: _source, members: _members, ...legacyRow } = row;
+  const { category: _category, source: _source, members: _members, card_template_id: _cardTemplateId, ...legacyRow } = row;
   return {
     ...legacyRow,
     member: Array.isArray(row.members) ? row.members.join(', ') : '',
@@ -60,6 +65,8 @@ function isMissingNewSchemaColumnError(error: unknown) {
     message.includes("Could not find the 'category' column") ||
     message.includes("Could not find the 'source' column") ||
     message.includes("Could not find the 'members' column") ||
+    message.includes("Could not find the 'card_template_id' column") ||
+    message.includes('column "card_template_id"') ||
     message.includes('null value in column "member"')
   );
 }
@@ -174,6 +181,7 @@ export async function bulkUpdatePhotocards(
 ): Promise<void> {
   const normalizedUpdates = normalizePhotocardUpdates(updates);
   const dbUpdates: Record<string, unknown> = {};
+  if (normalizedUpdates.cardTemplateId !== undefined) dbUpdates.card_template_id = normalizedUpdates.cardTemplateId;
   if (normalizedUpdates.group !== undefined) dbUpdates.group_name = normalizedUpdates.group;
   if (normalizedUpdates.members !== undefined) dbUpdates.members = normalizedUpdates.members;
   if (normalizedUpdates.category !== undefined) dbUpdates.category = normalizedUpdates.category;

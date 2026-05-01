@@ -17,7 +17,22 @@ interface PhotocardCardProps {
   isSelected?: boolean;
   onToggle?: (id: string) => void;
   onClick?: (pc: Photocard) => void;
+  infoMode?: 'default' | 'public-profile';
+  className?: string;
   key?: string;
+}
+
+function compactUnique(values: Array<string | undefined>) {
+  const seen = new Set<string>();
+  return values
+    .map(value => value?.trim())
+    .filter((value): value is string => {
+      if (!value) return false;
+      const key = value.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 }
 
 export function PhotocardCard({
@@ -26,7 +41,9 @@ export function PhotocardCard({
   selectMode = false,
   isSelected = false,
   onToggle,
-  onClick
+  onClick,
+  infoMode = 'default',
+  className = '',
 }: PhotocardCardProps) {
   const isWishlist = photocard.status === 'wishlist';
   const isOnTheWay = photocard.status === 'on_the_way';
@@ -39,6 +56,8 @@ export function PhotocardCard({
   const hasEra = !!photocard.era?.trim();
   const category = getPhotocardCategory(photocard);
   const memberLabel = formatPhotocardMembers(photocard);
+  const sourceOrAlbum = category !== 'Album' && hasSource ? photocard.source : photocard.album;
+  const publicProfileDetail = compactUnique([sourceOrAlbum, photocard.cardName]).join(' · ');
 
   useEffect(() => {
     setHasImageError(false);
@@ -75,7 +94,7 @@ export function PhotocardCard({
           onClick(photocard);
         }
       }}
-      className={`glass-card rounded-[28px] shadow-md flex flex-col relative overflow-hidden group cursor-pointer border-2 transition-all hover:shadow-xl hover:shadow-primary/5 ${selectMode && isSelected ? 'border-primary ring-4 ring-primary/10' : statusCardClass}`}
+      className={`glass-card rounded-[28px] shadow-md flex flex-col relative overflow-hidden group cursor-pointer border-2 transition-all hover:shadow-xl hover:shadow-primary/5 ${selectMode && isSelected ? 'border-primary ring-4 ring-primary/10' : statusCardClass} ${className}`}
     >
       {/* Selection UI */}
       {selectMode && (
@@ -157,19 +176,27 @@ export function PhotocardCard({
           </div>
         </div>
 
-        <div className="flex flex-col gap-0.5">
-          {(hasAlbum || hasSource || hasEra) && (
-            <div className="text-xs font-medium text-foreground/50 line-clamp-1">
-              {category !== 'Album' && hasSource ? photocard.source : hasAlbum && photocard.album}
-              {((category !== 'Album' && hasSource) || hasAlbum) && hasEra && <span className="opacity-60 mx-1">•</span>}
-              {hasEra && <span className={(category !== 'Album' && hasSource) || hasAlbum ? 'opacity-60' : undefined}>{photocard.era}</span>}
+        {infoMode === 'public-profile' ? (
+          publicProfileDetail && (
+            <div className="text-xs font-medium text-foreground/80 truncate tracking-normal">
+              {publicProfileDetail}
             </div>
-          )}
-          <div className="text-xs font-medium text-foreground/80 truncate tracking-normal">
-            {photocard.cardName}
-            {photocard.version && <span className="text-foreground/50"> • {photocard.version}</span>}
+          )
+        ) : (
+          <div className="flex flex-col gap-0.5">
+            {(hasAlbum || hasSource || hasEra) && (
+              <div className="text-xs font-medium text-foreground/50 line-clamp-1">
+                {sourceOrAlbum}
+                {sourceOrAlbum && hasEra && <span className="opacity-60 mx-1">•</span>}
+                {hasEra && <span className={sourceOrAlbum ? 'opacity-60' : undefined}>{photocard.era}</span>}
+              </div>
+            )}
+            <div className="text-xs font-medium text-foreground/80 truncate tracking-normal">
+              {photocard.cardName}
+              {photocard.version && <span className="text-foreground/50"> • {photocard.version}</span>}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </motion.div>
   );

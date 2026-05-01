@@ -21,7 +21,7 @@ import {
   deletePhotocard,
   bulkUpdatePhotocards,
 } from './lib/db';
-import { getCardIdentity } from './lib/social';
+import { getCardTemplateId } from './lib/social';
 
 type AuthScreen = 'splash' | 'login' | 'signup';
 type RouteState = { page: string; username?: string; socialTab?: 'people' | 'following' | 'followers' };
@@ -199,12 +199,14 @@ export default function App() {
 
   const handleCopyPublicCard = useCallback(async (sourceCard: Photocard, status: 'owned' | 'wishlist') => {
     if (!user) return;
-    const sourceIdentity = getCardIdentity(sourceCard);
-    if (photocards.some((card) => card.status === status && getCardIdentity(card) === sourceIdentity)) return;
+    const sourceTemplateId = getCardTemplateId(sourceCard);
+    if (photocards.some((card) => getCardTemplateId(card) === sourceTemplateId)) return;
 
     const copiedCard = normalizePhotocardForSave({
       ...sourceCard,
       id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      cardTemplateId: sourceTemplateId,
+      ownerUserId: user.id,
       status,
       condition: status === 'owned' ? sourceCard.condition : undefined,
       isDuplicate: false,

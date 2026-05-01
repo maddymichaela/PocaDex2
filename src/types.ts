@@ -30,6 +30,8 @@ export type Condition =
 
 export interface Photocard {
   id: string;
+  cardTemplateId?: string;
+  ownerUserId?: string;
   group?: string; // New field from old app
   members: string[];
   category?: PhotocardCategory;
@@ -131,6 +133,7 @@ export interface CollectionStats {
 }
 
 export interface Profile {
+  // Supabase profiles.id is the auth.users.id for this app.
   id: string;
   username: string;
   nickname: string | null;

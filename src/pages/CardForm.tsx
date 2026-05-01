@@ -60,6 +60,8 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
     if (members.length === 0) return;
     onSubmit(normalizePhotocardForSave({
       id: initialData?.id || Date.now().toString(),
+      cardTemplateId: initialData?.cardTemplateId || initialData?.id,
+      ownerUserId: initialData?.ownerUserId,
       group,
       members,
       category,

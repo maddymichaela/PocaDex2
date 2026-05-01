@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, Heart, Plus, Search, SlidersHorizontal } from 'lucide-react';
 import { PhotocardCard } from '../components/PhotocardGrid';
 import { Photocard } from '../types';
-import { getCardIdentity, PublicCardTemplate, searchPublicCardTemplates } from '../lib/social';
+import { getCardTemplateId, PublicCardTemplate, searchPublicCardTemplates } from '../lib/social';
 
 interface FindCardsProps {
   ownPhotocards: Photocard[];
@@ -44,8 +44,8 @@ export default function FindCards({ ownPhotocards, onCopyCard }: FindCardsProps)
     return () => window.clearTimeout(timeout);
   }, [query, runSearch]);
 
-  const ownedIdentitySet = new Set(ownPhotocards.filter((c) => c.status === 'owned').map(getCardIdentity));
-  const wishlistIdentitySet = new Set(ownPhotocards.filter((c) => c.status === 'wishlist').map(getCardIdentity));
+  const ownedIdentitySet = new Set(ownPhotocards.filter((c) => c.status === 'owned').map(getCardTemplateId));
+  const wishlistIdentitySet = new Set(ownPhotocards.filter((c) => c.status === 'wishlist').map(getCardTemplateId));
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 pb-16">
@@ -86,9 +86,10 @@ export default function FindCards({ ownPhotocards, onCopyCard }: FindCardsProps)
       ) : results.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:max-lg:gap-4 xl:grid-cols-5 lg:gap-6">
           {results.map((result, index) => {
-            const identity = getCardIdentity(result.card);
+            const identity = getCardTemplateId(result.card);
             const inCollection = ownedIdentitySet.has(identity);
             const inWishlist = wishlistIdentitySet.has(identity);
+            const alreadySaved = inCollection || inWishlist;
             return (
               <div key={result.identity} className="flex flex-col gap-2">
                 <div className="relative">
@@ -102,7 +103,7 @@ export default function FindCards({ ownPhotocards, onCopyCard }: FindCardsProps)
                 <div className="grid gap-1.5 sm:grid-cols-2">
                   <button
                     type="button"
-                    disabled={inCollection || busyId === `${result.identity}:owned`}
+                    disabled={alreadySaved || busyId === `${result.identity}:owned`}
                     onClick={async () => {
                       setBusyId(`${result.identity}:owned`);
                       try { await onCopyCard(result.card, 'owned'); } finally { setBusyId(null); }
@@ -110,11 +111,11 @@ export default function FindCards({ ownPhotocards, onCopyCard }: FindCardsProps)
                     className="flex h-10 items-center justify-center gap-1.5 rounded-2xl bg-primary px-2 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all disabled:bg-white disabled:text-primary disabled:ring-2 disabled:ring-primary/15"
                   >
                     {inCollection ? <CheckCircle2 size={13} /> : <Plus size={13} />}
-                    {inCollection ? 'In Collection' : 'Collect'}
+                    {inCollection ? 'In Collection' : inWishlist ? 'Wishlisted' : 'Collect'}
                   </button>
                   <button
                     type="button"
-                    disabled={inWishlist || busyId === `${result.identity}:wishlist`}
+                    disabled={alreadySaved || busyId === `${result.identity}:wishlist`}
                     onClick={async () => {
                       setBusyId(`${result.identity}:wishlist`);
                       try { await onCopyCard(result.card, 'wishlist'); } finally { setBusyId(null); }
@@ -122,7 +123,7 @@ export default function FindCards({ ownPhotocards, onCopyCard }: FindCardsProps)
                     className="flex h-10 items-center justify-center gap-1.5 rounded-2xl bg-[var(--wishlist-red)] px-2 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all disabled:bg-white disabled:text-[var(--wishlist-red)] disabled:ring-2 disabled:ring-red-100"
                   >
                     <Heart size={13} className={inWishlist ? 'fill-current' : undefined} />
-                    {inWishlist ? 'Wishlisted' : 'Wishlist'}
+                    {inWishlist ? 'Wishlisted' : inCollection ? 'In Collection' : 'Wishlist'}
                   </button>
                 </div>
               </div>

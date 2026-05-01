@@ -80,6 +80,8 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
     if (members.length === 0) return;
     const newPC: Photocard = normalizePhotocardForSave({
       id: initialData?.id || Date.now().toString(),
+      cardTemplateId: initialData?.cardTemplateId || initialData?.id,
+      ownerUserId: initialData?.ownerUserId,
       group,
       members,
       category,

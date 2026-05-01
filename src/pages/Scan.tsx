@@ -648,6 +648,8 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
       try {
         const saved = await insertPhotocard(user.id, {
           id: card.id,
+          cardTemplateId: card.id,
+          ownerUserId: user.id,
           group: card.group || undefined,
           members: card.members,
           category: card.category,

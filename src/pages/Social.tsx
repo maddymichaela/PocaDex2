@@ -7,6 +7,7 @@ import {
   fetchFollowingUsers,
   followUser,
   FollowUser,
+  getProfileUserId,
   searchProfiles,
   unfollowUser,
 } from '../lib/social';
@@ -44,7 +45,7 @@ export default function Social({ currentUserId, onOpenProfile, initialTab = 'peo
         : activeTab === 'followers'
           ? await fetchFollowerUsers(currentUserId, currentUserId)
           : await searchProfiles(query, currentUserId);
-      setUsers(nextUsers.filter((profile) => activeTab !== 'people' || profile.id !== currentUserId));
+      setUsers(nextUsers.filter((profile) => activeTab !== 'people' || getProfileUserId(profile) !== currentUserId));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load results.');
     } finally {
@@ -63,13 +64,14 @@ export default function Social({ currentUserId, onOpenProfile, initialTab = 'peo
   }, [loadUsers, activeTab, query]);
 
   const handleFollowToggle = async (profile: FollowUser) => {
+    const profileUserId = getProfileUserId(profile);
     setBusyId(profile.id);
     setError(null);
     const wasFollowing = Boolean(profile.is_following);
     setUsers((current) => current.map((u) => u.id === profile.id ? { ...u, is_following: !wasFollowing } : u));
     try {
-      if (wasFollowing) await unfollowUser(currentUserId, profile.id);
-      else await followUser(currentUserId, profile.id);
+      if (wasFollowing) await unfollowUser(currentUserId, profileUserId);
+      else await followUser(currentUserId, profileUserId);
       if (activeTab === 'following' && wasFollowing) {
         setUsers((current) => current.filter((u) => u.id !== profile.id));
       }
