@@ -16,9 +16,12 @@ interface PhotocardFormProps {
   onSubmit: (pc: Photocard) => void;
   onDelete?: (id: string) => void;
   onClose: () => void;
+  title?: string;
+  subtitle?: string;
+  allowImageEditing?: boolean;
 }
 
-export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose }: PhotocardFormProps) {
+export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose, title, subtitle, allowImageEditing = true }: PhotocardFormProps) {
   const [group, setGroup] = useState(initialData?.group || '');
   const [member, setMember] = useState(initialData?.member || '');
   const [category, setCategory] = useState<PhotocardCategory>(initialData ? getPhotocardCategory(initialData) : 'Album');
@@ -161,11 +164,11 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
         <div className="flex justify-between items-center px-5 md:px-10 py-4 md:py-6 border-b border-gray-100 bg-white sticky top-0 z-30 font-sans">
           <div className="space-y-1">
             <h2 className="text-xl md:text-2xl font-bold text-foreground tracking-tight leading-tight">
-              {isEditing ? 'Edit Card' : 'New Photocard'}
+              {title ?? (isEditing ? 'Edit Card' : 'New Photocard')}
             </h2>
             <div className="flex items-center gap-2">
                <span className="w-1.5 h-1.5 bg-primary rounded-full" />
-               <p className="text-[9px] font-black text-foreground/30 uppercase tracking-[0.2em]">{isEditing ? 'Updating Entry' : 'Adding to Binder'}</p>
+               <p className="text-[9px] font-black text-foreground/30 uppercase tracking-[0.2em]">{subtitle ?? (isEditing ? 'Updating Entry' : 'Adding to Binder')}</p>
             </div>
           </div>
           <button 
@@ -182,32 +185,34 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
               <div className="flex flex-col items-center gap-3 xl:h-full xl:items-stretch">
                   <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1 text-center xl:text-left">Card Image</label>
                   <div 
-                    onClick={() => !previewUrl && fileInputRef.current?.click()}
+                    onClick={() => allowImageEditing && !previewUrl && fileInputRef.current?.click()}
                     className={`w-full max-w-[220px] aspect-[650/1000] bg-gray-50 rounded-[28px] md:max-w-[260px] md:rounded-[32px] xl:max-w-none xl:flex-1 border-4 border-dashed flex flex-col items-center justify-center transition-all overflow-hidden relative group ${
-                      previewUrl ? 'border-transparent shadow-inner' : 'border-gray-100 hover:border-primary/30 cursor-pointer'
+                      previewUrl ? 'border-transparent shadow-inner' : `border-gray-100 ${allowImageEditing ? 'hover:border-primary/30 cursor-pointer' : ''}`
                     }`}
                   >
                     {previewUrl ? (
                       <>
                        <img src={previewUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                       <div className="absolute top-4 right-4 flex flex-col gap-3">
-                         <button
-                           type="button"
-                           onClick={(e) => { e.stopPropagation(); setEditingImage(previewUrl); setIsEditorOpen(true); }}
-                           className="bg-white/90 backdrop-blur shadow-xl text-primary p-2 md:p-3 rounded-xl md:rounded-2xl hover:scale-110 active:scale-95 transition-all border border-white/50"
-                           title="Edit Image"
-                         >
-                           <Edit3 className="w-4.5 h-4.5 md:w-5 md:h-5" />
-                         </button>
-                         <button
-                           type="button"
-                           onClick={(e) => { e.stopPropagation(); removeImage(); }}
-                           className="bg-white/90 backdrop-blur shadow-xl text-red-500 p-2 md:p-3 rounded-xl md:rounded-2xl hover:scale-110 active:scale-95 transition-all border border-white/50"
-                           title="Remove Image"
-                         >
-                           <Trash2 className="w-4.5 h-4.5 md:w-5 md:h-5" />
-                         </button>
-                       </div>
+                       {allowImageEditing && (
+                         <div className="absolute top-4 right-4 flex flex-col gap-3">
+                           <button
+                             type="button"
+                             onClick={(e) => { e.stopPropagation(); setEditingImage(previewUrl); setIsEditorOpen(true); }}
+                             className="bg-white/90 backdrop-blur shadow-xl text-primary p-2 md:p-3 rounded-xl md:rounded-2xl hover:scale-110 active:scale-95 transition-all border border-white/50"
+                             title="Edit Image"
+                           >
+                             <Edit3 className="w-4.5 h-4.5 md:w-5 md:h-5" />
+                           </button>
+                           <button
+                             type="button"
+                             onClick={(e) => { e.stopPropagation(); removeImage(); }}
+                             className="bg-white/90 backdrop-blur shadow-xl text-red-500 p-2 md:p-3 rounded-xl md:rounded-2xl hover:scale-110 active:scale-95 transition-all border border-white/50"
+                             title="Remove Image"
+                           >
+                             <Trash2 className="w-4.5 h-4.5 md:w-5 md:h-5" />
+                           </button>
+                         </div>
+                       )}
                       </>
                     ) : (
                       <>
@@ -215,10 +220,12 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
                           <div className="w-12 h-12 md:w-16 md:h-16 bg-white rounded-xl md:rounded-2xl flex items-center justify-center shadow-xl shadow-primary/5 transition-all group-hover:scale-110 group-hover:rotate-6 border border-gray-50">
                             <ImageIcon className="text-primary w-6 h-6 md:w-7 md:h-7" />
                           </div>
-                          <div className="text-center space-y-1">
-                             <span className="block text-[10px] md:text-[11px] font-black text-foreground uppercase tracking-widest">Select Image</span>
-                             <span className="block text-[9px] font-medium text-foreground/20 italic">PNG, JPG, etc.</span>
-                          </div>
+                          {allowImageEditing && (
+                            <div className="text-center space-y-1">
+                               <span className="block text-[10px] md:text-[11px] font-black text-foreground uppercase tracking-widest">Select Image</span>
+                               <span className="block text-[9px] font-medium text-foreground/20 italic">PNG, JPG, etc.</span>
+                            </div>
+                          )}
                         </div>
                       </>
                     )}
@@ -246,9 +253,8 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
               <div className="space-y-3 md:space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                   <div className="space-y-0">
-                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Group *</label>
+                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Group</label>
                     <input
-                      required
                       type="text"
                       value={group}
                       onChange={(e) => setGroup(e.target.value)}
@@ -341,9 +347,8 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
                 </div>
 
                 <div className="space-y-0">
-                  <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Photocard Name *</label>
+                  <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Photocard Name</label>
                   <input
-                    required
                     type="text"
                     value={cardName}
                     onChange={(e) => setCardName(e.target.value)}
@@ -424,7 +429,7 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
         </div>
 
         <div className="shrink-0 flex gap-3 md:gap-4 p-4 md:px-10 md:pb-6 md:pt-4 bg-white border-t border-gray-50 z-30 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)]">
-          {isEditing && (
+          {isEditing && onDelete && (
             <button
               type="button"
               onClick={() => setShowConfirmDelete(true)}

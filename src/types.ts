@@ -47,6 +47,21 @@ export interface Photocard {
   createdAt: number;
 }
 
+export function getMissingRequiredPhotocardFields(
+  photocard: Pick<Photocard, 'member' | 'category' | 'status'> & Partial<Pick<Photocard, 'album' | 'source'>>
+): string[] {
+  const category = getPhotocardCategory(photocard);
+  const missing: string[] = [];
+
+  if (!photocard.member?.trim()) missing.push('Member');
+  if (!photocard.category) missing.push('Category');
+  if (!photocard.status) missing.push('Status');
+  if (category === 'Album' && !photocard.album?.trim()) missing.push('Album');
+  if (category !== 'Album' && !photocard.source?.trim()) missing.push('Source');
+
+  return missing;
+}
+
 export function getPhotocardCategory(photocard: Pick<Photocard, 'category'>): PhotocardCategory {
   return photocard.category && PHOTOCARD_CATEGORIES.includes(photocard.category) ? photocard.category : 'Album';
 }

@@ -45,17 +45,31 @@ function photocardToRow(pc: Omit<Photocard, 'id' | 'createdAt'>, userId: string)
   };
 }
 
+function withoutNewSchemaColumns(row: Record<string, unknown>) {
+  const { category: _category, source: _source, ...legacyRow } = row;
+  return legacyRow;
+}
+
+function isMissingNewSchemaColumnError(error: unknown) {
+  if (!error || typeof error !== 'object' || !('message' in error)) return false;
+  const message = String((error as { message: unknown }).message);
+  return (
+    message.includes("Could not find the 'category' column") ||
+    message.includes("Could not find the 'source' column")
+  );
+}
+
 // ── Image upload ───────────────────────────────────────────────────────────
 
 export async function uploadPhotocardImage(userId: string, dataUrl: string): Promise<string> {
   const [header, base64] = dataUrl.split(',');
-  const mime = header.split(':')[1].split(';')[0];
+  const mime = header.split(':')[1]?.split(';')[0] || 'image/jpeg';
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   const blob = new Blob([bytes], { type: mime });
   const ext = mime.split('/')[1] || 'jpg';
-  const filename = `${userId}/${Date.now()}.${ext}`;
+  const filename = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
   const { error } = await supabase.storage.from('photocard-images').upload(filename, blob, {
     contentType: mime,
@@ -82,13 +96,27 @@ export async function fetchPhotocards(userId: string): Promise<Photocard[]> {
 export async function insertPhotocard(userId: string, pc: Photocard): Promise<Photocard> {
   let imageUrl = pc.imageUrl;
   if (imageUrl?.startsWith('data:')) {
-    imageUrl = await uploadPhotocardImage(userId, imageUrl);
+    try {
+      imageUrl = await uploadPhotocardImage(userId, imageUrl);
+    } catch (err) {
+      console.error('Failed to upload photocard image; saving inline image instead:', err);
+    }
   }
+  const row = photocardToRow({ ...pc, imageUrl }, userId);
   const { data, error } = await supabase
     .from('photocards')
-    .insert(photocardToRow({ ...pc, imageUrl }, userId))
+    .insert(row)
     .select()
     .single();
+  if (error && isMissingNewSchemaColumnError(error)) {
+    const { data: legacyData, error: legacyError } = await supabase
+      .from('photocards')
+      .insert(withoutNewSchemaColumns(row))
+      .select()
+      .single();
+    if (legacyError) throw legacyError;
+    return rowToPhotocard(legacyData);
+  }
   if (error) throw error;
   return rowToPhotocard(data);
 }
@@ -96,15 +124,31 @@ export async function insertPhotocard(userId: string, pc: Photocard): Promise<Ph
 export async function updatePhotocard(userId: string, pc: Photocard): Promise<Photocard> {
   let imageUrl = pc.imageUrl;
   if (imageUrl?.startsWith('data:')) {
-    imageUrl = await uploadPhotocardImage(userId, imageUrl);
+    try {
+      imageUrl = await uploadPhotocardImage(userId, imageUrl);
+    } catch (err) {
+      console.error('Failed to upload photocard image; saving inline image instead:', err);
+    }
   }
+  const row = photocardToRow({ ...pc, imageUrl }, userId);
   const { data, error } = await supabase
     .from('photocards')
-    .update(photocardToRow({ ...pc, imageUrl }, userId))
+    .update(row)
     .eq('id', pc.id)
     .eq('user_id', userId)
     .select()
     .single();
+  if (error && isMissingNewSchemaColumnError(error)) {
+    const { data: legacyData, error: legacyError } = await supabase
+      .from('photocards')
+      .update(withoutNewSchemaColumns(row))
+      .eq('id', pc.id)
+      .eq('user_id', userId)
+      .select()
+      .single();
+    if (legacyError) throw legacyError;
+    return rowToPhotocard(legacyData);
+  }
   if (error) throw error;
   return rowToPhotocard(data);
 }
@@ -144,5 +188,14 @@ export async function bulkUpdatePhotocards(
     .update(dbUpdates)
     .in('id', ids)
     .eq('user_id', userId);
+  if (error && isMissingNewSchemaColumnError(error)) {
+    const { error: legacyError } = await supabase
+      .from('photocards')
+      .update(withoutNewSchemaColumns(dbUpdates))
+      .in('id', ids)
+      .eq('user_id', userId);
+    if (legacyError) throw legacyError;
+    return;
+  }
   if (error) throw error;
 }

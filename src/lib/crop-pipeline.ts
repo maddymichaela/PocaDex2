@@ -55,7 +55,13 @@ export type DetectResult = {
   detectedCols: number;
 };
 
-export function detectTemplate(img: HTMLImageElement, whiteThr = 220, minBandFrac = 0.04): DetectResult | null {
+export function detectTemplate(
+  img: HTMLImageElement,
+  whiteThr = 220,
+  minBandFrac = 0.04,
+  separatorMinLightFrac = 0.65,
+  separatorToleranceFrac = 0.1,
+): DetectResult | null {
   try {
     const W = img.naturalWidth, H = img.naturalHeight;
     const scale = Math.min(1, 1400 / Math.max(W, H));
@@ -209,7 +215,7 @@ export function detectTemplate(img: HTMLImageElement, whiteThr = 220, minBandFra
             if (pitch < total * 0.04) continue;
 
             const expected = Array.from({ length: count + 1 }, (_, k) => start + k * pitch);
-            const tol = Math.max(5, pitch * 0.1);
+            const tol = Math.max(5, pitch * separatorToleranceFrac);
             let matches = 0;
             let distance = 0;
 
@@ -289,7 +295,7 @@ export function detectTemplate(img: HTMLImageElement, whiteThr = 220, minBandFra
     }
 
     const possibleRows = Array.from({ length: AUTO_MAX_ROWS }, (_, i) => i + 1);
-    const separatorColGrid = fitRegularSeparators(findSeparatorBands(colLight, dW), dW, AUTO_COL_COUNTS);
+    const separatorColGrid = fitRegularSeparators(findSeparatorBands(colLight, dW, separatorMinLightFrac), dW, AUTO_COL_COUNTS);
     const contentColBands = findContentBands(colContent, dW, isDarkBackground ? 0.12 : 0.08);
     const contentColGrid =
       fitRegularSeparators(contentColBands, dW, AUTO_COL_COUNTS) ??
@@ -309,7 +315,7 @@ export function detectTemplate(img: HTMLImageElement, whiteThr = 220, minBandFra
     const darkRowGrid = rowGridFromOccupiedBands(colGrid, filterDarkBands(rowBr, dH));
     const rowGrid =
       (isDarkBackground ? contentRowGrid ?? darkRowGrid : darkRowGrid ?? contentRowGrid) ??
-      fitRegularSeparators(findSeparatorBands(rowLight, dH), dH, possibleRows) ??
+      fitRegularSeparators(findSeparatorBands(rowLight, dH, separatorMinLightFrac), dH, possibleRows) ??
       contentBandFallback(rowContent, dH) ??
       darkBandFallback(rowBr, dH);
 

@@ -5,8 +5,9 @@ import { Area } from 'react-easy-crop';
 import { detectTemplate, cropImageFromRect, fitCropRectToCardAspect, trimBackground, PHOTOCARD_TEMPLATES, templateCellRects, GridTemplate } from '../lib/crop-pipeline';
 import { insertPhotocard } from '../lib/db';
 import { useAuth } from '../contexts/AuthContext';
-import { Status, Condition, Photocard, PHOTOCARD_CATEGORIES, PhotocardCategory } from '../types';
+import { Status, Condition, Photocard, PHOTOCARD_CATEGORIES, PhotocardCategory, getMissingRequiredPhotocardFields } from '../types';
 import ImageEditor, { ImageEditorState } from '../components/ImageEditor';
+import PhotocardForm from '../components/PhotocardForm';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -28,11 +29,15 @@ interface ReviewCard {
   condition: Condition;
   isDuplicate: boolean;
   notes: string;
-  selected: boolean;
 }
 
 type Step = 'upload' | 'detecting' | 'review' | 'saving' | 'done';
 const DEFAULT_TEMPLATE = PHOTOCARD_TEMPLATES[5]; // 2×4 is the most reliable common fan-template layout.
+const DETECTION_STRATEGIES = [
+  { name: 'Default', whiteThr: 220, minBandFrac: 0.04, separatorMinLightFrac: 0.65, separatorToleranceFrac: 0.1 },
+  { name: 'Tighter separators', whiteThr: 235, minBandFrac: 0.025, separatorMinLightFrac: 0.72, separatorToleranceFrac: 0.07 },
+  { name: 'Looser imperfect grid', whiteThr: 205, minBandFrac: 0.06, separatorMinLightFrac: 0.55, separatorToleranceFrac: 0.16 },
+] as const;
 
 type BulkDraft = {
   group: string;
@@ -73,12 +78,18 @@ function makeId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+function errorMessage(err: unknown) {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'object' && err && 'message' in err) return String((err as { message: unknown }).message);
+  return 'Unknown error';
+}
+
 function rectToArea(crop: { x: number; y: number; w: number; h: number }, img: HTMLImageElement): Area {
   return {
-    x: Math.round(crop.x * img.naturalWidth),
-    y: Math.round(crop.y * img.naturalHeight),
-    width: Math.max(1, Math.round(crop.w * img.naturalWidth)),
-    height: Math.max(1, Math.round(crop.h * img.naturalHeight)),
+    x: crop.x * img.naturalWidth,
+    y: crop.y * img.naturalHeight,
+    width: Math.max(1, crop.w * img.naturalWidth),
+    height: Math.max(1, crop.h * img.naturalHeight),
   };
 }
 
@@ -107,7 +118,6 @@ function emptyReviewCard(cropUrl: string, cropAreaPixels: Area): ReviewCard {
     condition: 'mint',
     isDuplicate: false,
     notes: '',
-    selected: true,
   };
 }
 
@@ -159,16 +169,31 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
   const [manualRows, setManualRows] = useState(DEFAULT_TEMPLATE.rows);
   const [manualCols, setManualCols] = useState(DEFAULT_TEMPLATE.cols);
   const [cards, setCards] = useState<ReviewCard[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [savedCount, setSavedCount] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [editingCropId, setEditingCropId] = useState<string | null>(null);
+  const [editingDetailsId, setEditingDetailsId] = useState<string | null>(null);
   const [isAddingManualCrop, setIsAddingManualCrop] = useState(false);
   const [bulkDraft, setBulkDraft] = useState<BulkDraft>(emptyBulkDraft);
+  const [detectionStrategyIndex, setDetectionStrategyIndex] = useState(0);
+  const [detectionFeedback, setDetectionFeedback] = useState<string | null>(null);
 
-  const selectedCards = cards.filter(c => c.selected);
-  const missingRequiredCount = selectedCards.filter(c => !c.group.trim() || !c.member.trim() || !c.cardName.trim()).length;
-  const canSaveSelectedCards = selectedCards.length > 0 && missingRequiredCount === 0;
+  const selectedCards = cards.filter(c => selectedIds.has(c.id));
+  const cardsWithMissingFields = selectedCards
+    .map((card, index) => ({
+      card,
+      index,
+      missingFields: getMissingRequiredPhotocardFields(card),
+    }))
+    .filter(({ missingFields }) => missingFields.length > 0);
+  const missingRequiredCount = cardsWithMissingFields.length;
+  const hasInvalidSelectedCards = selectedCards.length > 0 && missingRequiredCount > 0;
+  const missingRequiredSummary = cardsWithMissingFields
+    .slice(0, 3)
+    .map(({ index, card, missingFields }) => `${card.member.trim() || `Card ${index + 1}`}: ${missingFields.join(', ')}`)
+    .join('; ');
 
   // ── File handling ────────────────────────────────────────────────────────
 
@@ -177,9 +202,13 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
     if (file.size > 15 * 1024 * 1024) { setError('Image must be under 15MB.'); return; }
     setError(null);
     setCards([]);
+    setSelectedIds(new Set());
     setSavedCount(0);
     setEditingCropId(null);
+    setEditingDetailsId(null);
     setIsAddingManualCrop(false);
+    setDetectionStrategyIndex(0);
+    setDetectionFeedback(null);
     setStep('upload');
     const reader = new FileReader();
     reader.onload = e => setTemplateUrl(e.target?.result as string);
@@ -207,13 +236,21 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
     return emptyReviewCard(cropUrl, rectToArea(fitted, img));
   }, []);
 
-  const runGridDetect = useCallback(async () => {
+  const runGridDetect = useCallback(async (strategyIndex = 0, feedback?: string) => {
     if (!templateUrl) return;
     setStep('detecting');
     setError(null);
+    setDetectionFeedback(feedback ?? null);
     try {
+      const strategy = DETECTION_STRATEGIES[strategyIndex] ?? DETECTION_STRATEGIES[0];
       const img = await loadImage(templateUrl);
-      const result = detectTemplate(img);
+      const result = detectTemplate(
+        img,
+        strategy.whiteThr,
+        strategy.minBandFrac,
+        strategy.separatorMinLightFrac,
+        strategy.separatorToleranceFrac,
+      );
       const cells = result?.cells ?? [];
       if (result) {
         setSelectedGrid(result.template);
@@ -226,12 +263,25 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
       );
 
       setCards(reviewCards);
+      setSelectedIds(new Set(reviewCards.map(c => c.id)));
+      setDetectionStrategyIndex(strategyIndex);
+      setDetectionFeedback(null);
       setStep('review');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Grid detection failed.');
+      setDetectionFeedback(null);
       setStep('upload');
     }
   }, [makeReviewCardFromCrop, templateUrl]);
+
+  const runDefaultGridDetect = useCallback(() => {
+    void runGridDetect(0);
+  }, [runGridDetect]);
+
+  const tryDifferentDetection = useCallback(() => {
+    const nextStrategyIndex = (detectionStrategyIndex + 1) % DETECTION_STRATEGIES.length;
+    void runGridDetect(nextStrategyIndex, 'Trying a different grid detection…');
+  }, [detectionStrategyIndex, runGridDetect]);
 
   // ── Manual grid (no image analysis) ──────────────────────────────────────
 
@@ -252,6 +302,8 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
       }
 
       setCards(reviewCards);
+      setSelectedIds(new Set(reviewCards.map(c => c.id)));
+      setDetectionFeedback(null);
       setStep('review');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to splice grid.');
@@ -266,8 +318,17 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
   };
 
   const toggleAll = () => {
-    const allSelected = cards.every(c => c.selected);
-    setCards(prev => prev.map(c => ({ ...c, selected: !allSelected })));
+    const allSelected = cards.length > 0 && cards.every(c => selectedIds.has(c.id));
+    setSelectedIds(allSelected ? new Set() : new Set(cards.map(c => c.id)));
+  };
+
+  const toggleCardSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   const updateBulkDraft = (patch: Partial<BulkDraft>) => {
@@ -282,7 +343,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
     const parsedYear = parseInt(bulkDraft.year, 10);
 
     setCards(prev => prev.map(card => {
-      if (!card.selected) return card;
+      if (!selectedIds.has(card.id)) return card;
       const nextCategory = bulkDraft.category || card.category;
       return {
         ...card,
@@ -310,13 +371,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
     setEditingCropId(null);
   };
 
-  const handleCancelCropEdit = (editorState?: ImageEditorState) => {
-    if (editingCropId && editorState) {
-      updateCard(editingCropId, {
-        cropperState: editorState,
-        ...(editorState.croppedAreaPixels ? { cropAreaPixels: editorState.croppedAreaPixels } : {}),
-      });
-    }
+  const handleCancelCropEdit = () => {
     setEditingCropId(null);
   };
 
@@ -326,7 +381,9 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
       setIsAddingManualCrop(false);
       return;
     }
-    setCards(prev => [...prev, emptyReviewCard(croppedImage, cropAreaPixels)]);
+    const newCard = emptyReviewCard(croppedImage, cropAreaPixels);
+    setCards(prev => [...prev, newCard]);
+    setSelectedIds(prev => { const next = new Set(prev); next.add(newCard.id); return next; });
     setStep('review');
     setIsAddingManualCrop(false);
   };
@@ -335,14 +392,72 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
     setIsAddingManualCrop(false);
   };
 
+  const handleSaveCardDetails = (updated: Photocard) => {
+    if (!editingDetailsId) return;
+    updateCard(editingDetailsId, {
+      group: updated.group || '',
+      member: updated.member,
+      category: updated.category,
+      source: updated.source || '',
+      album: updated.album || '',
+      era: updated.era || '',
+      year: Number(updated.year) || new Date().getFullYear(),
+      cardName: updated.cardName,
+      version: updated.version || '',
+      status: updated.status,
+      condition: updated.condition || 'mint',
+      isDuplicate: !!updated.isDuplicate,
+      notes: updated.notes || '',
+    });
+    setEditingDetailsId(null);
+  };
+
   // ── Save ──────────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
-    if (!user || !canSaveSelectedCards) return;
+    if (!user) {
+      setError('Please sign in before adding cards to your collection.');
+      return;
+    }
+
+    const selectedIdList = Array.from(selectedIds);
+    const cardsToSave = cards.filter(card => selectedIdList.includes(card.id));
+
+    if (selectedIdList.length === 0 || cardsToSave.length === 0) {
+      setError('Select at least one card to add.');
+      return;
+    }
+
+    const invalidCards = cardsToSave
+      .map((card, index) => ({
+        index,
+        card,
+        missingFields: getMissingRequiredPhotocardFields(card),
+      }))
+      .filter(({ missingFields }) => missingFields.length > 0);
+    if (invalidCards.length > 0) {
+      const examples = invalidCards
+        .slice(0, 4)
+        .map(({ index, card, missingFields }) => `${card.member.trim() || `Card ${index + 1}`}: ${missingFields.join(', ')}`)
+        .join('; ');
+      setError(`Add to Collection blocked. Fill required fields on ${invalidCards.length} selected card${invalidCards.length !== 1 ? 's' : ''}: ${examples}${invalidCards.length > 4 ? '; …' : ''}.`);
+      return;
+    }
+
+    if (cardsToSave.length !== selectedIdList.length) {
+      console.warn('Some selected card IDs were not found in the current import cards.', {
+        selectedIds: selectedIdList,
+        currentCardIds: cards.map(card => card.id),
+      });
+    }
+
+    setError(null);
     setStep('saving');
-    let count = 0;
     const savedCards: Photocard[] = [];
-    for (const card of selectedCards) {
+    const savedReviewIds = new Set<string>();
+    const saveErrors: string[] = [];
+
+    for (const card of cardsToSave) {
       try {
         const saved = await insertPhotocard(user.id, {
           id: card.id,
@@ -363,13 +478,26 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
           createdAt: Date.now(),
         });
         savedCards.push(saved);
-        count++;
+        savedReviewIds.add(card.id);
       } catch (err) {
         console.error('Failed to save card:', err);
+        saveErrors.push(errorMessage(err));
       }
     }
-    if (savedCards.length > 0) onImported?.(savedCards);
-    setSavedCount(count);
+
+    if (savedCards.length === 0) {
+      setStep('review');
+      setError(`No selected cards were added. ${saveErrors[0] ? `First error: ${saveErrors[0]}` : 'Please try again.'}`);
+      return;
+    }
+
+    onImported?.(savedCards);
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      savedReviewIds.forEach(id => next.delete(id));
+      return next;
+    });
+    setSavedCount(savedCards.length);
     setStep('done');
   };
 
@@ -379,10 +507,14 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
     setStep('upload');
     setTemplateUrl(null);
     setCards([]);
+    setSelectedIds(new Set());
     setError(null);
     setSavedCount(0);
     setEditingCropId(null);
+    setEditingDetailsId(null);
     setIsAddingManualCrop(false);
+    setDetectionStrategyIndex(0);
+    setDetectionFeedback(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -399,14 +531,33 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
   const primaryButtonClass = 'btn-primary-pink inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black uppercase tracking-tight disabled:cursor-not-allowed disabled:opacity-40';
   const secondaryButtonClass = 'inline-flex items-center justify-center gap-2 rounded-2xl bg-primary/10 px-5 py-3 text-sm font-black uppercase tracking-tight text-primary transition-all hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-40';
   const tertiaryButtonClass = 'inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black uppercase tracking-tight text-foreground/45 transition-all hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40';
+  const editingDetailsCard = cards.find(card => card.id === editingDetailsId) ?? null;
+  const editingDetailsPhotocard: Photocard | null = editingDetailsCard ? {
+    id: editingDetailsCard.id,
+    group: editingDetailsCard.group || undefined,
+    member: editingDetailsCard.member,
+    category: editingDetailsCard.category,
+    source: editingDetailsCard.source || undefined,
+    album: editingDetailsCard.album,
+    era: editingDetailsCard.era || undefined,
+    year: editingDetailsCard.year,
+    cardName: editingDetailsCard.cardName,
+    version: editingDetailsCard.version,
+    status: editingDetailsCard.status,
+    condition: editingDetailsCard.condition,
+    isDuplicate: editingDetailsCard.isDuplicate,
+    notes: editingDetailsCard.notes || undefined,
+    imageUrl: editingDetailsCard.cropUrl,
+    createdAt: Date.now(),
+  } : null;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onFileInput} />
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-foreground tracking-tight">Scan Template</h2>
-          <p className="text-sm text-foreground/40 font-medium mt-1">Upload a fan template to auto-splice and import photocards</p>
+          <h2 className="text-3xl font-bold text-foreground tracking-tight">Import Template</h2>
+          <p className="text-sm text-foreground/40 font-medium mt-1">Upload a fan template to auto-split and import photocards</p>
         </div>
       </div>
 
@@ -471,7 +622,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
                     <p className="text-xs text-foreground/40 font-medium">
                       Automatically detect rows and columns from your template
                     </p>
-                    <button onClick={runGridDetect}
+                    <button onClick={runDefaultGridDetect}
                       className={secondaryButtonClass}>
                       <Grid3x3 size={14} /> Auto-detect Grid
                     </button>
@@ -550,7 +701,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
               Splicing template…
             </p>
             <p className="text-sm text-foreground/40 font-medium mt-1">
-              Detecting grid lines and cropping cards
+              {detectionFeedback ?? 'Detecting grid lines and cropping cards'}
             </p>
           </div>
         </div>
@@ -576,10 +727,10 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
                   <div className="flex flex-col gap-2 border-t border-gray-100 pt-3 sm:flex-row sm:flex-wrap sm:items-center">
                     <button
                       type="button"
-                      onClick={runGridDetect}
+                      onClick={tryDifferentDetection}
                       className={`${secondaryButtonClass} w-full sm:w-auto`}
                     >
-                      <Grid3x3 size={14} /> Auto-detect Again
+                      <Grid3x3 size={14} /> Try Different Detection
                     </button>
                     <button
                       type="button"
@@ -607,8 +758,8 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-3">
                 <button onClick={toggleAll} className={tertiaryButtonClass}>
-                  {cards.every(c => c.selected) ? <CheckSquare size={14} className="text-primary" /> : <Square size={14} />}
-                  {cards.every(c => c.selected) ? 'Deselect all' : 'Select all'}
+                  {cards.length > 0 && cards.every(c => selectedIds.has(c.id)) ? <CheckSquare size={14} className="text-primary" /> : <Square size={14} />}
+                  {cards.length > 0 && cards.every(c => selectedIds.has(c.id)) ? 'Deselect all' : 'Select all'}
                 </button>
                 <span className="rounded-full bg-primary/5 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-primary/70">
                   {selectedCards.length} / {cards.length} selected
@@ -676,23 +827,23 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
           </div>
 
           {/* Card grid */}
-          <div className="grid grid-cols-2 gap-4 pb-32 md:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 pb-40 md:grid-cols-3 xl:grid-cols-4">
             {cards.map(card => (
               <motion.div key={card.id} layout
-                className={`overflow-hidden rounded-2xl border-2 bg-white/70 shadow-sm transition-all ${card.selected ? 'border-primary ring-4 ring-primary/10' : 'border-white/50'}`}>
+                className={`overflow-hidden rounded-2xl border-2 bg-white/70 shadow-sm transition-all ${selectedIds.has(card.id) ? 'border-primary ring-4 ring-primary/10' : 'border-white/50'}`}>
                 {/* Crop preview */}
                 <div
                   className="relative aspect-[650/1000] overflow-hidden bg-accent/30"
-                  onClick={() => updateCard(card.id, { selected: !card.selected })}
+                  onClick={() => toggleCardSelection(card.id)}
                 >
                   <img src={card.cropUrl} alt="" className="w-full h-full object-cover" />
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); updateCard(card.id, { selected: !card.selected }); }}
-                    aria-label={card.selected ? 'Deselect card' : 'Select card'}
-                    className={`absolute top-4 left-4 z-20 w-6 h-6 rounded-xl border-2 flex items-center justify-center transition-all ${card.selected ? 'bg-primary border-primary text-white shadow-xl shadow-primary/20 scale-110' : 'bg-white/80 border-white'}`}
+                    onClick={(e) => { e.stopPropagation(); toggleCardSelection(card.id); }}
+                    aria-label={selectedIds.has(card.id) ? 'Deselect card' : 'Select card'}
+                    className={`absolute top-4 left-4 z-20 w-6 h-6 rounded-xl border-2 flex items-center justify-center transition-all ${selectedIds.has(card.id) ? 'bg-primary border-primary text-white shadow-xl shadow-primary/20 scale-110' : 'bg-white/80 border-white'}`}
                   >
-                    {card.selected && (
+                    {selectedIds.has(card.id) && (
                       <svg viewBox="0 0 10 8" className="w-3 h-3 fill-none stroke-current stroke-[2] stroke-linecap-round stroke-linejoin-round">
                         <path d="M1 4l3 3 5-6" />
                       </svg>
@@ -703,10 +854,10 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setEditingCropId(card.id); }}
-                        className={`${tertiaryButtonClass} bg-white/90 px-3 py-2 text-xs shadow-sm backdrop-blur`}
+                        className={`${tertiaryButtonClass} bg-white/90 px-2 py-2 text-xs shadow-sm backdrop-blur sm:px-3`}
                         aria-label="Edit crop"
                       >
-                        <Crop size={12} /> Crop
+                        <Crop size={12} /> <span className="hidden sm:inline">Crop</span>
                       </button>
                     )}
                   </div>
@@ -715,7 +866,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
                 {/* Editable fields */}
                 <div className="space-y-3 p-3">
                   <div className="grid grid-cols-1 gap-2">
-                    <Field label="Member" required invalid={card.selected && !card.member.trim()} value={card.member} onChange={v => updateCard(card.id, { member: v })} placeholder="Felix" />
+                    <Field label="Member" required invalid={selectedIds.has(card.id) && !card.member.trim()} value={card.member} onChange={v => updateCard(card.id, { member: v })} placeholder="Felix" />
                     <div>
                       <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Category *</label>
                       <select value={card.category} onChange={e => updateCard(card.id, { category: e.target.value as PhotocardCategory })} className={softSelectClass}>
@@ -723,9 +874,9 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
                       </select>
                     </div>
                     {card.category === 'Album' ? (
-                      <Field label="Album" value={card.album} onChange={v => updateCard(card.id, { album: v })} placeholder="DO IT" />
+                      <Field label="Album" required invalid={selectedIds.has(card.id) && !card.album.trim()} value={card.album} onChange={v => updateCard(card.id, { album: v })} placeholder="DO IT" />
                     ) : (
-                      <Field label="Source" value={card.source} onChange={v => updateCard(card.id, { source: v })} placeholder="Soundwave" />
+                      <Field label="Source" required invalid={selectedIds.has(card.id) && !card.source.trim()} value={card.source} onChange={v => updateCard(card.id, { source: v })} placeholder="Soundwave" />
                     )}
                     <div>
                       <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Status *</label>
@@ -737,45 +888,13 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
                     </div>
                   </div>
 
-                  <details className="group rounded-xl border border-primary/10 bg-white/55 px-3 py-2" open={card.selected && (!card.group.trim() || !card.cardName.trim())}>
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-[10px] font-black uppercase tracking-widest text-foreground/45">
-                      More details
-                      <ChevronDown size={13} className="transition-transform group-open:rotate-180" />
-                    </summary>
-                    <div className="mt-3 space-y-2">
-                      <Field label="Group" required invalid={card.selected && !card.group.trim()} value={card.group} onChange={v => updateCard(card.id, { group: v })} placeholder="Stray Kids" />
-                      <Field label="Era" value={card.era} onChange={v => updateCard(card.id, { era: v })} placeholder="DO IT" />
-                      <Field label="Year" value={String(card.year)} onChange={v => { const y = parseInt(v, 10); updateCard(card.id, { year: isNaN(y) ? card.year : y }); }} placeholder="2025" />
-                      <Field label="Version" value={card.version} onChange={v => updateCard(card.id, { version: v })} placeholder="Accordion ver." />
-                      <Field label="Photocard Name" required invalid={card.selected && !card.cardName.trim()} value={card.cardName} onChange={v => updateCard(card.id, { cardName: v })} placeholder="Felix DO IT photocard" />
-                      <div className={card.status !== 'owned' ? 'opacity-45 pointer-events-none' : ''}>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Condition</label>
-                        <select value={card.condition} onChange={e => updateCard(card.id, { condition: e.target.value as Condition })} className={softSelectClass}>
-                          <option value="mint">Mint</option>
-                          <option value="near_mint">Near mint</option>
-                          <option value="good">Good</option>
-                          <option value="fair">Fair</option>
-                          <option value="poor">Poor</option>
-                        </select>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => updateCard(card.id, { isDuplicate: !card.isDuplicate })}
-                        className={`${tertiaryButtonClass} w-full ${card.isDuplicate ? 'bg-primary/10 text-primary' : ''}`}
-                      >
-                        {card.isDuplicate ? 'Duplicate: Yes' : 'Duplicate: No'}
-                      </button>
-                      <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Notes</label>
-                        <textarea
-                          value={card.notes}
-                          onChange={e => updateCard(card.id, { notes: e.target.value })}
-                          placeholder="Pulled from DO IT album, Felix Accordion ver."
-                          className="h-16 w-full resize-none rounded-xl border border-primary/10 bg-white/70 px-2.5 py-2 text-xs font-medium text-foreground placeholder:text-foreground/25 focus:border-primary/40 focus:outline-none"
-                        />
-                      </div>
-                    </div>
-                  </details>
+                  <button
+                    type="button"
+                    onClick={() => setEditingDetailsId(card.id)}
+                    className={`${tertiaryButtonClass} w-full px-3 py-2 text-xs`}
+                  >
+                    Edit details
+                  </button>
                 </div>
               </motion.div>
             ))}
@@ -785,9 +904,11 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
           <div className="sticky bottom-4 z-30">
             <div className="glass-card rounded-2xl px-6 py-4 border border-white/60 flex items-center justify-between shadow-xl">
               <p className="text-sm font-bold text-foreground/60">
-                {missingRequiredCount > 0 ? (
+                {selectedCards.length === 0 ? (
+                  <span className="text-red-500">Select at least one card to add.</span>
+                ) : missingRequiredCount > 0 ? (
                   <span className="text-red-500">
-                    Fill required fields on <span className="font-black">{missingRequiredCount}</span> selected card{missingRequiredCount !== 1 ? 's' : ''}
+                    Fill required fields on <span className="font-black">{missingRequiredCount}</span> selected card{missingRequiredCount !== 1 ? 's' : ''}{missingRequiredSummary ? `: ${missingRequiredSummary}` : ''}
                   </span>
                 ) : (
                   <>
@@ -797,7 +918,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
               </p>
               <button
                 onClick={handleSave}
-                disabled={!canSaveSelectedCards}
+                disabled={selectedCards.length === 0 || hasInvalidSelectedCards}
                 className={primaryButtonClass}>
                 Add to Collection →
               </button>
@@ -836,15 +957,26 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
             </button>
             <button onClick={uploadNewTemplate}
               className={secondaryButtonClass}>
-              Scan Another
+              Import Another
             </button>
           </div>
         </motion.div>
       )}
 
       <AnimatePresence>
+        {editingDetailsPhotocard && (
+          <PhotocardForm
+            initialData={editingDetailsPhotocard}
+            onSubmit={handleSaveCardDetails}
+            onClose={() => setEditingDetailsId(null)}
+            title="Edit Card Details"
+            subtitle="Updating Scanned Card"
+            allowImageEditing={false}
+          />
+        )}
         {editingCropId && templateUrl && (
           <ImageEditor
+            key={editingCropId}
             image={templateUrl}
             initialState={cards.find(card => card.id === editingCropId)?.cropperState}
             onSave={handleSaveEditedCrop}

@@ -5,7 +5,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import Cropper, { Point, Area } from 'react-easy-crop';
+import Cropper, { Point, Area, MediaSize } from 'react-easy-crop';
 import {
   X,
   Sun,
@@ -121,6 +121,7 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = CAR
   const undoStackRef = useRef<EditorSnapshot[]>([]);
   const redoStackRef = useRef<EditorSnapshot[]>([]);
   const croppedAreaPixelsRef = useRef<Area | null>(initialState?.croppedAreaPixels ?? null);
+  const hasAppliedInitialAreaRef = useRef(false);
 
   useEffect(() => {
     const handleResize = () => setCropViewportSize(getCropViewportSize());
@@ -148,6 +149,50 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = CAR
     croppedAreaPixelsRef.current = croppedAreaPixels;
     setCroppedAreaPixels(croppedAreaPixels);
   }, []);
+
+  const applyInitialCroppedArea = useCallback((mediaSize: MediaSize) => {
+    const initialArea = initialState?.croppedAreaPixels;
+    if (!initialArea || initialState?.hasUserPosition || hasAppliedInitialAreaRef.current) return;
+
+    const naturalW = mediaSize.naturalWidth;
+    const naturalH = mediaSize.naturalHeight;
+
+    console.log('[EditCrop] naturalSize:', naturalW, '×', naturalH);
+    console.log('[EditCrop] renderedMediaSize:', mediaSize.width, '×', mediaSize.height);
+    console.log('[EditCrop] savedCropRect:', JSON.stringify(initialArea));
+    console.log('[EditCrop] cropFrameSize:', cropSize.width, '×', cropSize.height);
+
+    // For contain mode, both axes give the same display scale; min handles edge cases safely.
+    const displayScale = naturalW > 0 && naturalH > 0
+      ? Math.min(mediaSize.width / naturalW, mediaSize.height / naturalH)
+      : 1;
+
+    // Zoom needed so the crop rect fills (not under-fills) the crop frame.
+    const scaleX = cropSize.width / (initialArea.width * displayScale);
+    const scaleY = cropSize.height / (initialArea.height * displayScale);
+    const rawZoom = Math.max(scaleX, scaleY);
+    const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, rawZoom));
+
+    // Pan so the crop rect center aligns with the crop frame center.
+    // cropZoom = display px per natural px at this zoom level.
+    const cropZoom = displayScale * zoom;
+    const crop: Point = {
+      x: ((naturalW - initialArea.width) / 2 - initialArea.x) * cropZoom,
+      y: ((naturalH - initialArea.height) / 2 - initialArea.y) * cropZoom,
+    };
+
+    console.log('[EditCrop] displayScale:', displayScale, '| scaleX:', scaleX.toFixed(4), '| scaleY:', scaleY.toFixed(4));
+    console.log('[EditCrop] initialZoom:', zoom.toFixed(4), '| cropZoom:', cropZoom.toFixed(4));
+    console.log('[EditCrop] initialCrop:', JSON.stringify(crop));
+
+    hasAppliedInitialAreaRef.current = true;
+    cropRef.current = crop;
+    zoomRef.current = zoom;
+    croppedAreaPixelsRef.current = initialArea;
+    setCrop(crop);
+    setZoom(zoom);
+    setCroppedAreaPixels(initialArea);
+  }, [cropSize, initialState]);
 
   const syncHistoryState = useCallback(() => {
     setHistoryState({
@@ -354,10 +399,10 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = CAR
                 rotation={rotation}
                 aspect={aspectRatio}
                 cropSize={cropSize}
-                initialCroppedAreaPixels={initialState?.hasUserPosition ? undefined : initialState?.croppedAreaPixels}
                 onCropChange={handleCropChange}
                 onCropComplete={onCropComplete}
                 onCropAreaChange={onCropComplete}
+                onMediaLoaded={applyInitialCroppedArea}
                 onZoomChange={handleZoomChange}
                 onRotationChange={handleRotationChange}
                 showGrid={true}

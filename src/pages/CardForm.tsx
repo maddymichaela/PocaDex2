@@ -175,9 +175,8 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
               {/* Group + Member */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Group *</label>
+                  <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Group</label>
                   <input
-                    required
                     type="text"
                     value={group}
                     onChange={e => setGroup(e.target.value)}
@@ -231,8 +230,8 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
                     <input type="number" value={year} onChange={e => setYear(Number(e.target.value))} className="w-full px-4 py-3 bg-gray-50 border-2 border-transparent rounded-xl text-sm focus:bg-white focus:border-primary/30 outline-none transition-all appearance-none" placeholder="2025" />
                   </div>
                   <div className="xl:col-span-2">
-                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40">Photocard Name *</label>
-                    <input required type="text" value={cardName} onChange={e => setCardName(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border-2 border-transparent rounded-xl text-sm focus:bg-white focus:border-primary/30 outline-none transition-all" placeholder="Photocard Name" />
+                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40">Photocard Name</label>
+                    <input type="text" value={cardName} onChange={e => setCardName(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border-2 border-transparent rounded-xl text-sm focus:bg-white focus:border-primary/30 outline-none transition-all" placeholder="Photocard Name" />
                   </div>
                 </div>
               </div>

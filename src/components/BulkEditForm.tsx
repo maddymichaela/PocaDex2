@@ -28,6 +28,7 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
   const [condition, setCondition] = useState<Condition>('mint');
   const [isDuplicate, setIsDuplicate] = useState(false);
   const [notes, setNotes] = useState('');
+  const [validationMessage, setValidationMessage] = useState('');
 
   const [activeFields, setActiveFields] = useState<Set<string>>(new Set());
 
@@ -38,10 +39,22 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
     } else {
       newFields.add(field);
     }
+    setValidationMessage('');
     setActiveFields(newFields);
   };
 
   const handleSave = () => {
+    if (activeFields.has('category')) {
+      if (category === 'Album' && (!activeFields.has('album') || !album.trim())) {
+        setValidationMessage('Album is required when bulk editing cards to the Album category.');
+        return;
+      }
+      if (category !== 'Album' && (!activeFields.has('source') || !source.trim())) {
+        setValidationMessage('Source is required when bulk editing cards to a non-Album category.');
+        return;
+      }
+    }
+
     const updates: Partial<Photocard> = {};
     if (activeFields.has('group')) updates.group = group;
     if (activeFields.has('member')) updates.member = member;
@@ -299,6 +312,12 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
               className="bg-transparent text-sm font-medium outline-none resize-none h-20 disabled:opacity-30"
             />
           </div>
+
+          {validationMessage && (
+            <p className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-xs font-bold text-red-600">
+              {validationMessage}
+            </p>
+          )}
 
           <p className="text-[9px] font-bold text-foreground/30 italic text-center uppercase tracking-wider">
             Only checked fields will be updated on all selected items.

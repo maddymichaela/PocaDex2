@@ -16,7 +16,7 @@ interface NavbarProps {
 const NAV_ITEMS = [
   { id: 'Dashboard', label: 'Dashboard', icon: LayoutGrid },
   { id: 'Collection', label: 'My Binder', icon: BookOpen },
-  { id: 'Scan', label: 'Scan', icon: ScanLine },
+  { id: 'Scan', label: 'Import', icon: ScanLine },
 ] as const;
 
 export default function Navbar({ currentPage, onPageChange, profile, onSignOut, onAddCard, onOpenSettings }: NavbarProps) {
