@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, ChangeEvent, DragEvent } from 'react';
-import { Upload, Grid3x3, CheckSquare, Square, Loader2, AlertCircle, CheckCircle2, ChevronDown, Plus, RotateCcw } from 'lucide-react';
+import { Upload, Grid3x3, CheckSquare, Square, Loader2, AlertCircle, CheckCircle2, ChevronDown, Plus, Crop, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Area } from 'react-easy-crop';
 import { detectTemplate, cropImageFromRect, fitCropRectToCardAspect, trimBackground, PHOTOCARD_TEMPLATES, templateCellRects, GridTemplate } from '../lib/crop-pipeline';
@@ -33,6 +33,30 @@ interface ReviewCard {
 
 type Step = 'upload' | 'detecting' | 'review' | 'saving' | 'done';
 const DEFAULT_TEMPLATE = PHOTOCARD_TEMPLATES[5]; // 2×4 is the most reliable common fan-template layout.
+
+type BulkDraft = {
+  group: string;
+  category: '' | PhotocardCategory;
+  album: string;
+  source: string;
+  era: string;
+  year: string;
+  status: '' | Status;
+  condition: '' | Condition;
+  isDuplicate: '' | 'true' | 'false';
+};
+
+const emptyBulkDraft: BulkDraft = {
+  group: '',
+  category: '',
+  album: '',
+  source: '',
+  era: '',
+  year: '',
+  status: '',
+  condition: '',
+  isDuplicate: '',
+};
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -103,15 +127,6 @@ function manualTemplate(rows: number, cols: number, selectedGrid: GridTemplate):
   };
 }
 
-function fieldClass(label: string) {
-  return (
-    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">
-      {label}
-    </label>
-  );
-}
-void fieldClass; // used inline below
-
 // ── Editable field ─────────────────────────────────────────────────────────
 
 function Field({ label, value, onChange, placeholder, required = false, invalid = false }: {
@@ -127,37 +142,8 @@ function Field({ label, value, onChange, placeholder, required = false, invalid 
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder ?? label}
         aria-required={required}
-        className={`w-full px-2 py-1.5 rounded-xl border bg-white/80 text-xs font-medium text-foreground placeholder:text-foreground/25 focus:outline-none transition-colors ${invalid ? 'border-red-200 focus:border-red-400' : 'border-gray-100 focus:border-primary/40'}`}
+        className={`w-full rounded-xl border bg-white/70 px-2.5 py-2 text-xs font-medium text-foreground placeholder:text-foreground/25 shadow-sm shadow-primary/0 transition-colors focus:outline-none ${invalid ? 'border-red-200 focus:border-red-400' : 'border-primary/10 focus:border-primary/40'}`}
       />
-    </div>
-  );
-}
-
-// ── Bulk field (apply one value to all selected cards) ─────────────────────
-
-function BulkField({ label, placeholder, onApply, required = false }: {
-  label: string; placeholder?: string; onApply: (v: string) => void; required?: boolean;
-}) {
-  const [val, setVal] = useState('');
-  return (
-    <div className="flex w-full min-w-0 items-end gap-2">
-      <div className="min-w-0 flex-1">
-        <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">
-          {label}{required ? ' *' : ''}
-        </label>
-        <input
-          value={val}
-          onChange={e => setVal(e.target.value)}
-          placeholder={placeholder ?? label}
-          className="w-full px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-primary/40"
-        />
-      </div>
-      <button
-        onClick={() => { if (val.trim()) { onApply(val.trim()); setVal(''); } }}
-        className="px-2.5 py-1.5 rounded-xl bg-primary/10 text-primary text-[10px] font-black uppercase tracking-tight hover:bg-primary hover:text-white transition-all"
-      >
-        Fill
-      </button>
     </div>
   );
 }
@@ -178,6 +164,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
   const [isDragging, setIsDragging] = useState(false);
   const [editingCropId, setEditingCropId] = useState<string | null>(null);
   const [isAddingManualCrop, setIsAddingManualCrop] = useState(false);
+  const [bulkDraft, setBulkDraft] = useState<BulkDraft>(emptyBulkDraft);
 
   const selectedCards = cards.filter(c => c.selected);
   const missingRequiredCount = selectedCards.filter(c => !c.group.trim() || !c.member.trim() || !c.cardName.trim()).length;
@@ -283,6 +270,36 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
     setCards(prev => prev.map(c => ({ ...c, selected: !allSelected })));
   };
 
+  const updateBulkDraft = (patch: Partial<BulkDraft>) => {
+    setBulkDraft(prev => ({ ...prev, ...patch }));
+  };
+
+  const hasBulkDraftValues = Object.values(bulkDraft).some(value => String(value).trim() !== '');
+  const bulkCategoryForFields = bulkDraft.category || 'Album';
+
+  const applyBulkDraft = () => {
+    if (!selectedCards.length || !hasBulkDraftValues) return;
+    const parsedYear = parseInt(bulkDraft.year, 10);
+
+    setCards(prev => prev.map(card => {
+      if (!card.selected) return card;
+      const nextCategory = bulkDraft.category || card.category;
+      return {
+        ...card,
+        ...(bulkDraft.group.trim() ? { group: bulkDraft.group.trim() } : {}),
+        ...(bulkDraft.category ? { category: bulkDraft.category } : {}),
+        ...(nextCategory === 'Album' && bulkDraft.album.trim() ? { album: bulkDraft.album.trim() } : {}),
+        ...(nextCategory !== 'Album' && bulkDraft.source.trim() ? { source: bulkDraft.source.trim() } : {}),
+        ...(bulkDraft.era.trim() ? { era: bulkDraft.era.trim() } : {}),
+        ...(!isNaN(parsedYear) ? { year: parsedYear } : {}),
+        ...(bulkDraft.status ? { status: bulkDraft.status } : {}),
+        ...(bulkDraft.condition ? { condition: bulkDraft.condition } : {}),
+        ...(bulkDraft.isDuplicate ? { isDuplicate: bulkDraft.isDuplicate === 'true' } : {}),
+      };
+    }));
+    setBulkDraft(emptyBulkDraft);
+  };
+
   const handleSaveEditedCrop = (croppedImage: string, editorState?: ImageEditorState) => {
     if (!editingCropId) return;
     updateCard(editingCropId, {
@@ -358,22 +375,30 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
 
   // ── Reset ─────────────────────────────────────────────────────────────────
 
-  const resetDetection = () => {
+  const startOver = () => {
     setStep('upload');
+    setTemplateUrl(null);
     setCards([]);
     setError(null);
     setSavedCount(0);
     setEditingCropId(null);
     setIsAddingManualCrop(false);
-  };
-
-  const uploadNewTemplate = () => {
-    resetDetection();
-    setTemplateUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const uploadNewTemplate = () => {
+    if (!fileInputRef.current) return;
+    fileInputRef.current.value = '';
+    fileInputRef.current.click();
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
+
+  const softSelectClass = 'w-full cursor-pointer rounded-xl border border-primary/10 bg-white/70 px-2.5 py-2 text-xs font-medium text-foreground shadow-sm transition-colors focus:border-primary/40 focus:outline-none';
+  const bulkInputClass = 'w-full rounded-xl border border-primary/10 bg-white/70 px-3 py-2 text-xs font-semibold text-foreground placeholder:text-foreground/25 transition-colors focus:border-primary/40 focus:outline-none';
+  const primaryButtonClass = 'btn-primary-pink inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black uppercase tracking-tight disabled:cursor-not-allowed disabled:opacity-40';
+  const secondaryButtonClass = 'inline-flex items-center justify-center gap-2 rounded-2xl bg-primary/10 px-5 py-3 text-sm font-black uppercase tracking-tight text-primary transition-all hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-40';
+  const tertiaryButtonClass = 'inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black uppercase tracking-tight text-foreground/45 transition-all hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -399,94 +424,114 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
       {/* ── STEP: Upload ── */}
       {step === 'upload' && (
         <div className="space-y-4">
-          {/* Drop zone */}
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            onDrop={onDrop}
-            onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
-            onDragLeave={() => setIsDragging(false)}
-            className={`relative flex flex-col items-center justify-center gap-4 p-16 rounded-3xl border-2 border-dashed cursor-pointer transition-all ${isDragging ? 'border-primary bg-primary/5 scale-[1.01]' : 'border-gray-200 hover:border-primary/40 hover:bg-primary/2'}`}
-          >
-            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-colors ${isDragging ? 'bg-primary text-white' : 'bg-accent text-primary'}`}>
-              <Upload size={28} />
+          {!templateUrl && (
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              onDrop={onDrop}
+              onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              className={`relative flex flex-col items-center justify-center gap-4 rounded-3xl border-2 border-dashed px-5 py-14 cursor-pointer transition-all sm:px-8 lg:px-16 ${isDragging ? 'border-primary bg-primary/5 scale-[1.01]' : 'border-gray-200 hover:border-primary/40 hover:bg-primary/2'}`}
+            >
+              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-colors ${isDragging ? 'bg-primary text-white' : 'bg-accent text-primary'}`}>
+                <Upload size={28} />
+              </div>
+              <div className="text-center">
+                <p className="font-black text-foreground uppercase tracking-tight">Drop template image here</p>
+                <p className="text-sm text-foreground/40 font-medium mt-1">or click to browse · PNG, JPG, WEBP · max 15MB</p>
+              </div>
+              <p className="text-xs text-foreground/30 font-medium">Works with fan templates from Twitter/X, Discord, etc.</p>
             </div>
-            <div className="text-center">
-              <p className="font-black text-foreground uppercase tracking-tight">Drop template image here</p>
-              <p className="text-sm text-foreground/40 font-medium mt-1">or click to browse · PNG, JPG, WEBP · max 15MB</p>
-            </div>
-            <p className="text-xs text-foreground/30 font-medium">Works with fan templates from Twitter/X, Discord, etc.</p>
-          </div>
+          )}
 
           {/* Preview + detection options */}
           {templateUrl && (
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-              <div className="glass-card rounded-3xl p-4 border border-white/60">
-                <img src={templateUrl} alt="Template preview" className="w-full max-h-72 object-contain rounded-2xl" />
+              <div>
+                <div className="glass-card rounded-3xl p-4 border border-white/60 space-y-3">
+                  <img src={templateUrl} alt="Template preview" className="mx-auto w-full max-h-72 object-contain rounded-2xl" />
+                  <div className="flex justify-center">
+                    <button
+                      type="button"
+                      onClick={uploadNewTemplate}
+                      className={tertiaryButtonClass}
+                    >
+                      <Upload size={14} /> Upload New Image
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Detection controls */}
               <div className="glass-card rounded-3xl p-6 border border-white/60 space-y-4">
-                <div className="space-y-3">
-                  <p className="text-xs font-black uppercase tracking-widest text-foreground/40">Grid splicing</p>
-                  <p className="text-xs text-foreground/40 font-medium">
-                    Auto-detects white separator lines, or pick the grid manually. You'll fill in card info after.
-                  </p>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-xs font-black uppercase tracking-widest text-foreground/40">Preset:</span>
-                    <div className="relative">
-                      <select
-                        value={selectedGrid.name}
-                        onChange={e => {
-                          const next = PHOTOCARD_TEMPLATES.find(t => t.name === e.target.value)!;
-                          setSelectedGrid(next);
-                          setManualRows(next.rows);
-                          setManualCols(next.cols);
-                        }}
-                        className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-gray-200 bg-white text-xs font-bold text-foreground focus:outline-none focus:border-primary/50 cursor-pointer"
-                      >
-                        {PHOTOCARD_TEMPLATES.map(t => (
-                          <option key={t.name} value={t.name}>{t.name} ({t.rows * t.cols} cards)</option>
-                        ))}
-                      </select>
-                      <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground/40 pointer-events-none" />
-                    </div>
-                    <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-foreground/40">
-                      Rows
-                      <input
-                        type="number"
-                        min={1}
-                        max={20}
-                        value={manualRows}
-                        onChange={e => setManualRows(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
-                        className="w-16 rounded-xl border border-gray-200 bg-white px-2 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50"
-                      />
-                    </label>
-                    <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-foreground/40">
-                      Columns
-                      <input
-                        type="number"
-                        min={1}
-                        max={20}
-                        value={manualCols}
-                        onChange={e => setManualCols(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
-                        className="w-16 rounded-xl border border-gray-200 bg-white px-2 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50"
-                      />
-                    </label>
-                    <div className="rounded-full bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-primary">
-                      {manualRows * manualCols} cards
-                    </div>
-                  </div>
-                </div>
 
-                <div className="flex gap-2 pt-1">
-                  <button onClick={runGridDetect}
-                    className="btn-primary-pink flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black uppercase tracking-tight">
-                    <Grid3x3 size={14} /> Auto-detect Grid
-                  </button>
-                  <button onClick={runManualGrid}
-                    className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gray-100 text-foreground font-black text-sm uppercase tracking-tight hover:bg-gray-200 transition-all">
-                    Use {manualCols}×{manualRows} Grid
-                  </button>
+
+                <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_auto_minmax(0,3fr)] lg:items-start">
+                  <div className="space-y-3">
+                    <p className="text-xs font-black uppercase tracking-widest text-foreground/40">Auto Grid Splicing</p>
+                    <p className="text-xs text-foreground/40 font-medium">
+                      Automatically detect rows and columns from your template
+                    </p>
+                    <button onClick={runGridDetect}
+                      className={secondaryButtonClass}>
+                      <Grid3x3 size={14} /> Auto-detect Grid
+                    </button>
+
+                  </div>
+
+                  <div className="hidden h-full w-px bg-gray-100 lg:block" />
+
+                  <div className="border-t border-gray-100 pt-5 space-y-3 lg:border-t-0 lg:pt-0">
+                    <p className="text-xs font-black uppercase tracking-widest text-foreground/40">Manual Grid Splicing</p>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="text-xs font-black uppercase tracking-widest text-foreground/40">Preset:</span>
+                      <div className="relative">
+                        <select
+                          value={selectedGrid.name}
+                          onChange={e => {
+                            const next = PHOTOCARD_TEMPLATES.find(t => t.name === e.target.value)!;
+                            setSelectedGrid(next);
+                            setManualRows(next.rows);
+                            setManualCols(next.cols);
+                          }}
+                          className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-gray-200 bg-white text-xs font-bold text-foreground focus:outline-none focus:border-primary/50 cursor-pointer"
+                        >
+                          {PHOTOCARD_TEMPLATES.map(t => (
+                            <option key={t.name} value={t.name}>{t.name} ({t.rows * t.cols} cards)</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground/40 pointer-events-none" />
+                      </div>
+                      <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-foreground/40">
+                        Rows
+                        <input
+                          type="number"
+                          min={1}
+                          max={20}
+                          value={manualRows}
+                          onChange={e => setManualRows(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+                          className="w-16 rounded-xl border border-gray-200 bg-white px-2 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50"
+                        />
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-foreground/40">
+                        Columns
+                        <input
+                          type="number"
+                          min={1}
+                          max={20}
+                          value={manualCols}
+                          onChange={e => setManualCols(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+                          className="w-16 rounded-xl border border-gray-200 bg-white px-2 py-2 text-xs font-bold text-foreground outline-none focus:border-primary/50"
+                        />
+                      </label>
+                      <div className="rounded-full bg-primary/5 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-primary/70">
+                        {manualRows * manualCols} cards
+                      </div>
+                    </div>
+                    <button onClick={runManualGrid}
+                      className={secondaryButtonClass}>
+                      Use Grid
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -520,41 +565,36 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
                 <img src={templateUrl} alt="Template preview" className="max-h-80 w-full rounded-xl object-contain" />
               </div>
               <div className="glass-card rounded-2xl border border-white/60 p-5">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="space-y-3">
                   <button
                     type="button"
                     onClick={() => setIsAddingManualCrop(true)}
-                    className="btn-primary-pink flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black uppercase tracking-tight"
+                    className={`${primaryButtonClass} w-full sm:w-auto`}
                   >
                     <Plus size={14} /> Add Card Manually
                   </button>
-                  <button
-                    type="button"
-                    onClick={runGridDetect}
-                    className="flex items-center gap-2 rounded-2xl bg-primary/10 px-5 py-3 text-sm font-black uppercase tracking-tight text-primary transition-all hover:bg-primary hover:text-white"
-                  >
-                    <Grid3x3 size={14} /> Auto-detect Again
-                  </button>
-                  <button
-                    type="button"
-                    onClick={resetDetection}
-                    className="flex items-center gap-2 rounded-2xl bg-gray-100 px-5 py-3 text-sm font-black uppercase tracking-tight text-foreground transition-all hover:bg-gray-200"
-                  >
-                    <RotateCcw size={14} /> Start Over
-                  </button>
-                  <button
-                    type="button"
-                    onClick={uploadNewTemplate}
-                    className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-black uppercase tracking-tight text-foreground/55 transition-all hover:border-primary/30 hover:text-primary"
-                  >
-                    <Upload size={14} /> Upload New Template
-                  </button>
+                  <div className="flex flex-col gap-2 border-t border-gray-100 pt-3 sm:flex-row sm:flex-wrap sm:items-center">
+                    <button
+                      type="button"
+                      onClick={runGridDetect}
+                      className={`${secondaryButtonClass} w-full sm:w-auto`}
+                    >
+                      <Grid3x3 size={14} /> Auto-detect Again
+                    </button>
+                    <button
+                      type="button"
+                      onClick={startOver}
+                      className={`${tertiaryButtonClass} w-full sm:w-auto`}
+                    >
+                      <RotateCcw size={14} /> Start Over
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <div className="rounded-full bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-primary">
+                  <div className="rounded-full bg-primary/5 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-primary/70">
                     {cards.length} crop{cards.length !== 1 ? 's' : ''}
                   </div>
-                  <div className="rounded-full bg-gray-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-foreground/45">
+                  <div className="rounded-full bg-foreground/5 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-foreground/40">
                     Output 650×1000
                   </div>
                 </div>
@@ -563,175 +603,186 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
           )}
 
           {/* Controls */}
-          <div className="glass-card rounded-2xl px-5 py-4 border border-white/60 space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <button onClick={toggleAll} className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-foreground/50 hover:text-foreground transition-colors">
-                {cards.every(c => c.selected) ? <CheckSquare size={14} className="text-primary" /> : <Square size={14} />}
-                {cards.every(c => c.selected) ? 'Deselect all' : 'Select all'}
+          <div className="glass-card rounded-2xl border border-white/70 bg-white/75 px-4 py-4 shadow-sm">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <button onClick={toggleAll} className={tertiaryButtonClass}>
+                  {cards.every(c => c.selected) ? <CheckSquare size={14} className="text-primary" /> : <Square size={14} />}
+                  {cards.every(c => c.selected) ? 'Deselect all' : 'Select all'}
+                </button>
+                <span className="rounded-full bg-primary/5 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-primary/70">
+                  {selectedCards.length} / {cards.length} selected
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={applyBulkDraft}
+                disabled={!selectedCards.length || !hasBulkDraftValues}
+                className="hidden items-center justify-center gap-2 rounded-2xl bg-primary/10 px-5 py-3 text-sm font-black uppercase tracking-tight text-primary transition-all hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-40 md:inline-flex"
+              >
+                Apply to selected
               </button>
-              <span className="text-xs font-bold text-foreground/40">
-                {selectedCards.length} / {cards.length} selected
-              </span>
             </div>
 
-            {/* Bulk fill row */}
-            <div className="border-t border-gray-100 pt-3">
-              <p className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-2">Fill selected cards:</p>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <BulkField label="Group" placeholder="Stray Kids" required onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, group: v } : c))} />
-                <div className="min-w-0">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Category</label>
-                  <select
-                    onChange={e => setCards(prev => prev.map(c => c.selected ? { ...c, category: e.target.value as PhotocardCategory } : c))}
-                    className="w-full px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground focus:outline-none focus:border-primary/40"
-                    defaultValue="Album"
-                  >
-                    {PHOTOCARD_CATEGORIES.map(option => <option key={option} value={option}>{option}</option>)}
-                  </select>
-                </div>
-                <BulkField label="Album" placeholder="DO IT" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, album: v } : c))} />
-                <BulkField label="Source" placeholder="Soundwave" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, source: v } : c))} />
-                <BulkField label="Era" placeholder="DO IT" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, era: v } : c))} />
-                <BulkField label="Year" placeholder="2025" onApply={v => { const y = parseInt(v); if (!isNaN(y)) setCards(prev => prev.map(c => c.selected ? { ...c, year: y } : c)); }} />
-                <div className="min-w-0">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Status *</label>
-                  <select
-                    onChange={e => setCards(prev => prev.map(c => c.selected ? { ...c, status: e.target.value as Status } : c))}
-                    className="w-full px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground focus:outline-none focus:border-primary/40"
-                    defaultValue=""
-                  >
-                    <option value="" disabled>Choose</option>
-                    <option value="owned">Owned</option>
-                    <option value="wishlist">Wishlist</option>
-                    <option value="on_the_way">On the way</option>
-                  </select>
-                </div>
-                <div className="min-w-0">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Condition</label>
-                  <select
-                    onChange={e => setCards(prev => prev.map(c => c.selected ? { ...c, condition: e.target.value as Condition } : c))}
-                    className="w-full px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground focus:outline-none focus:border-primary/40"
-                    defaultValue=""
-                  >
-                    <option value="" disabled>Choose</option>
-                    <option value="mint">Mint</option>
-                    <option value="near_mint">Near mint</option>
-                    <option value="good">Good</option>
-                    <option value="fair">Fair</option>
-                    <option value="poor">Poor</option>
-                  </select>
-                </div>
-                <div className="min-w-0">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Duplicates</label>
-                  <select
-                    onChange={e => setCards(prev => prev.map(c => c.selected ? { ...c, isDuplicate: e.target.value === 'true' } : c))}
-                    className="w-full px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground focus:outline-none focus:border-primary/40"
-                    defaultValue=""
-                  >
-                    <option value="" disabled>Choose</option>
-                    <option value="false">No</option>
-                    <option value="true">Yes</option>
-                  </select>
-                </div>
+            <div className="min-w-0">
+              <div className="mb-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-foreground/45">Batch edit selected</p>
+                <p className="text-xs font-medium text-foreground/40">Fill any fields here, then apply them together.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                <input value={bulkDraft.group} onChange={e => updateBulkDraft({ group: e.target.value })} placeholder="Group" className={bulkInputClass} />
+                <select value={bulkDraft.category} onChange={e => updateBulkDraft({ category: e.target.value as BulkDraft['category'] })} className={softSelectClass}>
+                  <option value="">Category</option>
+                  {PHOTOCARD_CATEGORIES.map(option => <option key={option} value={option}>{option}</option>)}
+                </select>
+                {bulkCategoryForFields === 'Album' ? (
+                  <input value={bulkDraft.album} onChange={e => updateBulkDraft({ album: e.target.value })} placeholder="Album" className={bulkInputClass} />
+                ) : (
+                  <input value={bulkDraft.source} onChange={e => updateBulkDraft({ source: e.target.value })} placeholder="Source" className={bulkInputClass} />
+                )}
+                <input value={bulkDraft.era} onChange={e => updateBulkDraft({ era: e.target.value })} placeholder="Era" className={bulkInputClass} />
+                <input value={bulkDraft.year} onChange={e => updateBulkDraft({ year: e.target.value })} placeholder="Year" inputMode="numeric" className={bulkInputClass} />
+                <select value={bulkDraft.status} onChange={e => updateBulkDraft({ status: e.target.value as BulkDraft['status'] })} className={softSelectClass}>
+                  <option value="">Status</option>
+                  <option value="owned">Owned</option>
+                  <option value="wishlist">Wishlist</option>
+                  <option value="on_the_way">On the way</option>
+                </select>
+                <select value={bulkDraft.condition} onChange={e => updateBulkDraft({ condition: e.target.value as BulkDraft['condition'] })} className={softSelectClass}>
+                  <option value="">Condition</option>
+                  <option value="mint">Mint</option>
+                  <option value="near_mint">Near mint</option>
+                  <option value="good">Good</option>
+                  <option value="fair">Fair</option>
+                  <option value="poor">Poor</option>
+                </select>
+                <select value={bulkDraft.isDuplicate} onChange={e => updateBulkDraft({ isDuplicate: e.target.value as BulkDraft['isDuplicate'] })} className={softSelectClass}>
+                  <option value="">Duplicate</option>
+                  <option value="false">Not duplicate</option>
+                  <option value="true">Duplicate</option>
+                </select>
+              </div>
+              <div className="mt-3 md:hidden">
+                <button
+                  type="button"
+                  onClick={applyBulkDraft}
+                  disabled={!selectedCards.length || !hasBulkDraftValues}
+                  className={`${secondaryButtonClass} w-full`}
+                >
+                  Apply to selected
+                </button>
               </div>
             </div>
           </div>
 
           {/* Card grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 gap-4 pb-32 md:grid-cols-3 xl:grid-cols-4">
             {cards.map(card => (
               <motion.div key={card.id} layout
-                className={`glass-card rounded-2xl border-2 overflow-hidden transition-all ${card.selected ? 'border-primary/40 shadow-md' : 'border-white/40 opacity-50'}`}>
+                className={`overflow-hidden rounded-2xl border-2 bg-white/70 shadow-sm transition-all ${card.selected ? 'border-primary ring-4 ring-primary/10' : 'border-white/50'}`}>
                 {/* Crop preview */}
                 <div
-                  className="relative aspect-[650/1000] bg-gray-50 overflow-hidden"
+                  className="relative aspect-[650/1000] overflow-hidden bg-accent/30"
                   onClick={() => updateCard(card.id, { selected: !card.selected })}
                 >
                   <img src={card.cropUrl} alt="" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 flex flex-col justify-between p-2">
-                    <div className="flex justify-end">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); updateCard(card.id, { selected: !card.selected }); }}
-                        aria-label={card.selected ? 'Deselect card' : 'Select card'}
-                        className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow"
-                      >
-                        {card.selected
-                          ? <CheckSquare size={13} className="text-primary" />
-                          : <Square size={13} className="text-foreground/30" />}
-                      </button>
-                    </div>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); updateCard(card.id, { selected: !card.selected }); }}
+                    aria-label={card.selected ? 'Deselect card' : 'Select card'}
+                    className={`absolute top-4 left-4 z-20 w-6 h-6 rounded-xl border-2 flex items-center justify-center transition-all ${card.selected ? 'bg-primary border-primary text-white shadow-xl shadow-primary/20 scale-110' : 'bg-white/80 border-white'}`}
+                  >
+                    {card.selected && (
+                      <svg viewBox="0 0 10 8" className="w-3 h-3 fill-none stroke-current stroke-[2] stroke-linecap-round stroke-linejoin-round">
+                        <path d="M1 4l3 3 5-6" />
+                      </svg>
+                    )}
+                  </button>
+                  <div className="absolute right-3 top-3 z-10 flex items-start">
                     {templateUrl && (
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setEditingCropId(card.id); }}
-                        className="rounded-xl bg-white/90 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-primary shadow transition-all hover:bg-primary hover:text-white"
+                        className={`${tertiaryButtonClass} bg-white/90 px-3 py-2 text-xs shadow-sm backdrop-blur`}
+                        aria-label="Edit crop"
                       >
-                        Edit Crop
+                        <Crop size={12} /> Crop
                       </button>
                     )}
                   </div>
                 </div>
 
                 {/* Editable fields */}
-                <div className="p-3 space-y-2">
-                  <Field label="Member" required invalid={card.selected && !card.member.trim()} value={card.member} onChange={v => updateCard(card.id, { member: v })} placeholder="Felix" />
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Category *</label>
-                    <select value={card.category} onChange={e => updateCard(card.id, { category: e.target.value as PhotocardCategory })}
-                      className="w-full px-2 py-1.5 rounded-xl border border-gray-100 bg-white/80 text-xs font-medium text-foreground focus:outline-none focus:border-primary/40 transition-colors cursor-pointer">
-                      {PHOTOCARD_CATEGORIES.map(option => <option key={option} value={option}>{option}</option>)}
-                    </select>
+                <div className="space-y-3 p-3">
+                  <div className="grid grid-cols-1 gap-2">
+                    <Field label="Member" required invalid={card.selected && !card.member.trim()} value={card.member} onChange={v => updateCard(card.id, { member: v })} placeholder="Felix" />
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Category *</label>
+                      <select value={card.category} onChange={e => updateCard(card.id, { category: e.target.value as PhotocardCategory })} className={softSelectClass}>
+                        {PHOTOCARD_CATEGORIES.map(option => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </div>
+                    {card.category === 'Album' ? (
+                      <Field label="Album" value={card.album} onChange={v => updateCard(card.id, { album: v })} placeholder="DO IT" />
+                    ) : (
+                      <Field label="Source" value={card.source} onChange={v => updateCard(card.id, { source: v })} placeholder="Soundwave" />
+                    )}
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Status *</label>
+                      <select value={card.status} onChange={e => updateCard(card.id, { status: e.target.value as Status })} className={softSelectClass}>
+                        <option value="owned">Owned</option>
+                        <option value="wishlist">Wishlist</option>
+                        <option value="on_the_way">On the way</option>
+                      </select>
+                    </div>
                   </div>
-                  {card.category === 'Album' ? (
-                    <Field label="Album" value={card.album} onChange={v => updateCard(card.id, { album: v })} placeholder="DO IT" />
-                  ) : (
-                    <Field label="Source" value={card.source} onChange={v => updateCard(card.id, { source: v })} placeholder="Soundwave" />
-                  )}
-                  <Field label="Version" value={card.version} onChange={v => updateCard(card.id, { version: v })} placeholder="Felix Accordion ver." />
-                  <Field label="Photocard Name" required invalid={card.selected && !card.cardName.trim()} value={card.cardName} onChange={v => updateCard(card.id, { cardName: v })} placeholder="Felix DO IT photocard" />
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Status *</label>
-                    <select value={card.status} onChange={e => updateCard(card.id, { status: e.target.value as Status })}
-                      className="w-full px-2 py-1.5 rounded-xl border border-gray-100 bg-white/80 text-xs font-medium text-foreground focus:outline-none focus:border-primary/40 transition-colors cursor-pointer">
-                      <option value="owned">Owned</option>
-                      <option value="wishlist">Wishlist</option>
-                      <option value="on_the_way">On the way</option>
-                    </select>
-                  </div>
-                  <div className={card.status !== 'owned' ? 'opacity-40 pointer-events-none' : ''}>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Condition</label>
-                    <select value={card.condition} onChange={e => updateCard(card.id, { condition: e.target.value as Condition })}
-                      className="w-full px-2 py-1.5 rounded-xl border border-gray-100 bg-white/80 text-xs font-medium text-foreground focus:outline-none focus:border-primary/40 transition-colors cursor-pointer">
-                      <option value="mint">Mint</option>
-                      <option value="near_mint">Near mint</option>
-                      <option value="good">Good</option>
-                      <option value="fair">Fair</option>
-                      <option value="poor">Poor</option>
-                    </select>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => updateCard(card.id, { isDuplicate: !card.isDuplicate })}
-                    className={`w-full rounded-xl border px-2 py-1.5 text-xs font-medium transition-all ${card.isDuplicate ? 'border-primary/25 bg-primary/10 text-primary' : 'border-gray-100 bg-white/80 text-foreground/45'}`}
-                  >
-                    {card.isDuplicate ? 'Duplicate: Yes' : 'Duplicate: No'}
-                  </button>
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Notes</label>
-                    <textarea
-                      value={card.notes}
-                      onChange={e => updateCard(card.id, { notes: e.target.value })}
-                      placeholder="Pulled from DO IT album, Felix Accordion ver."
-                      className="h-16 w-full resize-none rounded-xl border border-gray-100 bg-white/80 px-2 py-1.5 text-xs font-medium text-foreground placeholder:text-foreground/25 focus:outline-none focus:border-primary/40"
-                    />
-                  </div>
+
+                  <details className="group rounded-xl border border-primary/10 bg-white/55 px-3 py-2" open={card.selected && (!card.group.trim() || !card.cardName.trim())}>
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-[10px] font-black uppercase tracking-widest text-foreground/45">
+                      More details
+                      <ChevronDown size={13} className="transition-transform group-open:rotate-180" />
+                    </summary>
+                    <div className="mt-3 space-y-2">
+                      <Field label="Group" required invalid={card.selected && !card.group.trim()} value={card.group} onChange={v => updateCard(card.id, { group: v })} placeholder="Stray Kids" />
+                      <Field label="Era" value={card.era} onChange={v => updateCard(card.id, { era: v })} placeholder="DO IT" />
+                      <Field label="Year" value={String(card.year)} onChange={v => { const y = parseInt(v, 10); updateCard(card.id, { year: isNaN(y) ? card.year : y }); }} placeholder="2025" />
+                      <Field label="Version" value={card.version} onChange={v => updateCard(card.id, { version: v })} placeholder="Accordion ver." />
+                      <Field label="Photocard Name" required invalid={card.selected && !card.cardName.trim()} value={card.cardName} onChange={v => updateCard(card.id, { cardName: v })} placeholder="Felix DO IT photocard" />
+                      <div className={card.status !== 'owned' ? 'opacity-45 pointer-events-none' : ''}>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Condition</label>
+                        <select value={card.condition} onChange={e => updateCard(card.id, { condition: e.target.value as Condition })} className={softSelectClass}>
+                          <option value="mint">Mint</option>
+                          <option value="near_mint">Near mint</option>
+                          <option value="good">Good</option>
+                          <option value="fair">Fair</option>
+                          <option value="poor">Poor</option>
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => updateCard(card.id, { isDuplicate: !card.isDuplicate })}
+                        className={`${tertiaryButtonClass} w-full ${card.isDuplicate ? 'bg-primary/10 text-primary' : ''}`}
+                      >
+                        {card.isDuplicate ? 'Duplicate: Yes' : 'Duplicate: No'}
+                      </button>
+                      <div>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Notes</label>
+                        <textarea
+                          value={card.notes}
+                          onChange={e => updateCard(card.id, { notes: e.target.value })}
+                          placeholder="Pulled from DO IT album, Felix Accordion ver."
+                          className="h-16 w-full resize-none rounded-xl border border-primary/10 bg-white/70 px-2.5 py-2 text-xs font-medium text-foreground placeholder:text-foreground/25 focus:border-primary/40 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </details>
                 </div>
               </motion.div>
             ))}
           </div>
 
           {/* Save button */}
-          <div className="sticky bottom-4">
+          <div className="sticky bottom-4 z-30">
             <div className="glass-card rounded-2xl px-6 py-4 border border-white/60 flex items-center justify-between shadow-xl">
               <p className="text-sm font-bold text-foreground/60">
                 {missingRequiredCount > 0 ? (
@@ -747,7 +798,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
               <button
                 onClick={handleSave}
                 disabled={!canSaveSelectedCards}
-                className="btn-primary-pink flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-black uppercase tracking-tight disabled:cursor-not-allowed disabled:opacity-40">
+                className={primaryButtonClass}>
                 Add to Collection →
               </button>
             </div>
@@ -780,11 +831,11 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
           </div>
           <div className="flex gap-3">
             <button onClick={onDone}
-              className="btn-primary-pink rounded-2xl px-6 py-3 text-sm font-black uppercase tracking-tight">
+              className={primaryButtonClass}>
               View Collection
             </button>
             <button onClick={uploadNewTemplate}
-              className="px-6 py-3 rounded-2xl bg-gray-100 text-foreground font-black text-sm uppercase tracking-tight hover:bg-gray-200 transition-all">
+              className={secondaryButtonClass}>
               Scan Another
             </button>
           </div>
