@@ -29,6 +29,12 @@ export default function Social({ currentUserId, onOpenProfile, initialTab = 'peo
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setActiveTab(initialTab === 'following' || initialTab === 'followers' ? initialTab : 'people');
+    setQuery('');
+    setError(null);
+  }, [initialTab]);
+
   const loadUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -58,6 +64,7 @@ export default function Social({ currentUserId, onOpenProfile, initialTab = 'peo
 
   const handleFollowToggle = async (profile: FollowUser) => {
     setBusyId(profile.id);
+    setError(null);
     const wasFollowing = Boolean(profile.is_following);
     setUsers((current) => current.map((u) => u.id === profile.id ? { ...u, is_following: !wasFollowing } : u));
     try {

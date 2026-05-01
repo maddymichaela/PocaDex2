@@ -53,7 +53,7 @@ function readRouteState(): RouteState {
     const username = decodeURIComponent(path.replace('/u/', '').split('/')[0] || '');
     return username ? { page: 'Profile', username } : { page: 'Collection' };
   }
-  if (path === '/discover') return { page: 'Friends', socialTab: 'people' };
+  if (path === '/discover') return { page: 'FindCards' };
   if (path === '/friends' || path === '/social') return { page: 'Friends' };
   if (path === '/find-cards') return { page: 'FindCards' };
   return { page: 'Collection' };
