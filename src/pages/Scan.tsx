@@ -1,13 +1,14 @@
-import { useState, useRef, useCallback, ChangeEvent, DragEvent } from 'react';
-import { Upload, Grid3x3, CheckSquare, Square, Loader2, AlertCircle, CheckCircle2, ChevronDown, Plus, Crop, RotateCcw } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect, ChangeEvent, DragEvent, PointerEvent, WheelEvent } from 'react';
+import { Upload, Grid3x3, CheckSquare, Square, Loader2, AlertCircle, CheckCircle2, ChevronDown, Plus, Crop, RotateCcw, Eye, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Area } from 'react-easy-crop';
 import { detectTemplate, cropImageFromRect, fitCropRectToCardAspect, trimBackground, PHOTOCARD_TEMPLATES, templateCellRects, GridTemplate } from '../lib/crop-pipeline';
 import { insertPhotocard } from '../lib/db';
 import { useAuth } from '../contexts/AuthContext';
-import { Status, Condition, Photocard, PHOTOCARD_CATEGORIES, PhotocardCategory, getMissingRequiredPhotocardFields } from '../types';
+import { Status, Condition, Photocard, PHOTOCARD_CATEGORIES, PhotocardCategory, formatPhotocardMembers, getMissingRequiredPhotocardFields, getPhotocardMembers } from '../types';
 import ImageEditor, { ImageEditorState } from '../components/ImageEditor';
 import PhotocardForm from '../components/PhotocardForm';
+import MemberTagInput from '../components/MemberTagInput';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -16,7 +17,7 @@ interface ReviewCard {
   cropUrl: string;
   cropAreaPixels: Area;
   cropperState: ImageEditorState;
-  member: string;
+  members: string[];
   group: string;
   category: PhotocardCategory;
   source: string;
@@ -105,7 +106,7 @@ function emptyReviewCard(cropUrl: string, cropAreaPixels: Area): ReviewCard {
       croppedAreaPixels: cropAreaPixels,
       hasUserPosition: false,
     },
-    member: '',
+    members: [],
     group: '',
     category: 'Album',
     source: '',
@@ -158,6 +159,187 @@ function Field({ label, value, onChange, placeholder, required = false, invalid 
   );
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function TemplateLightbox({ image, onClose }: { image: string; onClose: () => void }) {
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const lastPanRef = useRef<{ x: number; y: number } | null>(null);
+  const lastPinchDistanceRef = useRef<number | null>(null);
+
+  const resetView = useCallback(() => {
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+  }, []);
+
+  const updateScale = useCallback((nextScale: number) => {
+    setScale(() => {
+      const clamped = clamp(nextScale, 1, 5);
+      if (clamped === 1) setPosition({ x: 0, y: 0 });
+      return clamped;
+    });
+  }, []);
+
+  const zoomBy = useCallback((delta: number) => {
+    setScale(prev => {
+      const next = clamp(prev + delta, 1, 5);
+      if (next === 1) setPosition({ x: 0, y: 0 });
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [onClose]);
+
+  const distanceBetweenPointers = () => {
+    const points = Array.from(pointersRef.current.values());
+    if (points.length < 2) return null;
+    return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+  };
+
+  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    if (pointersRef.current.size === 2) {
+      lastPinchDistanceRef.current = distanceBetweenPointers();
+      lastPanRef.current = null;
+      return;
+    }
+
+    if (scale > 1) {
+      lastPanRef.current = { x: event.clientX, y: event.clientY };
+    }
+  };
+
+  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (!pointersRef.current.has(event.pointerId)) return;
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (pointersRef.current.size >= 2) {
+      const distance = distanceBetweenPointers();
+      if (!distance) return;
+      const previousDistance = lastPinchDistanceRef.current ?? distance;
+      lastPinchDistanceRef.current = distance;
+      setScale(prev => {
+        const next = clamp(prev * (distance / previousDistance), 1, 5);
+        if (next === 1) setPosition({ x: 0, y: 0 });
+        return next;
+      });
+      return;
+    }
+
+    if (scale <= 1 || !lastPanRef.current) return;
+    const dx = event.clientX - lastPanRef.current.x;
+    const dy = event.clientY - lastPanRef.current.y;
+    lastPanRef.current = { x: event.clientX, y: event.clientY };
+    setPosition(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+  };
+
+  const handlePointerEnd = (event: PointerEvent<HTMLDivElement>) => {
+    pointersRef.current.delete(event.pointerId);
+    lastPinchDistanceRef.current = pointersRef.current.size >= 2 ? distanceBetweenPointers() : null;
+    lastPanRef.current = null;
+  };
+
+  const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    zoomBy(event.deltaY > 0 ? -0.25 : 0.25);
+  };
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-3 backdrop-blur-sm sm:p-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Full template image"
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/95 text-foreground shadow-xl transition-all hover:bg-white hover:text-primary"
+        aria-label="Close full image"
+      >
+        <X size={20} />
+      </button>
+
+      <div
+        className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-2xl bg-white/95 p-1.5 shadow-xl"
+        onClick={event => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={(event) => { event.stopPropagation(); zoomBy(-0.5); }}
+          className="flex h-10 w-10 items-center justify-center rounded-xl text-foreground/60 transition-all hover:bg-primary/10 hover:text-primary disabled:opacity-30"
+          disabled={scale <= 1}
+          aria-label="Zoom out"
+        >
+          <ZoomOut size={18} />
+        </button>
+        <button
+          type="button"
+          onClick={(event) => { event.stopPropagation(); resetView(); }}
+          className="h-10 min-w-14 rounded-xl px-3 text-xs font-black text-foreground/50 transition-all hover:bg-primary/10 hover:text-primary"
+        >
+          {Math.round(scale * 100)}%
+        </button>
+        <button
+          type="button"
+          onClick={(event) => { event.stopPropagation(); zoomBy(0.5); }}
+          className="flex h-10 w-10 items-center justify-center rounded-xl text-foreground/60 transition-all hover:bg-primary/10 hover:text-primary disabled:opacity-30"
+          disabled={scale >= 5}
+          aria-label="Zoom in"
+        >
+          <ZoomIn size={18} />
+        </button>
+      </div>
+
+      <div
+        className={`flex h-full w-full items-center justify-center overflow-hidden touch-none ${scale > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
+        onClick={event => {
+          if (event.target === event.currentTarget) onClose();
+          else event.stopPropagation();
+        }}
+        onDoubleClick={() => updateScale(scale > 1 ? 1 : 2.5)}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        onWheel={handleWheel}
+      >
+        <img
+          src={image}
+          alt="Full template"
+          className="max-h-[88vh] max-w-[92vw] select-none object-contain shadow-2xl"
+          draggable={false}
+          onClick={event => event.stopPropagation()}
+          style={{
+            transform: `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})`,
+            transformOrigin: 'center',
+          }}
+        />
+      </div>
+    </motion.div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 
 export default function Scan({ onDone, onImported }: { onDone: () => void; onImported?: (cards: Photocard[]) => void }) {
@@ -179,6 +361,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
   const [bulkDraft, setBulkDraft] = useState<BulkDraft>(emptyBulkDraft);
   const [detectionStrategyIndex, setDetectionStrategyIndex] = useState(0);
   const [detectionFeedback, setDetectionFeedback] = useState<string | null>(null);
+  const [isTemplateLightboxOpen, setIsTemplateLightboxOpen] = useState(false);
 
   const selectedCards = cards.filter(c => selectedIds.has(c.id));
   const cardsWithMissingFields = selectedCards
@@ -192,7 +375,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
   const hasInvalidSelectedCards = selectedCards.length > 0 && missingRequiredCount > 0;
   const missingRequiredSummary = cardsWithMissingFields
     .slice(0, 3)
-    .map(({ index, card, missingFields }) => `${card.member.trim() || `Card ${index + 1}`}: ${missingFields.join(', ')}`)
+    .map(({ index, card, missingFields }) => `${formatPhotocardMembers(card) || `Card ${index + 1}`}: ${missingFields.join(', ')}`)
     .join('; ');
 
   // ── File handling ────────────────────────────────────────────────────────
@@ -396,7 +579,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
     if (!editingDetailsId) return;
     updateCard(editingDetailsId, {
       group: updated.group || '',
-      member: updated.member,
+      members: getPhotocardMembers(updated),
       category: updated.category,
       source: updated.source || '',
       album: updated.album || '',
@@ -438,7 +621,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
     if (invalidCards.length > 0) {
       const examples = invalidCards
         .slice(0, 4)
-        .map(({ index, card, missingFields }) => `${card.member.trim() || `Card ${index + 1}`}: ${missingFields.join(', ')}`)
+        .map(({ index, card, missingFields }) => `${formatPhotocardMembers(card) || `Card ${index + 1}`}: ${missingFields.join(', ')}`)
         .join('; ');
       setError(`Add to Collection blocked. Fill required fields on ${invalidCards.length} selected card${invalidCards.length !== 1 ? 's' : ''}: ${examples}${invalidCards.length > 4 ? '; …' : ''}.`);
       return;
@@ -462,7 +645,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
         const saved = await insertPhotocard(user.id, {
           id: card.id,
           group: card.group || undefined,
-          member: card.member,
+          members: card.members,
           category: card.category,
           source: card.category === 'Album' ? undefined : card.source || undefined,
           album: card.category === 'Album' ? card.album : '',
@@ -515,6 +698,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
     setIsAddingManualCrop(false);
     setDetectionStrategyIndex(0);
     setDetectionFeedback(null);
+    setIsTemplateLightboxOpen(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -535,7 +719,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
   const editingDetailsPhotocard: Photocard | null = editingDetailsCard ? {
     id: editingDetailsCard.id,
     group: editingDetailsCard.group || undefined,
-    member: editingDetailsCard.member,
+    members: editingDetailsCard.members,
     category: editingDetailsCard.category,
     source: editingDetailsCard.source || undefined,
     album: editingDetailsCard.album,
@@ -599,7 +783,17 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
               <div>
                 <div className="glass-card rounded-3xl p-4 border border-white/60 space-y-3">
-                  <img src={templateUrl} alt="Template preview" className="mx-auto w-full max-h-72 object-contain rounded-2xl" />
+                  <button
+                    type="button"
+                    onClick={() => setIsTemplateLightboxOpen(true)}
+                    className="group relative mx-auto block w-full overflow-hidden rounded-2xl focus:outline-none focus:ring-4 focus:ring-primary/20"
+                    aria-label="View full template image"
+                  >
+                    <img src={templateUrl} alt="Template preview" className="mx-auto w-full max-h-72 object-contain transition-all duration-300 group-hover:scale-[1.01] group-hover:brightness-95" />
+                    <span className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/90 text-primary opacity-95 shadow-sm backdrop-blur transition-all group-hover:scale-105 sm:opacity-0 sm:group-hover:opacity-100">
+                      <Eye size={18} />
+                    </span>
+                  </button>
                   <div className="flex justify-center">
                     <button
                       type="button"
@@ -713,7 +907,17 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
           {templateUrl && (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(260px,0.75fr)_minmax(0,1.25fr)]">
               <div className="glass-card rounded-2xl border border-white/60 p-4">
-                <img src={templateUrl} alt="Template preview" className="max-h-80 w-full rounded-xl object-contain" />
+                <button
+                  type="button"
+                  onClick={() => setIsTemplateLightboxOpen(true)}
+                  className="group relative block w-full overflow-hidden rounded-xl focus:outline-none focus:ring-4 focus:ring-primary/20"
+                  aria-label="View full template image"
+                >
+                  <img src={templateUrl} alt="Template preview" className="max-h-80 w-full object-contain transition-all duration-300 group-hover:scale-[1.01] group-hover:brightness-95" />
+                  <span className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/90 text-primary opacity-95 shadow-sm backdrop-blur transition-all group-hover:scale-105 sm:opacity-0 sm:group-hover:opacity-100">
+                    <Eye size={18} />
+                  </span>
+                </button>
               </div>
               <div className="glass-card rounded-2xl border border-white/60 p-5">
                 <div className="space-y-3">
@@ -866,7 +1070,18 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
                 {/* Editable fields */}
                 <div className="space-y-3 p-3">
                   <div className="grid grid-cols-1 gap-2">
-                    <Field label="Member" required invalid={selectedIds.has(card.id) && !card.member.trim()} value={card.member} onChange={v => updateCard(card.id, { member: v })} placeholder="Felix" />
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Member *</label>
+                      <MemberTagInput
+                        members={card.members}
+                        onChange={members => updateCard(card.id, { members })}
+                        className={`rounded-xl border bg-white/70 px-3 py-1.5 text-xs font-semibold transition-colors focus-within:border-primary/40 ${
+                          selectedIds.has(card.id) && card.members.length === 0 ? 'border-red-300' : 'border-primary/10'
+                        }`}
+                        inputClassName="placeholder:text-foreground/25"
+                        placeholder="Felix"
+                      />
+                    </div>
                     <div>
                       <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Category *</label>
                       <select value={card.category} onChange={e => updateCard(card.id, { category: e.target.value as PhotocardCategory })} className={softSelectClass}>
@@ -964,6 +1179,9 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
       )}
 
       <AnimatePresence>
+        {isTemplateLightboxOpen && templateUrl && (
+          <TemplateLightbox image={templateUrl} onClose={() => setIsTemplateLightboxOpen(false)} />
+        )}
         {editingDetailsPhotocard && (
           <PhotocardForm
             initialData={editingDetailsPhotocard}

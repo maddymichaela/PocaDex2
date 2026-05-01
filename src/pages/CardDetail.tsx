@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Image as ImageIcon, Edit3, Copy, Heart, Truck } from 'lucide-react';
-import { getPhotocardCategory, Photocard } from '../types';
+import { formatPhotocardMembers, getPhotocardCategory, Photocard } from '../types';
 import { placeholderImage } from '../lib/assets';
 
 interface CardDetailProps {
@@ -14,6 +14,7 @@ interface CardDetailProps {
 
 export default function CardDetail({ photocard, onBack, onEdit, hasPrev, hasNext, onPrev, onNext }: CardDetailProps) {
   const category = getPhotocardCategory(photocard);
+  const memberLabel = formatPhotocardMembers(photocard);
 
   return (
     <div className="bg-gray-50/30">
@@ -94,7 +95,7 @@ export default function CardDetail({ photocard, onBack, onEdit, hasPrev, hasNext
                 <span className="w-1.5 h-1.5 bg-primary/20 rounded-full" />
                 {photocard.year}
               </div>
-              <h1 className="text-4xl md:text-5xl font-bold text-foreground tracking-tight leading-none">{photocard.member}</h1>
+              <h1 className="break-words text-4xl font-bold tracking-tight text-foreground md:text-5xl">{memberLabel}</h1>
               <div className="h-1 w-20 bg-primary/60 rounded-full mt-4" />
             </div>
 

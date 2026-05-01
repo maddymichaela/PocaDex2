@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Save, Layers } from 'lucide-react';
 import { Status, Photocard, Condition, PHOTOCARD_CATEGORIES, PhotocardCategory, normalizePhotocardUpdates } from '../types';
 import ModalShell from './ModalShell';
+import MemberTagInput from './MemberTagInput';
 
 interface BulkEditFormProps {
   selectedCount: number;
@@ -16,7 +17,7 @@ interface BulkEditFormProps {
 
 export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEditFormProps) {
   const [group, setGroup] = useState('');
-  const [member, setMember] = useState('');
+  const [members, setMembers] = useState<string[]>([]);
   const [category, setCategory] = useState<PhotocardCategory>('Album');
   const [source, setSource] = useState('');
   const [album, setAlbum] = useState('');
@@ -54,10 +55,14 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
         return;
       }
     }
+    if (activeFields.has('members') && members.length === 0) {
+      setValidationMessage('At least one member is required when bulk editing members.');
+      return;
+    }
 
     const updates: Partial<Photocard> = {};
     if (activeFields.has('group')) updates.group = group;
-    if (activeFields.has('member')) updates.member = member;
+    if (activeFields.has('members')) updates.members = members;
     if (activeFields.has('category')) updates.category = category;
     if (activeFields.has('source')) updates.source = source;
     if (activeFields.has('album')) updates.album = album;
@@ -136,17 +141,18 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
               />
             </div>
 
-            <div className={fieldClass('member')}>
+            <div className={fieldClass('members')}>
               <div className="flex items-center justify-between">
                 <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40">Member</label>
-                <Checkbox id="member" />
+                <Checkbox id="members" />
               </div>
-              <input
-                disabled={!activeFields.has('member')}
-                type="text"
+              <MemberTagInput
+                disabled={!activeFields.has('members')}
+                members={members}
+                onChange={setMembers}
+                className="border-b border-black/5 pb-1"
+                inputClassName="text-sm font-bold"
                 placeholder="Felix"
-                onChange={(e) => setMember(e.target.value)}
-                className="bg-transparent text-sm font-bold outline-none border-b border-black/5 pb-1 disabled:opacity-30"
               />
             </div>
 

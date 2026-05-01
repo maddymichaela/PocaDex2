@@ -1,9 +1,10 @@
 import { useState, useRef, FormEvent, ChangeEvent } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { ChevronLeft, Image as ImageIcon, Save, Upload, Trash2, Edit3 } from 'lucide-react';
-import { Status, Photocard, Condition, PHOTOCARD_CATEGORIES, PhotocardCategory, getPhotocardCategory, normalizePhotocardForSave } from '../types';
+import { Status, Photocard, Condition, PHOTOCARD_CATEGORIES, PhotocardCategory, getPhotocardCategory, getPhotocardMembers, normalizePhotocardForSave } from '../types';
 import { useImageUpload } from '../hooks/useImageUpload';
 import ImageEditor from '../components/ImageEditor';
+import MemberTagInput from '../components/MemberTagInput';
 import { placeholderImage } from '../lib/assets';
 
 interface CardFormProps {
@@ -17,7 +18,7 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
   const isEditing = !!initialData;
 
   const [group, setGroup] = useState(initialData?.group || '');
-  const [member, setMember] = useState(initialData?.member || '');
+  const [members, setMembers] = useState<string[]>(initialData ? getPhotocardMembers(initialData) : []);
   const [category, setCategory] = useState<PhotocardCategory>(initialData ? getPhotocardCategory(initialData) : 'Album');
   const [source, setSource] = useState(initialData?.source || '');
   const [album, setAlbum] = useState(initialData?.album || '');
@@ -56,10 +57,11 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    if (members.length === 0) return;
     onSubmit(normalizePhotocardForSave({
       id: initialData?.id || Date.now().toString(),
       group,
-      member,
+      members,
       category,
       source,
       album,
@@ -186,12 +188,11 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
                 </div>
                 <div>
                   <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Member *</label>
-                  <input
-                    required
-                    type="text"
-                    value={member}
-                    onChange={e => setMember(e.target.value)}
-                    className="w-full rounded-[16px] border-2 border-gray-100 bg-white px-4 py-3 text-base font-semibold text-foreground outline-none transition-all focus:border-primary/30 md:rounded-[20px] md:px-6 md:py-4 md:text-xl"
+                  <MemberTagInput
+                    members={members}
+                    onChange={setMembers}
+                    className="rounded-[16px] border-2 border-gray-100 bg-white px-4 py-2 text-base font-semibold text-foreground transition-all focus-within:border-primary/30 md:rounded-[20px] md:px-6 md:py-3 md:text-xl"
+                    inputClassName="placeholder:text-foreground/35"
                     placeholder="Member Name"
                   />
                 </div>

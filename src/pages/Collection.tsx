@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { getPhotocardCategory, Photocard } from '../types';
+import { formatPhotocardMembers, getPhotocardCategory, getPhotocardMembers, Photocard } from '../types';
 import { PhotocardGrid } from '../components/PhotocardGrid';
 import BulkEditForm from '../components/BulkEditForm';
 import FilterBar, { FilterState } from '../components/FilterBar';
@@ -31,7 +31,7 @@ const getGroupedViewKey = (photocard: Photocard, viewMode: ViewMode): string | n
     case 'group':
       return hasGroupableValue(photocard.group) ? photocard.group as string : 'Unknown';
     case 'member':
-      return photocard.member;
+      return getPhotocardMembers(photocard).length > 1 ? 'Multi-member' : getPhotocardMembers(photocard)[0] || 'Unknown';
     case 'era':
       return hasGroupableValue(photocard.era) ? photocard.era as string : GROUP_FALLBACK_LABELS.era;
     case 'category':
@@ -110,14 +110,16 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
   }, []);
 
   const uniqueGroups = useMemo(() => Array.from(new Set(photocards.map(pc => pc.group).filter(Boolean))) as string[], [photocards]);
-  const uniqueMembers = useMemo(() => Array.from(new Set(photocards.map(pc => pc.member).filter(Boolean))) as string[], [photocards]);
+  const uniqueMembers = useMemo(() => Array.from(new Set(photocards.flatMap(pc => getPhotocardMembers(pc)))).sort((a, b) => a.localeCompare(b)), [photocards]);
   const uniqueCategories = useMemo(() => Array.from(new Set(photocards.map(pc => getPhotocardCategory(pc)))), [photocards]);
   const uniqueYears = useMemo(() => Array.from(new Set(photocards.map(pc => pc.year))), [photocards]);
 
   const filteredPhotocards = useMemo(() => {
     return photocards.filter(pc => {
       const matchGroup = filters.group === 'All' || pc.group === filters.group;
-      const matchMember = filters.member === 'All' || pc.member === filters.member;
+      const members = getPhotocardMembers(pc);
+      const memberLabel = formatPhotocardMembers(pc);
+      const matchMember = filters.member === 'All' || members.includes(filters.member);
       const matchCategory = filters.category === 'All' || getPhotocardCategory(pc) === filters.category;
       const matchYear = filters.year === 'All' || pc.year === filters.year;
       const matchStatus = filters.status === 'All' || pc.status === filters.status;
@@ -125,7 +127,7 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
       const matchSearch = !q ||
         pc.cardName.toLowerCase().includes(q) ||
         pc.version.toLowerCase().includes(q) ||
-        pc.member.toLowerCase().includes(q) ||
+        memberLabel.toLowerCase().includes(q) ||
         (pc.group?.toLowerCase().includes(q)) ||
         (pc.album?.toLowerCase().includes(q)) ||
         (pc.source?.toLowerCase().includes(q)) ||
@@ -145,8 +147,8 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
       switch (filters.sortBy) {
         case 'newest': return (Number(b.year) - Number(a.year)) || (b.createdAt - a.createdAt);
         case 'oldest': return (Number(a.year) - Number(b.year)) || (b.createdAt - a.createdAt);
-        case 'member-az': return a.member.localeCompare(b.member) || (b.createdAt - a.createdAt);
-        case 'member-za': return b.member.localeCompare(a.member) || (b.createdAt - a.createdAt);
+        case 'member-az': return formatPhotocardMembers(a).localeCompare(formatPhotocardMembers(b)) || (b.createdAt - a.createdAt);
+        case 'member-za': return formatPhotocardMembers(b).localeCompare(formatPhotocardMembers(a)) || (b.createdAt - a.createdAt);
         default: return b.createdAt - a.createdAt;
       }
     });

@@ -31,7 +31,7 @@ export type Condition =
 export interface Photocard {
   id: string;
   group?: string; // New field from old app
-  member: string;
+  members: string[];
   category?: PhotocardCategory;
   source?: string;
   album: string;
@@ -47,13 +47,39 @@ export interface Photocard {
   createdAt: number;
 }
 
+export type LegacyPhotocardInput = Partial<Photocard> & { member?: string };
+
+export function normalizeMembers(input: unknown): string[] {
+  if (Array.isArray(input)) {
+    return Array.from(new Set(input.map(member => String(member).trim()).filter(Boolean)));
+  }
+  if (typeof input === 'string') {
+    return input.split(',').map(member => member.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+export function getPhotocardMembers(photocard: LegacyPhotocardInput): string[] {
+  const members = normalizeMembers(photocard.members);
+  if (members.length > 0) return members;
+
+  const legacyMember = typeof photocard.member === 'string' ? photocard.member.trim() : '';
+  return legacyMember ? [legacyMember] : [];
+}
+
+export function formatPhotocardMembers(photocard: LegacyPhotocardInput, maxNames = 3): string {
+  const members = getPhotocardMembers(photocard);
+  if (members.length <= maxNames) return members.join(' · ');
+  return `${members[0]} + ${members.length - 1}`;
+}
+
 export function getMissingRequiredPhotocardFields(
-  photocard: Pick<Photocard, 'member' | 'category' | 'status'> & Partial<Pick<Photocard, 'album' | 'source'>>
+  photocard: Pick<Photocard, 'members' | 'category' | 'status'> & Partial<Pick<Photocard, 'album' | 'source'>> & { member?: string }
 ): string[] {
   const category = getPhotocardCategory(photocard);
   const missing: string[] = [];
 
-  if (!photocard.member?.trim()) missing.push('Member');
+  if (getPhotocardMembers(photocard).length === 0) missing.push('Member');
   if (!photocard.category) missing.push('Category');
   if (!photocard.status) missing.push('Status');
   if (category === 'Album' && !photocard.album?.trim()) missing.push('Album');
@@ -68,8 +94,10 @@ export function getPhotocardCategory(photocard: Pick<Photocard, 'category'>): Ph
 
 export function normalizePhotocardForSave(photocard: Photocard): Photocard {
   const category = getPhotocardCategory(photocard);
+  const members = getPhotocardMembers(photocard);
   return {
     ...photocard,
+    members,
     category,
     album: category === 'Album' ? photocard.album : '',
     source: category === 'Album' ? undefined : photocard.source?.trim() || undefined,
@@ -77,17 +105,18 @@ export function normalizePhotocardForSave(photocard: Photocard): Photocard {
 }
 
 export function normalizePhotocardUpdates(updates: Partial<Photocard>): Partial<Photocard> {
-  if (updates.category === undefined) return updates;
+  const normalizedBase = updates.members === undefined ? updates : { ...updates, members: normalizeMembers(updates.members) };
+  if (normalizedBase.category === undefined) return normalizedBase;
 
-  const category = getPhotocardCategory({ category: updates.category });
+  const category = getPhotocardCategory({ category: normalizedBase.category });
   const nextUpdates: Partial<Photocard> = {
-    ...updates,
+    ...normalizedBase,
     category,
     ...(category === 'Album' ? { source: undefined } : { album: '' }),
   };
 
-  if (category !== 'Album' && 'source' in updates) {
-    nextUpdates.source = updates.source?.trim() || undefined;
+  if (category !== 'Album' && 'source' in normalizedBase) {
+    nextUpdates.source = normalizedBase.source?.trim() || undefined;
   }
 
   return {

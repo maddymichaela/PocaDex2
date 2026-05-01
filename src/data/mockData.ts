@@ -9,7 +9,7 @@ export const MOCK_PHOTOCARDS: Photocard[] = [
   {
     id: '1',
     group: 'aespa',
-    member: 'Karina',
+    members: ['Karina'],
     category: 'Album',
     album: 'Savage',
     era: 'Hallucination',
@@ -23,7 +23,7 @@ export const MOCK_PHOTOCARDS: Photocard[] = [
   {
     id: '2',
     group: 'aespa',
-    member: 'Winter',
+    members: ['Winter'],
     category: 'Album',
     album: 'Next Level',
     era: 'P.O.S',
@@ -37,7 +37,7 @@ export const MOCK_PHOTOCARDS: Photocard[] = [
   {
     id: '3',
     group: 'aespa',
-    member: 'Ningning',
+    members: ['Ningning'],
     category: 'Album',
     album: 'Girls',
     era: 'Real World',
@@ -51,7 +51,7 @@ export const MOCK_PHOTOCARDS: Photocard[] = [
   {
     id: '4',
     group: 'aespa',
-    member: 'Giselle',
+    members: ['Giselle'],
     category: 'Album',
     album: 'Drama',
     era: 'Sequence',

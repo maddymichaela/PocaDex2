@@ -28,7 +28,7 @@ function readCachedPhotocards(userId: string): Photocard[] | null {
     const cached = window.localStorage.getItem(collectionCacheKey(userId));
     if (!cached) return null;
     const parsed = JSON.parse(cached);
-    return Array.isArray(parsed) ? (parsed as Photocard[]) : null;
+    return Array.isArray(parsed) ? parsed.map(card => normalizePhotocardForSave(card as Photocard)) : null;
   } catch {
     return null;
   }

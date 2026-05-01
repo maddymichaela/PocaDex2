@@ -7,9 +7,10 @@ import { useState, useRef, FormEvent, ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Image as ImageIcon, Upload, Trash2, Save, Trash, Edit3, Copy } from 'lucide-react';
-import { Status, Photocard, Condition, PHOTOCARD_CATEGORIES, PhotocardCategory, getPhotocardCategory, normalizePhotocardForSave } from '../types';
+import { Status, Photocard, Condition, PHOTOCARD_CATEGORIES, PhotocardCategory, getPhotocardCategory, getPhotocardMembers, normalizePhotocardForSave } from '../types';
 import { useImageUpload } from '../hooks/useImageUpload';
 import ImageEditor from './ImageEditor';
+import MemberTagInput from './MemberTagInput';
 
 interface PhotocardFormProps {
   initialData?: Photocard | null;
@@ -23,7 +24,7 @@ interface PhotocardFormProps {
 
 export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose, title, subtitle, allowImageEditing = true }: PhotocardFormProps) {
   const [group, setGroup] = useState(initialData?.group || '');
-  const [member, setMember] = useState(initialData?.member || '');
+  const [members, setMembers] = useState<string[]>(initialData ? getPhotocardMembers(initialData) : []);
   const [category, setCategory] = useState<PhotocardCategory>(initialData ? getPhotocardCategory(initialData) : 'Album');
   const [source, setSource] = useState(initialData?.source || '');
   const [album, setAlbum] = useState(initialData?.album || '');
@@ -76,10 +77,11 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    if (members.length === 0) return;
     const newPC: Photocard = normalizePhotocardForSave({
       id: initialData?.id || Date.now().toString(),
       group,
-      member,
+      members,
       category,
       source,
       album,
@@ -264,12 +266,11 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
                   </div>
                   <div className="space-y-0">
                     <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Member *</label>
-                    <input
-                      required
-                      type="text"
-                      value={member}
-                      onChange={(e) => setMember(e.target.value)}
-                      className="w-full px-4 md:px-6 py-3 md:py-4 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-normal focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all placeholder:text-foreground/35"
+                    <MemberTagInput
+                      members={members}
+                      onChange={setMembers}
+                      className="px-4 md:px-6 py-2 md:py-3 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-normal focus-within:ring-4 focus-within:ring-primary/10 focus-within:bg-white focus-within:border-primary/20 transition-all"
+                      inputClassName="placeholder:text-foreground/35"
                       placeholder="Felix"
                     />
                   </div>

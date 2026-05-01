@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { normalizePhotocardForSave, normalizePhotocardUpdates, Photocard } from '../types';
+import { getPhotocardMembers, normalizePhotocardForSave, normalizePhotocardUpdates, Photocard } from '../types';
 
 // ── Row ↔ Photocard mappers ────────────────────────────────────────────────
 
@@ -7,7 +7,7 @@ function rowToPhotocard(row: Record<string, unknown>): Photocard {
   return {
     id: row.id as string,
     group: (row.group_name as string) ?? undefined,
-    member: row.member as string,
+    members: getPhotocardMembers({ members: row.members as string[] | undefined, member: row.member as string | undefined }),
     category: (row.category as Photocard['category']) ?? 'Album',
     source: (row.source as string) ?? undefined,
     album: row.album as string,
@@ -29,7 +29,7 @@ function photocardToRow(pc: Omit<Photocard, 'id' | 'createdAt'>, userId: string)
   return {
     user_id: userId,
     group_name: normalized.group ?? null,
-    member: normalized.member,
+    members: normalized.members,
     category: normalized.category ?? 'Album',
     source: normalized.source ?? null,
     album: normalized.album,
@@ -46,8 +46,11 @@ function photocardToRow(pc: Omit<Photocard, 'id' | 'createdAt'>, userId: string)
 }
 
 function withoutNewSchemaColumns(row: Record<string, unknown>) {
-  const { category: _category, source: _source, ...legacyRow } = row;
-  return legacyRow;
+  const { category: _category, source: _source, members: _members, ...legacyRow } = row;
+  return {
+    ...legacyRow,
+    member: Array.isArray(row.members) ? row.members.join(', ') : '',
+  };
 }
 
 function isMissingNewSchemaColumnError(error: unknown) {
@@ -55,7 +58,9 @@ function isMissingNewSchemaColumnError(error: unknown) {
   const message = String((error as { message: unknown }).message);
   return (
     message.includes("Could not find the 'category' column") ||
-    message.includes("Could not find the 'source' column")
+    message.includes("Could not find the 'source' column") ||
+    message.includes("Could not find the 'members' column") ||
+    message.includes('null value in column "member"')
   );
 }
 
@@ -170,7 +175,7 @@ export async function bulkUpdatePhotocards(
   const normalizedUpdates = normalizePhotocardUpdates(updates);
   const dbUpdates: Record<string, unknown> = {};
   if (normalizedUpdates.group !== undefined) dbUpdates.group_name = normalizedUpdates.group;
-  if (normalizedUpdates.member !== undefined) dbUpdates.member = normalizedUpdates.member;
+  if (normalizedUpdates.members !== undefined) dbUpdates.members = normalizedUpdates.members;
   if (normalizedUpdates.category !== undefined) dbUpdates.category = normalizedUpdates.category;
   if ('source' in normalizedUpdates) dbUpdates.source = normalizedUpdates.source ?? null;
   if (normalizedUpdates.album !== undefined) dbUpdates.album = normalizedUpdates.album;

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Photocard, PHOTOCARD_CATEGORIES } from '../types';
+import { getPhotocardMembers, normalizePhotocardForSave, Photocard, PHOTOCARD_CATEGORIES } from '../types';
 
 export const validatePhotocards = (data: any): data is Photocard[] => {
   if (!Array.isArray(data)) return false;
@@ -11,7 +11,7 @@ export const validatePhotocards = (data: any): data is Photocard[] => {
   return data.every(item => {
     return (
       typeof item.id === 'string' &&
-      typeof item.member === 'string' &&
+      getPhotocardMembers(item).length > 0 &&
       typeof item.album === 'string' &&
       typeof item.cardName === 'string' &&
       typeof item.version === 'string' &&
@@ -47,7 +47,7 @@ export const importCollection = (file: File): Promise<Photocard[]> => {
       try {
         const json = JSON.parse(e.target?.result as string);
         if (validatePhotocards(json)) {
-          resolve(json);
+          resolve(json.map((item: Photocard) => normalizePhotocardForSave(item)));
         } else {
           reject(new Error('Invalid backup file structure. Please ensure it is a valid Pocadex JSON.'));
         }

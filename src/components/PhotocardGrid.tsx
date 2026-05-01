@@ -6,7 +6,7 @@
 import { motion } from 'motion/react';
 import { Heart, Copy, Truck } from 'lucide-react';
 import { useEffect, useState, type CSSProperties } from 'react';
-import { getPhotocardCategory, Photocard } from '../types';
+import { formatPhotocardMembers, getPhotocardCategory, Photocard } from '../types';
 import { placeholderImage } from '../lib/assets';
 import { STATUS_COLORS } from '../lib/statusStyles';
 
@@ -38,6 +38,7 @@ export function PhotocardCard({
   const hasSource = !!photocard.source?.trim();
   const hasEra = !!photocard.era?.trim();
   const category = getPhotocardCategory(photocard);
+  const memberLabel = formatPhotocardMembers(photocard);
 
   useEffect(() => {
     setHasImageError(false);
@@ -128,7 +129,7 @@ export function PhotocardCard({
         {showPlaceholder && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <span className="text-center px-4 font-black italic text-primary/70 text-base drop-shadow-[0_1px_2px_rgba(255,255,255,0.8)]">
-              {photocard.member}
+              {memberLabel}
             </span>
           </div>
         )}
@@ -148,7 +149,7 @@ export function PhotocardCard({
             </span>
           )}
           <div className="flex justify-between items-start">
-            <h3 className="text-xl font-bold text-foreground leading-none truncate">{photocard.member}</h3>
+            <h3 className="min-w-0 truncate text-xl font-bold leading-none text-foreground">{memberLabel}</h3>
           </div>
         </div>
 
