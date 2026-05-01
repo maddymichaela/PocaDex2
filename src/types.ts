@@ -75,6 +75,28 @@ export function formatPhotocardMembers(photocard: LegacyPhotocardInput, maxNames
   return `${members[0]} + ${members.length - 1}`;
 }
 
+function normalizeIdentityPart(value: unknown) {
+  return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+export function getSharedPhotocardIdentity(photocard: LegacyPhotocardInput) {
+  return [
+    normalizeIdentityPart(photocard.group),
+    normalizeIdentityPart(formatPhotocardMembers(photocard)),
+    normalizeIdentityPart(getPhotocardCategory(photocard)),
+    normalizeIdentityPart(photocard.album),
+    normalizeIdentityPart(photocard.source),
+    normalizeIdentityPart(photocard.era),
+    normalizeIdentityPart(photocard.year),
+    normalizeIdentityPart(photocard.cardName),
+    normalizeIdentityPart(photocard.version),
+  ].join('|');
+}
+
+export function getPhotocardTemplateId(photocard: LegacyPhotocardInput) {
+  return photocard.cardTemplateId || getSharedPhotocardIdentity(photocard);
+}
+
 export function getMissingRequiredPhotocardFields(
   photocard: Pick<Photocard, 'members' | 'category' | 'status'> & Partial<Pick<Photocard, 'album' | 'source'>> & { member?: string }
 ): string[] {

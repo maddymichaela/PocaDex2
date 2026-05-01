@@ -28,12 +28,27 @@ type RouteState = { page: string; username?: string; socialTab?: 'people' | 'fol
 
 const collectionCacheKey = (userId: string) => `pocadex:collection:${userId}`;
 
+function dedupePhotocardsByTemplateId(cards: Photocard[]) {
+  const cardsByTemplateId = new Map<string, Photocard>();
+  const statusPriority: Record<Photocard['status'], number> = { owned: 3, on_the_way: 2, wishlist: 1 };
+
+  cards.forEach((card) => {
+    const templateId = getCardTemplateId(card);
+    const current = cardsByTemplateId.get(templateId);
+    if (!current || statusPriority[card.status] > statusPriority[current.status]) {
+      cardsByTemplateId.set(templateId, card);
+    }
+  });
+
+  return Array.from(cardsByTemplateId.values());
+}
+
 function readCachedPhotocards(userId: string): Photocard[] | null {
   try {
     const cached = window.localStorage.getItem(collectionCacheKey(userId));
     if (!cached) return null;
     const parsed = JSON.parse(cached);
-    return Array.isArray(parsed) ? parsed.map(card => normalizePhotocardForSave(card as Photocard)) : null;
+    return Array.isArray(parsed) ? dedupePhotocardsByTemplateId(parsed.map(card => normalizePhotocardForSave(card as Photocard))) : null;
   } catch {
     return null;
   }
@@ -126,7 +141,12 @@ export default function App() {
       setDataLoading(true);
     }
     fetchPhotocards(userId)
-      .then((cards) => { if (isCurrent) { setPhotocards(cards); writeCachedPhotocards(userId, cards); } })
+      .then((cards) => {
+        if (!isCurrent) return;
+        const dedupedCards = dedupePhotocardsByTemplateId(cards);
+        setPhotocards(dedupedCards);
+        writeCachedPhotocards(userId, dedupedCards);
+      })
       .catch(console.error)
       .finally(() => { if (isCurrent) setDataLoading(false); });
     return () => { isCurrent = false; };
@@ -140,11 +160,16 @@ export default function App() {
   const handleAddPhotocard = useCallback(async (newPC: Photocard) => {
     if (!user) return;
     const normalizedPC = normalizePhotocardForSave(newPC);
-    setPhotocards(prev => [normalizedPC, ...prev]);
+    const templateId = getCardTemplateId(normalizedPC);
+    setPhotocards(prev => prev.some((card) => getCardTemplateId(card) === templateId) ? prev : [normalizedPC, ...prev]);
     try {
       const saved = await insertPhotocard(user.id, normalizedPC);
-      const mergedSaved = normalizePhotocardForSave({ ...saved, ...normalizedPC });
-      setPhotocards(prev => prev.map(pc => pc.id === normalizedPC.id ? mergedSaved : pc));
+      const mergedSaved = normalizePhotocardForSave({ ...normalizedPC, ...saved });
+      const savedTemplateId = getCardTemplateId(mergedSaved);
+      setPhotocards(prev => [
+        mergedSaved,
+        ...prev.filter((pc) => pc.id !== normalizedPC.id && getCardTemplateId(pc) !== savedTemplateId),
+      ]);
     } catch (err) {
       console.error('Failed to add photocard:', err);
       setPhotocards(prev => prev.filter(pc => pc.id !== normalizedPC.id));
@@ -187,16 +212,16 @@ export default function App() {
 
   const handleScanImported = useCallback((savedCards: Photocard[]) => {
     setPhotocards(prev => {
-      const savedIds = new Set(savedCards.map(card => card.id));
-      return [...savedCards, ...prev.filter(card => !savedIds.has(card.id))];
+      const savedTemplateIds = new Set(savedCards.map(getCardTemplateId));
+      return dedupePhotocardsByTemplateId([...savedCards, ...prev.filter(card => !savedTemplateIds.has(getCardTemplateId(card)))]);
     });
   }, []);
 
   const handleImportPhotocards = useCallback((newData: Photocard[], mode: 'replace' | 'merge') => {
     setPhotocards(prev => {
-      if (mode === 'replace') return newData;
-      const existingIds = new Set(prev.map(card => card.id));
-      return [...newData.filter(card => !existingIds.has(card.id)), ...prev];
+      if (mode === 'replace') return dedupePhotocardsByTemplateId(newData);
+      const existingTemplateIds = new Set(prev.map(getCardTemplateId));
+      return dedupePhotocardsByTemplateId([...newData.filter(card => !existingTemplateIds.has(getCardTemplateId(card))), ...prev]);
     });
   }, []);
 

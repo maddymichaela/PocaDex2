@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { getPhotocardMembers, normalizePhotocardForSave, normalizePhotocardUpdates, Photocard } from '../types';
+import { getPhotocardMembers, getPhotocardTemplateId, normalizePhotocardForSave, normalizePhotocardUpdates, Photocard } from '../types';
 
 // ── Row ↔ Photocard mappers ────────────────────────────────────────────────
 
@@ -8,7 +8,7 @@ export function rowToPhotocard(row: Record<string, unknown>): Photocard {
   const ownerUserId = (row.user_id as string) ?? undefined;
   return {
     id,
-    cardTemplateId: (row.card_template_id as string) || id,
+    cardTemplateId: (row.card_template_id as string) || undefined,
     ownerUserId,
     group: (row.group_name as string) ?? undefined,
     members: getPhotocardMembers({ members: row.members as string[] | undefined, member: row.member as string | undefined }),
@@ -32,7 +32,7 @@ function photocardToRow(pc: Photocard, userId: string) {
   const normalized = normalizePhotocardForSave(pc);
   return {
     user_id: userId,
-    card_template_id: normalized.cardTemplateId || normalized.id,
+    card_template_id: getPhotocardTemplateId(normalized),
     group_name: normalized.group ?? null,
     members: normalized.members,
     category: normalized.category ?? 'Album',
@@ -67,6 +67,7 @@ function isMissingNewSchemaColumnError(error: unknown) {
     message.includes("Could not find the 'members' column") ||
     message.includes("Could not find the 'card_template_id' column") ||
     message.includes('column "card_template_id"') ||
+    message.includes('.card_template_id') ||
     message.includes('null value in column "member"')
   );
 }
@@ -105,8 +106,35 @@ export async function fetchPhotocards(userId: string): Promise<Photocard[]> {
   return (data ?? []).map(rowToPhotocard);
 }
 
+export async function findPhotocardByTemplateId(userId: string, templateId: string): Promise<Photocard | null> {
+  if (!templateId) return null;
+
+  const { data, error } = await supabase
+    .from('photocards')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('card_template_id', templateId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error && isMissingNewSchemaColumnError(error)) {
+    const cards = await fetchPhotocards(userId);
+    return cards.find((card) => getPhotocardTemplateId(card) === templateId) ?? null;
+  }
+  if (error) throw error;
+  if (data) return rowToPhotocard(data);
+
+  const cards = await fetchPhotocards(userId);
+  return cards.find((card) => getPhotocardTemplateId(card) === templateId) ?? null;
+}
+
 export async function insertPhotocard(userId: string, pc: Photocard): Promise<Photocard> {
-  let imageUrl = pc.imageUrl;
+  const normalized = normalizePhotocardForSave(pc);
+  const templateId = getPhotocardTemplateId(normalized);
+  const existing = await findPhotocardByTemplateId(userId, templateId);
+  if (existing) return existing;
+
+  let imageUrl = normalized.imageUrl;
   if (imageUrl?.startsWith('data:')) {
     try {
       imageUrl = await uploadPhotocardImage(userId, imageUrl);
@@ -114,7 +142,7 @@ export async function insertPhotocard(userId: string, pc: Photocard): Promise<Ph
       console.error('Failed to upload photocard image; saving inline image instead:', err);
     }
   }
-  const row = photocardToRow({ ...pc, imageUrl }, userId);
+  const row = photocardToRow({ ...normalized, cardTemplateId: templateId, imageUrl }, userId);
   const { data, error } = await supabase
     .from('photocards')
     .insert(row)

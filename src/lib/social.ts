@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { formatPhotocardMembers, Photocard, Profile } from '../types';
+import { getPhotocardTemplateId, Photocard, Profile } from '../types';
 import { rowToPhotocard } from './db';
 
 export interface SocialCounts {
@@ -131,10 +131,6 @@ function createSocialDataError(context: {
   return error;
 }
 
-function normalizeIdentityPart(value: unknown) {
-  return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
 function escapeLikePattern(value: string) {
   return value.replace(/[%_]/g, '\\$&');
 }
@@ -181,18 +177,11 @@ function createFallbackProfile(userId: string): Profile {
 }
 
 export function getCardIdentity(card: Photocard) {
-  return [
-    normalizeIdentityPart(card.group),
-    normalizeIdentityPart(formatPhotocardMembers(card)),
-    normalizeIdentityPart(card.era || card.album),
-    normalizeIdentityPart(card.source),
-    normalizeIdentityPart(card.version || card.cardName),
-    normalizeIdentityPart(card.imageUrl),
-  ].join('|');
+  return getPhotocardTemplateId(card);
 }
 
 export function getCardTemplateId(card: Photocard) {
-  return card.cardTemplateId || card.id || getCardIdentity(card);
+  return getPhotocardTemplateId(card);
 }
 
 export async function fetchPublicProfileByUsername(username: string): Promise<Profile | null> {

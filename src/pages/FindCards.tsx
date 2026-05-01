@@ -15,6 +15,8 @@ export default function FindCards({ ownPhotocards, onCopyCard }: FindCardsProps)
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [collectedTemplateIds, setCollectedTemplateIds] = useState<Set<string>>(() => new Set());
+  const [wishlistTemplateIds, setWishlistTemplateIds] = useState<Set<string>>(() => new Set());
 
   const runSearch = useCallback(async () => {
     const trimmed = query.trim();
@@ -44,8 +46,10 @@ export default function FindCards({ ownPhotocards, onCopyCard }: FindCardsProps)
     return () => window.clearTimeout(timeout);
   }, [query, runSearch]);
 
-  const ownedIdentitySet = new Set(ownPhotocards.filter((c) => c.status === 'owned').map(getCardTemplateId));
-  const wishlistIdentitySet = new Set(ownPhotocards.filter((c) => c.status === 'wishlist').map(getCardTemplateId));
+  useEffect(() => {
+    setCollectedTemplateIds(new Set(ownPhotocards.filter((c) => c.status === 'owned').map(getCardTemplateId)));
+    setWishlistTemplateIds(new Set(ownPhotocards.filter((c) => c.status === 'wishlist').map(getCardTemplateId)));
+  }, [ownPhotocards]);
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 pb-16">
@@ -87,8 +91,8 @@ export default function FindCards({ ownPhotocards, onCopyCard }: FindCardsProps)
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:max-lg:gap-4 xl:grid-cols-5 lg:gap-6">
           {results.map((result, index) => {
             const identity = getCardTemplateId(result.card);
-            const inCollection = ownedIdentitySet.has(identity);
-            const inWishlist = wishlistIdentitySet.has(identity);
+            const inCollection = collectedTemplateIds.has(identity);
+            const inWishlist = wishlistTemplateIds.has(identity);
             const alreadySaved = inCollection || inWishlist;
             return (
               <div key={result.identity} className="flex flex-col gap-2">
@@ -106,7 +110,19 @@ export default function FindCards({ ownPhotocards, onCopyCard }: FindCardsProps)
                     disabled={alreadySaved || busyId === `${result.identity}:owned`}
                     onClick={async () => {
                       setBusyId(`${result.identity}:owned`);
-                      try { await onCopyCard(result.card, 'owned'); } finally { setBusyId(null); }
+                      setCollectedTemplateIds((current) => new Set(current).add(identity));
+                      try {
+                        await onCopyCard(result.card, 'owned');
+                      } catch (err) {
+                        setCollectedTemplateIds((current) => {
+                          const next = new Set(current);
+                          next.delete(identity);
+                          return next;
+                        });
+                        setError(err instanceof Error ? err.message : 'Could not add card to your collection.');
+                      } finally {
+                        setBusyId(null);
+                      }
                     }}
                     className="flex h-10 items-center justify-center gap-1.5 rounded-2xl bg-primary px-2 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all disabled:bg-white disabled:text-primary disabled:ring-2 disabled:ring-primary/15"
                   >
@@ -118,12 +134,24 @@ export default function FindCards({ ownPhotocards, onCopyCard }: FindCardsProps)
                     disabled={alreadySaved || busyId === `${result.identity}:wishlist`}
                     onClick={async () => {
                       setBusyId(`${result.identity}:wishlist`);
-                      try { await onCopyCard(result.card, 'wishlist'); } finally { setBusyId(null); }
+                      setWishlistTemplateIds((current) => new Set(current).add(identity));
+                      try {
+                        await onCopyCard(result.card, 'wishlist');
+                      } catch (err) {
+                        setWishlistTemplateIds((current) => {
+                          const next = new Set(current);
+                          next.delete(identity);
+                          return next;
+                        });
+                        setError(err instanceof Error ? err.message : 'Could not add card to your wishlist.');
+                      } finally {
+                        setBusyId(null);
+                      }
                     }}
                     className="flex h-10 items-center justify-center gap-1.5 rounded-2xl bg-[var(--wishlist-red)] px-2 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all disabled:bg-white disabled:text-[var(--wishlist-red)] disabled:ring-2 disabled:ring-red-100"
                   >
                     <Heart size={13} className={inWishlist ? 'fill-current' : undefined} />
-                    {inWishlist ? 'Wishlisted' : inCollection ? 'In Collection' : 'Wishlist'}
+                    {inCollection ? 'In Collection' : inWishlist ? 'Wishlisted' : 'Wishlist'}
                   </button>
                 </div>
               </div>

@@ -64,8 +64,8 @@ export default function PublicProfile({
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ProfileTab>('collection');
   const [followBusy, setFollowBusy] = useState(false);
-  const [copiedOwnedIdentities, setCopiedOwnedIdentities] = useState<Set<string>>(() => new Set());
-  const [copiedWishlistIdentities, setCopiedWishlistIdentities] = useState<Set<string>>(() => new Set());
+  const [collectedTemplateIds, setCollectedTemplateIds] = useState<Set<string>>(() => new Set());
+  const [wishlistTemplateIds, setWishlistTemplateIds] = useState<Set<string>>(() => new Set());
 
   const isOwnProfileRoute = ownProfile?.username?.toLowerCase() === username.toLowerCase();
 
@@ -120,8 +120,8 @@ export default function PublicProfile({
   }, [bundle?.profile, onProfileResolved]);
 
   useEffect(() => {
-    setCopiedOwnedIdentities(new Set(ownPhotocards.filter((card) => card.status === 'owned').map(getCardTemplateId)));
-    setCopiedWishlistIdentities(new Set(ownPhotocards.filter((card) => card.status === 'wishlist').map(getCardTemplateId)));
+    setCollectedTemplateIds(new Set(ownPhotocards.filter((card) => card.status === 'owned').map(getCardTemplateId)));
+    setWishlistTemplateIds(new Set(ownPhotocards.filter((card) => card.status === 'wishlist').map(getCardTemplateId)));
   }, [ownPhotocards]);
 
   const cards = bundle?.cards ?? [];
@@ -201,8 +201,8 @@ export default function PublicProfile({
       <div className="grid grid-cols-2 items-stretch gap-3 md:grid-cols-4 md:max-lg:gap-4 xl:grid-cols-5 lg:gap-6">
         {nextCards.map((card, index) => {
           const identity = getCardTemplateId(card);
-          const inCollection = copiedOwnedIdentities.has(identity);
-          const inWishlist = copiedWishlistIdentities.has(identity);
+          const inCollection = collectedTemplateIds.has(identity);
+          const inWishlist = wishlistTemplateIds.has(identity);
           const alreadySaved = inCollection || inWishlist;
           const collecting = copyingCardId === `${identity}:owned`;
           const wishlisting = copyingCardId === `${identity}:wishlist`;
@@ -218,11 +218,11 @@ export default function PublicProfile({
                       event.preventDefault();
                       event.stopPropagation();
                       setCopyingCardId(`${identity}:owned`);
-                      setCopiedOwnedIdentities((current) => new Set(current).add(identity));
+                      setCollectedTemplateIds((current) => new Set(current).add(identity));
                       try {
                         await onCopyCard(card, 'owned');
                       } catch (err) {
-                        setCopiedOwnedIdentities((current) => {
+                        setCollectedTemplateIds((current) => {
                           const next = new Set(current);
                           next.delete(identity);
                           return next;
@@ -244,11 +244,11 @@ export default function PublicProfile({
                       event.preventDefault();
                       event.stopPropagation();
                       setCopyingCardId(`${identity}:wishlist`);
-                      setCopiedWishlistIdentities((current) => new Set(current).add(identity));
+                      setWishlistTemplateIds((current) => new Set(current).add(identity));
                       try {
                         await onCopyCard(card, 'wishlist');
                       } catch (err) {
-                        setCopiedWishlistIdentities((current) => {
+                        setWishlistTemplateIds((current) => {
                           const next = new Set(current);
                           next.delete(identity);
                           return next;
@@ -261,7 +261,7 @@ export default function PublicProfile({
                     className="flex h-10 items-center justify-center gap-1.5 rounded-2xl bg-[var(--wishlist-red)] px-2 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all disabled:bg-white disabled:text-[var(--wishlist-red)] disabled:ring-2 disabled:ring-red-100"
                   >
                     <Heart size={13} className={inWishlist ? 'fill-current' : undefined} />
-                    {wishlisting ? 'Adding...' : inWishlist ? 'Wishlisted' : inCollection ? 'In Collection' : 'Wishlist'}
+                    {wishlisting ? 'Adding...' : inCollection ? 'In Collection' : inWishlist ? 'Wishlisted' : 'Wishlist'}
                   </button>
                 </div>
               )}

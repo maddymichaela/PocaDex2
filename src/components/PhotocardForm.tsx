@@ -7,7 +7,7 @@ import { useState, useRef, FormEvent, ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Image as ImageIcon, Upload, Trash2, Save, Trash, Edit3, Copy } from 'lucide-react';
-import { Status, Photocard, Condition, PHOTOCARD_CATEGORIES, PhotocardCategory, getPhotocardCategory, getPhotocardMembers, normalizePhotocardForSave } from '../types';
+import { Status, Photocard, Condition, PHOTOCARD_CATEGORIES, PhotocardCategory, getPhotocardCategory, getPhotocardMembers, getPhotocardTemplateId, normalizePhotocardForSave } from '../types';
 import { useImageUpload } from '../hooks/useImageUpload';
 import ImageEditor from './ImageEditor';
 import MemberTagInput from './MemberTagInput';
@@ -80,7 +80,7 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
     if (members.length === 0) return;
     const newPC: Photocard = normalizePhotocardForSave({
       id: initialData?.id || Date.now().toString(),
-      cardTemplateId: initialData?.cardTemplateId || initialData?.id,
+      cardTemplateId: initialData ? getPhotocardTemplateId(initialData) : undefined,
       ownerUserId: initialData?.ownerUserId,
       group,
       members,

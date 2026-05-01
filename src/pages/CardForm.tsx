@@ -1,7 +1,7 @@
 import { useState, useRef, FormEvent, ChangeEvent } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { ChevronLeft, Image as ImageIcon, Save, Upload, Trash2, Edit3 } from 'lucide-react';
-import { Status, Photocard, Condition, PHOTOCARD_CATEGORIES, PhotocardCategory, getPhotocardCategory, getPhotocardMembers, normalizePhotocardForSave } from '../types';
+import { Status, Photocard, Condition, PHOTOCARD_CATEGORIES, PhotocardCategory, getPhotocardCategory, getPhotocardMembers, getPhotocardTemplateId, normalizePhotocardForSave } from '../types';
 import { useImageUpload } from '../hooks/useImageUpload';
 import ImageEditor from '../components/ImageEditor';
 import MemberTagInput from '../components/MemberTagInput';
@@ -60,7 +60,7 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
     if (members.length === 0) return;
     onSubmit(normalizePhotocardForSave({
       id: initialData?.id || Date.now().toString(),
-      cardTemplateId: initialData?.cardTemplateId || initialData?.id,
+      cardTemplateId: initialData ? getPhotocardTemplateId(initialData) : undefined,
       ownerUserId: initialData?.ownerUserId,
       group,
       members,
