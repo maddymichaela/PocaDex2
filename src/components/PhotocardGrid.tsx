@@ -8,6 +8,7 @@ import { Heart, Copy, Truck } from 'lucide-react';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Photocard } from '../types';
 import { placeholderImage } from '../lib/assets';
+import { STATUS_COLORS } from '../lib/statusStyles';
 
 interface PhotocardCardProps {
   photocard: Photocard;
@@ -50,7 +51,7 @@ export function PhotocardCard({
     }
   };
 
-  const conditionLabel = getConditionLabel(photocard.condition);
+  const conditionLabel = photocard.status === 'owned' ? getConditionLabel(photocard.condition) : null;
 
   return (
     <motion.div
@@ -84,17 +85,17 @@ export function PhotocardCard({
       {/* Status Badges Overlay */}
       <div className="absolute top-3 right-3 z-10 flex flex-col gap-2">
         {isWishlist && (
-          <div className="bg-red-400 text-white p-2 rounded-full shadow-xl scale-90 md:scale-100">
+          <div className={`${STATUS_COLORS.wishlist.bgClass} text-white p-2 rounded-full shadow-xl scale-90 md:scale-100`}>
             <Heart size={14} className="fill-current" />
           </div>
         )}
         {isOnTheWay && (
-          <div className="bg-amber-400 text-white p-2 rounded-full shadow-xl scale-90 md:scale-100">
+          <div className={`${STATUS_COLORS.onTheWay.bgClass} text-white p-2 rounded-full shadow-xl scale-90 md:scale-100`}>
             <Truck size={14} />
           </div>
         )}
         {isDuplicate && (
-          <div className="bg-purple-400 text-white p-2 rounded-full shadow-xl scale-90 md:scale-100">
+          <div className={`${STATUS_COLORS.duplicates.bgClass} text-white p-2 rounded-full shadow-xl scale-90 md:scale-100`}>
             <Copy size={14} />
           </div>
         )}

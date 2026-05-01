@@ -30,6 +30,7 @@
   --foreground: hsl(280, 40%, 15%);
   --accent-green: hsl(150, 40%, 60%);
   --accent-blue: hsl(200, 50%, 75%);
+  --wishlist-red: #f87171;
   --radius: 20px;
 }
 

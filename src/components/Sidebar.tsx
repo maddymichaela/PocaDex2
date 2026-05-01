@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { STATUS_COLORS } from '../lib/statusStyles';
+
 
 interface StatCardProps {
   label: string;
@@ -35,22 +37,23 @@ export function Sidebar({ stats }: { stats: any }) {
       <StatCard
         label="Owned"
         value={stats.totalCollected.toLocaleString()}
-        highlightColor="var(--accent-green)"
+        highlightColor={STATUS_COLORS.owned.css}
       />
       <StatCard
         label="On The Way"
         value={stats.onTheWay.toLocaleString()}
-        highlightColor="var(--accent-blue)"
+        highlightColor={STATUS_COLORS.onTheWay.css}
       />
       <StatCard
         label="Wishlist"
         value={stats.wishlistGoals}
+        highlightColor={STATUS_COLORS.wishlist.css}
         isWishlist
       />
       <StatCard
         label="Duplicates"
         value={stats.duplicates || 0}
-        highlightColor="var(--secondary)"
+        highlightColor={STATUS_COLORS.duplicates.css}
       />
       {/* <StatCard 
         label="Est. Value" 

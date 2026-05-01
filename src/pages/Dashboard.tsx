@@ -8,6 +8,7 @@ import { Photocard } from '../types';
 import { PhotocardGrid } from '../components/PhotocardGrid';
 import { Sidebar } from '../components/Sidebar';
 import BackupControls from '../components/BackupControls';
+import { STATUS_COLORS } from '../lib/statusStyles';
 
 interface DashboardProps {
   photocards: Photocard[];
@@ -22,17 +23,17 @@ export default function Dashboard({ photocards, onEdit, onDelete, onImport }: Da
     [photocards]
   );
 
-  const totalCards = photocards.length;
   const ownedCount = photocards.filter(p => p.status === 'owned').length;
   const onTheWayCount = photocards.filter(p => p.status === 'on_the_way').length;
   const wishlistCount = photocards.filter(p => p.status === 'wishlist').length;
   const duplicateCount = photocards.filter(p => p.isDuplicate).length;
+  const totalCards = ownedCount + onTheWayCount + wishlistCount;
   const hasCards = totalCards > 0;
 
   const progressSegments = [
-    { key: 'owned', label: 'Owned', count: ownedCount, colorClass: 'bg-primary' },
-    { key: 'on-the-way', label: 'On the Way', count: onTheWayCount, colorClass: 'bg-secondary' },
-    { key: 'wishlist', label: 'Wishlist', count: wishlistCount, colorClass: 'bg-foreground/25' },
+    { key: 'owned', label: 'Owned', count: ownedCount, colorClass: STATUS_COLORS.owned.bgClass },
+    { key: 'on-the-way', label: 'On the Way', count: onTheWayCount, colorClass: STATUS_COLORS.onTheWay.bgClass },
+    { key: 'wishlist', label: 'Wishlist', count: wishlistCount, colorClass: STATUS_COLORS.wishlist.bgClass },
   ].map(segment => ({
     ...segment,
     percentage: totalCards > 0 ? (segment.count / totalCards) * 100 : 0,
@@ -127,17 +128,21 @@ export default function Dashboard({ photocards, onEdit, onDelete, onImport }: Da
                   {visibleProgressSegments.map(segment => (
                     <div
                       key={segment.key}
-                      className={`${segment.colorClass} h-full min-w-3 transition-all duration-1000`}
-                      style={{ flexBasis: `${segment.percentage}%` }}
+                      className={`${segment.colorClass} h-full shrink-0 transition-all duration-1000`}
+                      style={{ flex: `0 0 ${segment.percentage}%` }}
                       title={`${segment.label}: ${segment.count.toLocaleString()} (${formatPercentage(segment.percentage)})`}
                     />
                   ))}
                 </div>
                 {duplicateCount > 0 && (
                   <div
-                    className="absolute bottom-1 left-1 h-1 rounded-full bg-foreground/25"
-                    style={{ width: `${duplicatePercentage}%`, maxWidth: 'calc(100% - 0.5rem)' }}
-                    title={`Duplicates: ${duplicateCount.toLocaleString()} (${formatPercentage(duplicatePercentage)})`}
+                    className="absolute inset-y-1 right-1 rounded-r-full border-l border-white/60 opacity-70"
+                    style={{
+                      width: `min(${duplicatePercentage}%, calc(100% - 0.5rem))`,
+                      backgroundColor: STATUS_COLORS.duplicates.css,
+                      backgroundImage: 'repeating-linear-gradient(135deg, rgba(40, 23, 54, 0.18) 0 4px, rgba(255, 255, 255, 0.22) 4px 8px)',
+                    }}
+                    title={`Duplicates: ${duplicateCount.toLocaleString()}`}
                   />
                 )}
               </div>
@@ -157,15 +162,10 @@ export default function Dashboard({ photocards, onEdit, onDelete, onImport }: Da
                   </div>
                 ))}
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="h-3 w-3 rounded-full bg-foreground/25 ring-2 ring-white shrink-0" />
+                  <span className={`h-3 w-3 rounded-full ${STATUS_COLORS.duplicates.bgClass} ring-2 ring-white shrink-0`} />
                   <span className="min-w-0 truncate text-[10px] font-black uppercase tracking-widest text-foreground/45">
                     Duplicates ({duplicateCount.toLocaleString()})
                   </span>
-                  {duplicateCount > 0 && (
-                    <span className="ml-auto shrink-0 text-[10px] font-black text-foreground/35">
-                      {formatPercentage(duplicatePercentage)}
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
