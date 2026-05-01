@@ -15,6 +15,7 @@ interface PublicProfileProps {
   onEditProfile: () => void;
   onOpenCard?: (card: Photocard) => void;
   onCopyCard?: (card: Photocard, status: 'owned' | 'wishlist') => Promise<void>;
+  onProfileResolved?: (profile: Profile | null) => void;
 }
 
 function PrivateState({ label }: { label: string }) {
@@ -39,6 +40,15 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
+function CardErrorState({ message }: { message: string }) {
+  return (
+    <div className="flex min-h-[260px] flex-col items-center justify-center rounded-[36px] border-2 border-red-100 bg-red-50 px-6 py-16 text-center shadow-sm">
+      <p className="text-sm font-black uppercase tracking-widest text-red-500">Could not load cards</p>
+      <p className="mt-2 max-w-md text-sm font-medium text-red-500/70">{message}</p>
+    </div>
+  );
+}
+
 export default function PublicProfile({
   username,
   currentUserId,
@@ -47,6 +57,7 @@ export default function PublicProfile({
   onEditProfile,
   onOpenCard,
   onCopyCard,
+  onProfileResolved,
 }: PublicProfileProps) {
   const [bundle, setBundle] = useState<PublicProfileBundle | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,22 +67,22 @@ export default function PublicProfile({
   const [copiedOwnedIdentities, setCopiedOwnedIdentities] = useState<Set<string>>(() => new Set());
   const [copiedWishlistIdentities, setCopiedWishlistIdentities] = useState<Set<string>>(() => new Set());
 
-  const isOwnProfile = ownProfile?.username?.toLowerCase() === username.toLowerCase();
+  const isOwnProfileRoute = ownProfile?.username?.toLowerCase() === username.toLowerCase();
 
   useEffect(() => {
     let isCurrent = true;
     setLoading(true);
     setError(null);
 
-    if (isOwnProfile && ownProfile) {
+    if (isOwnProfileRoute && ownProfile) {
       setBundle({
         profile: ownProfile,
         counts: { followers: 0, following: 0, isFollowing: false },
         cards: ownPhotocards,
       });
-    fetchPublicProfileBundle(username, currentUserId)
+      fetchPublicProfileBundle(username, currentUserId)
         .then((nextBundle) => {
-          if (isCurrent && nextBundle) setBundle({ ...nextBundle, cards: ownPhotocards });
+          if (isCurrent && nextBundle) setBundle({ ...nextBundle, cards: ownPhotocards, cardsError: null });
         })
         .catch(() => {
           if (isCurrent) setBundle((current) => current);
@@ -97,12 +108,16 @@ export default function PublicProfile({
     return () => {
       isCurrent = false;
     };
-  }, [currentUserId, isOwnProfile, ownProfile, username]);
+  }, [currentUserId, isOwnProfileRoute, ownPhotocards, ownProfile, username]);
 
   useEffect(() => {
-    if (!isOwnProfile || !ownProfile) return;
+    if (!isOwnProfileRoute || !ownProfile) return;
     setBundle((current) => current ? { ...current, profile: ownProfile, cards: ownPhotocards } : current);
-  }, [isOwnProfile, ownPhotocards, ownProfile]);
+  }, [isOwnProfileRoute, ownPhotocards, ownProfile]);
+
+  useEffect(() => {
+    onProfileResolved?.(bundle?.profile ?? null);
+  }, [bundle?.profile, onProfileResolved]);
 
   useEffect(() => {
     setCopiedOwnedIdentities(new Set(ownPhotocards.filter((card) => card.status === 'owned').map(getCardTemplateId)));
@@ -116,7 +131,7 @@ export default function PublicProfile({
   const [copyingCardId, setCopyingCardId] = useState<string | null>(null);
 
   const handleFollowToggle = async () => {
-    if (!bundle || isOwnProfile) return;
+    if (!bundle) return;
     if (!currentUserId) {
       setError('Sign in to follow collectors.');
       return;
@@ -170,6 +185,7 @@ export default function PublicProfile({
 
   const { profile, counts } = bundle;
   const isViewingSelf = currentUserId === getProfileUserId(profile);
+  const cardLoadError = bundle.cardsError ?? null;
   const displayName = getProfileDisplayName(profile);
   const showBio = profile.is_bio_public !== false && Boolean(profile.bio);
   const tabs: { id: ProfileTab; label: string }[] = [
@@ -179,7 +195,7 @@ export default function PublicProfile({
   ];
 
   const renderSharedGrid = (nextCards: Photocard[]) => {
-    if (isOwnProfile) return <PhotocardGrid photocards={nextCards} onCardClick={onOpenCard} />;
+    if (isViewingSelf) return <PhotocardGrid photocards={nextCards} onCardClick={onOpenCard} />;
 
     return (
       <div className="grid grid-cols-2 items-stretch gap-3 md:grid-cols-4 md:max-lg:gap-4 xl:grid-cols-5 lg:gap-6">
@@ -287,7 +303,7 @@ export default function PublicProfile({
           </div>
 
           <div className="flex flex-col gap-3 md:items-end">
-            {isOwnProfile || isViewingSelf ? (
+            {isViewingSelf ? (
               <button
                 type="button"
                 onClick={onEditProfile}
@@ -350,14 +366,18 @@ export default function PublicProfile({
       <AnimatePresence mode="wait">
         <motion.div key={activeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
           {activeTab === 'collection' && (
-            profile.is_collection_public === false && !isOwnProfile
+            cardLoadError
+              ? <CardErrorState message={cardLoadError} />
+              : profile.is_collection_public === false && !isViewingSelf
               ? <PrivateState label="collection" />
               : ownedCards.length > 0
                 ? renderSharedGrid(ownedCards)
                 : <EmptyState label="collection cards" />
           )}
           {activeTab === 'wishlist' && (
-            profile.is_wishlist_public === false && !isOwnProfile
+            cardLoadError
+              ? <CardErrorState message={cardLoadError} />
+              : profile.is_wishlist_public === false && !isViewingSelf
               ? <PrivateState label="wishlist" />
               : wishlistCards.length > 0
                 ? renderSharedGrid(wishlistCards)

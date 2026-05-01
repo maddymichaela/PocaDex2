@@ -12,7 +12,7 @@ import AccountSettings from './pages/AccountSettings';
 import PublicProfile from './pages/PublicProfile';
 import Social from './pages/Social';
 import FindCards from './pages/FindCards';
-import { normalizePhotocardForSave, normalizePhotocardUpdates, Photocard } from './types';
+import { normalizePhotocardForSave, normalizePhotocardUpdates, Photocard, Profile } from './types';
 import { useAuth } from './contexts/AuthContext';
 import {
   fetchPhotocards,
@@ -79,6 +79,7 @@ export default function App() {
   const [formCard, setFormCard] = useState<Photocard | null>(null);
   const [photocards, setPhotocards] = useState<Photocard[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
+  const [viewedProfile, setViewedProfile] = useState<Profile | null>(null);
 
   const handleAddCard = useCallback(() => {
     setFormCard(null);
@@ -89,6 +90,7 @@ export default function App() {
     setCurrentPage(page);
     setRouteUsername(username ?? '');
     if (page === 'Friends') setSocialTab('people');
+    if (page !== 'Profile') setViewedProfile(null);
     setSelectedId(null);
     setIsFormOpen(false);
     window.history.pushState({}, '', routeForPage(page, username));
@@ -100,6 +102,7 @@ export default function App() {
       setCurrentPage(nextRoute.page);
       setRouteUsername(nextRoute.username ?? '');
       setSocialTab(nextRoute.socialTab ?? 'people');
+      setViewedProfile(null);
       setSelectedId(null);
       setIsFormOpen(false);
     };
@@ -257,6 +260,12 @@ export default function App() {
   // Compute card detail state
   const currentCard = selectedId ? (photocards.find(p => p.id === selectedId) ?? null) : null;
   const currentCardIndex = currentCard ? photocards.findIndex(p => p.id === selectedId) : -1;
+  const isViewingOwnProfile = currentPage === 'Profile'
+    && (
+      viewedProfile?.id === user.id ||
+      (!viewedProfile && Boolean(profile?.username) && routeUsername.toLowerCase() === profile.username.toLowerCase())
+    );
+  const navbarCurrentPage = currentPage === 'Profile' && !isViewingOwnProfile ? 'Friends' : currentPage;
 
   const renderPage = () => {
     switch (currentPage) {
@@ -283,6 +292,7 @@ export default function App() {
             onEditProfile={() => navigateToPage('Account')}
             onOpenCard={(pc) => setSelectedId(pc.id)}
             onCopyCard={handleCopyPublicCard}
+            onProfileResolved={setViewedProfile}
           />
         );
       case 'FindCards':
@@ -339,7 +349,7 @@ export default function App() {
         <div className="absolute bottom-[-5rem] left-[-2rem] h-56 w-56 rounded-full bg-white/60 blur-3xl" />
       </div>
       <Navbar
-        currentPage={currentPage}
+        currentPage={navbarCurrentPage}
         onPageChange={(page) => navigateToPage(page, page === 'Profile' ? profile?.username : undefined)}
         profile={profile}
         onSignOut={signOut}

@@ -15,6 +15,7 @@ export interface PublicProfileBundle {
   profile: Profile;
   counts: FollowState;
   cards: Photocard[];
+  cardsError?: string | null;
 }
 
 export interface FollowUser extends Profile {
@@ -141,7 +142,12 @@ function escapeLikePattern(value: string) {
 function isMissingColumnError(error: unknown, columns: string[]) {
   if (!error || typeof error !== 'object' || !('message' in error)) return false;
   const message = String((error as { message: unknown }).message);
-  return columns.some((column) => message.includes(`'${column}' column`) || message.includes(`column "${column}"`));
+  return columns.some((column) => (
+    message.includes(`'${column}' column`) ||
+    message.includes(`column "${column}"`) ||
+    message.includes(`.${column}`) ||
+    message.includes(` ${column} `)
+  ));
 }
 
 function withPublicProfileDefaults(profile: Partial<Profile>): Profile {
@@ -238,27 +244,33 @@ export async function fetchPublicProfileBundle(username: string, viewerId?: stri
   if (!profile) return null;
   const profileUserId = getProfileUserId(profile);
 
-  const [counts, cards] = await Promise.all([
+  const [counts, cardsResult] = await Promise.all([
     fetchSocialCounts(profileUserId, viewerId).catch((error) => {
       console.warn('Could not load social counts:', error);
       return { followers: 0, following: 0, isFollowing: false };
     }),
-    fetchPublicPhotocards(profile, viewerId).catch((error) => {
-      console.warn('Could not load public photocards:', error);
-      return [];
-    }),
+    fetchPublicPhotocards(profile, viewerId)
+      .then((cards) => ({ cards, cardsError: null }))
+      .catch((error) => {
+        console.warn('Could not load public photocards:', error);
+        return {
+          cards: [],
+          cardsError: error instanceof Error ? error.message : 'Could not load photocards.',
+        };
+      }),
   ]);
 
-  return { profile, counts, cards };
+  return { profile, counts, cards: cardsResult.cards, cardsError: cardsResult.cardsError };
 }
 
 async function fetchPublicPhotocards(profile: Profile, viewerId?: string | null): Promise<Photocard[]> {
+  const profileUserId = getProfileUserId(profile);
+  const filterDescription = { table: 'photocards', column: 'user_id', value: profileUserId };
   const applyVisibility = <T extends {
     eq: (column: string, value: unknown) => T;
     neq: (column: string, value: unknown) => T;
     limit: (count: number) => T;
   }>(request: T): T => {
-    const profileUserId = getProfileUserId(profile);
     if (viewerId === profileUserId) return request;
 
     const canViewCollection = profile.is_collection_public !== false;
@@ -276,6 +288,13 @@ async function fetchPublicPhotocards(profile: Profile, viewerId?: string | null)
     .order('created_at', { ascending: false }));
 
   const { data, error } = await request;
+  logSocialQuery('public photocard query', {
+    profileId: profileUserId,
+    currentUserId: viewerId ?? null,
+    filter: filterDescription,
+    returnedCount: data?.length ?? 0,
+    error: error ? getSupabaseErrorDetails(error) : null,
+  });
   if (error && isMissingColumnError(error, ['members', 'category', 'source', 'card_template_id'])) {
     const legacyRequest = applyVisibility(supabase
       .from('photocards')
@@ -284,6 +303,13 @@ async function fetchPublicPhotocards(profile: Profile, viewerId?: string | null)
       .order('created_at', { ascending: false }));
     const { data: legacyData, error: legacyError } = await legacyRequest;
     if (legacyError) throw legacyError;
+    logSocialQuery('public photocard legacy query', {
+      profileId: profileUserId,
+      currentUserId: viewerId ?? null,
+      filter: filterDescription,
+      returnedCount: legacyData?.length ?? 0,
+      error: null,
+    });
     return ((legacyData ?? []) as unknown as Record<string, unknown>[]).map(rowToPhotocard);
   }
   if (error) throw error;
