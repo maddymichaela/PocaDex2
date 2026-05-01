@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Image as ImageIcon, Edit3, Copy, Heart, Truck } from 'lucide-react';
-import { Photocard } from '../types';
+import { getPhotocardCategory, Photocard } from '../types';
 import { placeholderImage } from '../lib/assets';
 
 interface CardDetailProps {
@@ -13,6 +13,8 @@ interface CardDetailProps {
 }
 
 export default function CardDetail({ photocard, onBack, onEdit, hasPrev, hasNext, onPrev, onNext }: CardDetailProps) {
+  const category = getPhotocardCategory(photocard);
+
   return (
     <div className="bg-gray-50/30">
       {/* Header */}
@@ -121,13 +123,23 @@ export default function CardDetail({ photocard, onBack, onEdit, hasPrev, hasNext
             </div>
 
             {/* Details card — only renders fields that have values */}
-            {(photocard.album || photocard.era || photocard.version || photocard.cardName) && (
+            {(category || photocard.source || photocard.album || photocard.era || photocard.version || photocard.cardName) && (
               <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-6">
-                  {photocard.album && (
+                  <div>
+                    <div className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40">Category</div>
+                    <p className="text-base font-medium text-foreground/85">{category}</p>
+                  </div>
+                  {category === 'Album' && photocard.album && (
                     <div>
                       <div className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40">Album</div>
                       <p className="text-base font-medium text-foreground/85">{photocard.album}</p>
+                    </div>
+                  )}
+                  {category !== 'Album' && photocard.source && (
+                    <div>
+                      <div className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40">Source</div>
+                      <p className="text-base font-medium text-foreground/85">{photocard.source}</p>
                     </div>
                   )}
                   {photocard.era && (

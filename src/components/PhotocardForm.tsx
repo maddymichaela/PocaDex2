@@ -7,7 +7,7 @@ import { useState, useRef, FormEvent, ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Image as ImageIcon, Upload, Trash2, Save, Trash, Edit3, Copy } from 'lucide-react';
-import { Status, Photocard, Condition } from '../types';
+import { Status, Photocard, Condition, PHOTOCARD_CATEGORIES, PhotocardCategory, getPhotocardCategory, normalizePhotocardForSave } from '../types';
 import { useImageUpload } from '../hooks/useImageUpload';
 import ImageEditor from './ImageEditor';
 
@@ -21,6 +21,8 @@ interface PhotocardFormProps {
 export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose }: PhotocardFormProps) {
   const [group, setGroup] = useState(initialData?.group || '');
   const [member, setMember] = useState(initialData?.member || '');
+  const [category, setCategory] = useState<PhotocardCategory>(initialData ? getPhotocardCategory(initialData) : 'Album');
+  const [source, setSource] = useState(initialData?.source || '');
   const [album, setAlbum] = useState(initialData?.album || '');
   const [era, setEra] = useState(initialData?.era || '');
   const [year, setYear] = useState<number>(Number(initialData?.year) || new Date().getFullYear());
@@ -71,10 +73,12 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    const newPC: Photocard = {
+    const newPC: Photocard = normalizePhotocardForSave({
       id: initialData?.id || Date.now().toString(),
       group,
       member,
+      category,
+      source,
       album,
       era,
       year: Number(year),
@@ -86,7 +90,7 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
       notes,
       imageUrl: previewUrl || undefined,
       createdAt: initialData?.createdAt || Date.now(),
-    };
+    });
     onSubmit(newPC);
     onClose();
   };
@@ -267,8 +271,20 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                   <div className="space-y-0">
-                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Album</label>
+                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Category *</label>
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value as PhotocardCategory)}
+                      className="w-full px-4 md:px-6 py-3 md:py-4 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-normal focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all"
+                    >
+                      {PHOTOCARD_CATEGORIES.map(option => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </div>
+                  {category === 'Album' ? (
+                  <div className="space-y-0">
+                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Album *</label>
                     <input
+                      required
                       type="text"
                       value={album}
                       onChange={(e) => setAlbum(e.target.value)}
@@ -276,6 +292,19 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
                       placeholder="DO IT"
                     />
                   </div>
+                  ) : (
+                  <div className="space-y-0">
+                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Source *</label>
+                    <input
+                      required
+                      type="text"
+                      value={source}
+                      onChange={(e) => setSource(e.target.value)}
+                      className="w-full px-4 md:px-6 py-3 md:py-4 bg-gray-50/50 border-gray-100 border-2 rounded-xl md:rounded-[24px] text-xs md:text-sm font-normal focus:ring-4 focus:ring-primary/10 focus:bg-white focus:border-primary/20 outline-none transition-all placeholder:text-foreground/35"
+                      placeholder="Soundwave"
+                    />
+                  </div>
+                  )}
                   <div className="space-y-0">
                     <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40 ml-1">Era</label>
                     <input

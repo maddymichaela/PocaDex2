@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 import { Save, Layers } from 'lucide-react';
-import { Status, Photocard, Condition } from '../types';
+import { Status, Photocard, Condition, PHOTOCARD_CATEGORIES, PhotocardCategory, normalizePhotocardUpdates } from '../types';
 import ModalShell from './ModalShell';
 
 interface BulkEditFormProps {
@@ -17,6 +17,8 @@ interface BulkEditFormProps {
 export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEditFormProps) {
   const [group, setGroup] = useState('');
   const [member, setMember] = useState('');
+  const [category, setCategory] = useState<PhotocardCategory>('Album');
+  const [source, setSource] = useState('');
   const [album, setAlbum] = useState('');
   const [era, setEra] = useState('');
   const [version, setVersion] = useState('');
@@ -43,6 +45,8 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
     const updates: Partial<Photocard> = {};
     if (activeFields.has('group')) updates.group = group;
     if (activeFields.has('member')) updates.member = member;
+    if (activeFields.has('category')) updates.category = category;
+    if (activeFields.has('source')) updates.source = source;
     if (activeFields.has('album')) updates.album = album;
     if (activeFields.has('era')) updates.era = era;
     if (activeFields.has('version')) updates.version = version;
@@ -53,7 +57,7 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
     if (activeFields.has('isDuplicate')) updates.isDuplicate = isDuplicate;
     if (activeFields.has('notes')) updates.notes = notes;
 
-    onSave(updates);
+    onSave(normalizePhotocardUpdates(updates));
   };
 
   const fieldClass = (field: string) => `
@@ -143,6 +147,35 @@ export default function BulkEditForm({ selectedCount, onSave, onClose }: BulkEdi
                 type="text"
                 placeholder="DO IT"
                 onChange={(e) => setAlbum(e.target.value)}
+                className="bg-transparent text-sm font-bold outline-none border-b border-black/5 pb-1 disabled:opacity-30"
+              />
+            </div>
+
+            <div className={fieldClass('category')}>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40">Category</label>
+                <Checkbox id="category" />
+              </div>
+              <select
+                disabled={!activeFields.has('category')}
+                value={category}
+                onChange={(e) => setCategory(e.target.value as PhotocardCategory)}
+                className="bg-transparent text-sm font-black outline-none cursor-pointer disabled:opacity-30"
+              >
+                {PHOTOCARD_CATEGORIES.map(option => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </div>
+
+            <div className={fieldClass('source')}>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40">Source</label>
+                <Checkbox id="source" />
+              </div>
+              <input
+                disabled={!activeFields.has('source')}
+                type="text"
+                placeholder="Soundwave"
+                onChange={(e) => setSource(e.target.value)}
                 className="bg-transparent text-sm font-bold outline-none border-b border-black/5 pb-1 disabled:opacity-30"
               />
             </div>

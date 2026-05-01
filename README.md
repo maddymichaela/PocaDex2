@@ -4,7 +4,7 @@
 
 # PocaDex
 
-PocaDex is a web binder for K-pop photocard collectors. It helps you keep track of owned cards, wishlists, duplicates, cards on the way, and the little details that make a collection searchable: group, member, era, album, year, version, condition, notes, and images.
+PocaDex is a web binder for K-pop photocard collectors. It helps you keep track of owned cards, wishlists, duplicates, cards on the way, and the little details that make a collection searchable: group, member, category, source, era, album, year, version, condition, notes, and images.
 
 The app is built with React, Vite, Tailwind CSS, and Supabase.
 
@@ -12,7 +12,7 @@ The app is built with React, Vite, Tailwind CSS, and Supabase.
 
 - Supabase authentication with email/password and Google OAuth
 - Personal photocard collection stored per user
-- Binder views grouped by artist, member, era, album, or year
+- Binder views grouped by artist, member, era, category, or year
 - Search, filters, sorting, and collection status tracking
 - Add and edit photocards with image upload, crop, rotation, and zoom tools
 - Bulk select and bulk edit for collection cleanup
@@ -70,7 +70,14 @@ The app maps photocard rows to these fields:
 
 ```text
 id, user_id, group_name, member, album, era, year, card_name, version,
-status, condition, is_duplicate, notes, image_url, created_at
+status, condition, is_duplicate, notes, image_url, created_at, category, source
+```
+
+For existing projects, add the new optional columns:
+
+```sql
+alter table photocards add column if not exists category text default 'Album';
+alter table photocards add column if not exists source text;
 ```
 
 Statuses used by the app are:

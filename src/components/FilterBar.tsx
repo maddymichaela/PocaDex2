@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { Status } from '../types';
+import { PHOTOCARD_CATEGORIES, Status } from '../types';
 
 export type SortOption = 'newest' | 'oldest' | 'member-az' | 'member-za' | 'recently-added';
 export type YearFilter = number | 'All';
@@ -7,7 +7,7 @@ export type YearFilter = number | 'All';
 export interface FilterState {
   group: string;
   member: string;
-  album: string;
+  category: string;
   year: YearFilter;
   status: Status | 'All';
   search: string;
@@ -19,23 +19,23 @@ interface FilterBarProps {
   onFilterChange: (filters: FilterState) => void;
   uniqueGroups: string[];
   uniqueMembers: string[];
-  uniqueAlbums: string[];
+  uniqueCategories: string[];
   uniqueYears: number[];
 }
 
 const selectClass = 'w-full px-3 py-2 bg-gray-50 border-2 border-transparent rounded-[14px] text-[10px] md:text-xs font-semibold text-foreground focus:bg-white focus:border-primary/20 transition-all outline-none h-10 cursor-pointer';
 
-export default function FilterBar({ filters, onFilterChange, uniqueGroups, uniqueMembers, uniqueAlbums, uniqueYears }: FilterBarProps) {
+export default function FilterBar({ filters, onFilterChange, uniqueGroups, uniqueMembers, uniqueCategories, uniqueYears }: FilterBarProps) {
   const update = <K extends keyof FilterState>(key: K, value: FilterState[K]) =>
     onFilterChange({ ...filters, [key]: value });
 
   const reset = () =>
-    onFilterChange({ group: 'All', member: 'All', album: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' });
+    onFilterChange({ group: 'All', member: 'All', category: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' });
 
   const hasActive =
     filters.group !== 'All' ||
     filters.member !== 'All' ||
-    filters.album !== 'All' ||
+    filters.category !== 'All' ||
     filters.year !== 'All' ||
     filters.status !== 'All' ||
     filters.sortBy !== 'recently-added';
@@ -71,10 +71,10 @@ export default function FilterBar({ filters, onFilterChange, uniqueGroups, uniqu
         </div>
 
         <div className="space-y-1">
-          <label className="text-[9px] font-black uppercase tracking-widest text-foreground/40 ml-1">Album</label>
-          <select value={filters.album} onChange={e => update('album', e.target.value)} className={selectClass}>
-            <option value="All">All Albums</option>
-            {[...uniqueAlbums].filter(Boolean).sort().map(o => <option key={o} value={o}>{o}</option>)}
+          <label className="text-[9px] font-black uppercase tracking-widest text-foreground/40 ml-1">Category</label>
+          <select value={filters.category} onChange={e => update('category', e.target.value)} className={selectClass}>
+            <option value="All">All Categories</option>
+            {PHOTOCARD_CATEGORIES.filter(category => uniqueCategories.includes(category)).map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         </div>
 

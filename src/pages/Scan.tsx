@@ -5,7 +5,7 @@ import { Area } from 'react-easy-crop';
 import { detectTemplate, cropImageFromRect, fitCropRectToCardAspect, trimBackground, PHOTOCARD_TEMPLATES, templateCellRects, GridTemplate } from '../lib/crop-pipeline';
 import { insertPhotocard } from '../lib/db';
 import { useAuth } from '../contexts/AuthContext';
-import { Status, Condition, Photocard } from '../types';
+import { Status, Condition, Photocard, PHOTOCARD_CATEGORIES, PhotocardCategory } from '../types';
 import ImageEditor, { ImageEditorState } from '../components/ImageEditor';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -17,6 +17,8 @@ interface ReviewCard {
   cropperState: ImageEditorState;
   member: string;
   group: string;
+  category: PhotocardCategory;
+  source: string;
   album: string;
   era: string;
   cardName: string;
@@ -70,6 +72,8 @@ function emptyReviewCard(cropUrl: string, cropAreaPixels: Area): ReviewCard {
     },
     member: '',
     group: '',
+    category: 'Album',
+    source: '',
     album: '',
     era: '',
     cardName: '',
@@ -327,7 +331,9 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
           id: card.id,
           group: card.group || undefined,
           member: card.member,
-          album: card.album,
+          category: card.category,
+          source: card.category === 'Album' ? undefined : card.source || undefined,
+          album: card.category === 'Album' ? card.album : '',
           era: card.era || undefined,
           year: card.year,
           cardName: card.cardName,
@@ -573,7 +579,18 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
               <p className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-2">Fill selected cards:</p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <BulkField label="Group" placeholder="Stray Kids" required onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, group: v } : c))} />
+                <div className="min-w-0">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Category</label>
+                  <select
+                    onChange={e => setCards(prev => prev.map(c => c.selected ? { ...c, category: e.target.value as PhotocardCategory } : c))}
+                    className="w-full px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-medium text-foreground focus:outline-none focus:border-primary/40"
+                    defaultValue="Album"
+                  >
+                    {PHOTOCARD_CATEGORIES.map(option => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </div>
                 <BulkField label="Album" placeholder="DO IT" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, album: v } : c))} />
+                <BulkField label="Source" placeholder="Soundwave" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, source: v } : c))} />
                 <BulkField label="Era" placeholder="DO IT" onApply={v => setCards(prev => prev.map(c => c.selected ? { ...c, era: v } : c))} />
                 <BulkField label="Year" placeholder="2025" onApply={v => { const y = parseInt(v); if (!isNaN(y)) setCards(prev => prev.map(c => c.selected ? { ...c, year: y } : c)); }} />
                 <div className="min-w-0">
@@ -658,6 +675,18 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
                 {/* Editable fields */}
                 <div className="p-3 space-y-2">
                   <Field label="Member" required invalid={card.selected && !card.member.trim()} value={card.member} onChange={v => updateCard(card.id, { member: v })} placeholder="Felix" />
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-0.5 block">Category *</label>
+                    <select value={card.category} onChange={e => updateCard(card.id, { category: e.target.value as PhotocardCategory })}
+                      className="w-full px-2 py-1.5 rounded-xl border border-gray-100 bg-white/80 text-xs font-medium text-foreground focus:outline-none focus:border-primary/40 transition-colors cursor-pointer">
+                      {PHOTOCARD_CATEGORIES.map(option => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </div>
+                  {card.category === 'Album' ? (
+                    <Field label="Album" value={card.album} onChange={v => updateCard(card.id, { album: v })} placeholder="DO IT" />
+                  ) : (
+                    <Field label="Source" value={card.source} onChange={v => updateCard(card.id, { source: v })} placeholder="Soundwave" />
+                  )}
                   <Field label="Version" value={card.version} onChange={v => updateCard(card.id, { version: v })} placeholder="Felix Accordion ver." />
                   <Field label="Photocard Name" required invalid={card.selected && !card.cardName.trim()} value={card.cardName} onChange={v => updateCard(card.id, { cardName: v })} placeholder="Felix DO IT photocard" />
                   <div>

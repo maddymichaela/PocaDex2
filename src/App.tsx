@@ -9,7 +9,7 @@ import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
 import Scan from './pages/Scan';
 import AccountSettings from './pages/AccountSettings';
-import { Photocard } from './types';
+import { normalizePhotocardForSave, normalizePhotocardUpdates, Photocard } from './types';
 import { useAuth } from './contexts/AuthContext';
 import {
   fetchPhotocards,
@@ -86,21 +86,26 @@ export default function App() {
 
   const handleAddPhotocard = useCallback(async (newPC: Photocard) => {
     if (!user) return;
-    setPhotocards(prev => [newPC, ...prev]);
+    const normalizedPC = normalizePhotocardForSave(newPC);
+    setPhotocards(prev => [normalizedPC, ...prev]);
     try {
-      const saved = await insertPhotocard(user.id, newPC);
-      setPhotocards(prev => prev.map(pc => pc.id === newPC.id ? saved : pc));
+      const saved = await insertPhotocard(user.id, normalizedPC);
+      const mergedSaved = normalizePhotocardForSave({ ...saved, ...normalizedPC });
+      setPhotocards(prev => prev.map(pc => pc.id === normalizedPC.id ? mergedSaved : pc));
     } catch (err) {
       console.error('Failed to add photocard:', err);
-      setPhotocards(prev => prev.filter(pc => pc.id !== newPC.id));
+      setPhotocards(prev => prev.filter(pc => pc.id !== normalizedPC.id));
     }
   }, [user]);
 
   const handleUpdatePhotocard = useCallback(async (updatedPC: Photocard) => {
     if (!user) return;
+    const normalizedPC = normalizePhotocardForSave(updatedPC);
+    setPhotocards(prev => prev.map(pc => pc.id === normalizedPC.id ? normalizedPC : pc));
     try {
-      const saved = await updatePhotocard(user.id, updatedPC);
-      setPhotocards(prev => prev.map(pc => pc.id === saved.id ? saved : pc));
+      const saved = await updatePhotocard(user.id, normalizedPC);
+      const mergedSaved = normalizePhotocardForSave({ ...saved, ...normalizedPC });
+      setPhotocards(prev => prev.map(pc => pc.id === mergedSaved.id ? mergedSaved : pc));
     } catch (err) {
       console.error('Failed to update photocard:', err);
     }
@@ -118,9 +123,10 @@ export default function App() {
 
   const handleBulkUpdatePartial = useCallback(async (ids: string[], updates: Partial<Photocard>) => {
     if (!user) return;
+    const normalizedUpdates = normalizePhotocardUpdates(updates);
+    setPhotocards(prev => prev.map(pc => ids.includes(pc.id) ? normalizePhotocardForSave({ ...pc, ...normalizedUpdates }) : pc));
     try {
-      await bulkUpdatePhotocards(user.id, ids, updates);
-      setPhotocards(prev => prev.map(pc => ids.includes(pc.id) ? { ...pc, ...updates } : pc));
+      await bulkUpdatePhotocards(user.id, ids, normalizedUpdates);
     } catch (err) {
       console.error('Failed to bulk update:', err);
     }

@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Photocard } from '../types';
+import { getPhotocardCategory, Photocard } from '../types';
 import { PhotocardGrid } from '../components/PhotocardGrid';
 import BulkEditForm from '../components/BulkEditForm';
 import FilterBar, { FilterState } from '../components/FilterBar';
 import { placeholderImage } from '../lib/assets';
-import { Plus, CheckSquare, Trash2, X, LayoutGrid, User2, Sparkles, Disc3, Calendar, ChevronLeft, Edit3, ArrowUp, Search, Filter, Users } from 'lucide-react';
+import { Plus, CheckSquare, Trash2, X, LayoutGrid, User2, Sparkles, Calendar, ChevronLeft, Edit3, ArrowUp, Search, Filter, Users, Tags } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface CollectionProps {
@@ -15,11 +15,11 @@ interface CollectionProps {
   onNewCard: () => void;
 }
 
-type ViewMode = 'all' | 'group' | 'member' | 'era' | 'album' | 'year';
+type ViewMode = 'all' | 'group' | 'member' | 'era' | 'category' | 'year';
 
 const GROUP_FALLBACK_LABELS = {
   era: 'No Era',
-  album: 'No Album',
+  category: 'Other',
   year: 'UnknownYear',
 } as const;
 
@@ -34,8 +34,8 @@ const getGroupedViewKey = (photocard: Photocard, viewMode: ViewMode): string | n
       return photocard.member;
     case 'era':
       return hasGroupableValue(photocard.era) ? photocard.era as string : GROUP_FALLBACK_LABELS.era;
-    case 'album':
-      return hasGroupableValue(photocard.album) ? photocard.album : GROUP_FALLBACK_LABELS.album;
+    case 'category':
+      return hasGroupableValue(photocard.category) ? getPhotocardCategory(photocard) : GROUP_FALLBACK_LABELS.category;
     case 'year':
       return hasGroupableValue(photocard.year) ? photocard.year : GROUP_FALLBACK_LABELS.year;
     default:
@@ -88,7 +88,7 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
   const [filters, setFilters] = useState<FilterState>({
     group: 'All',
     member: 'All',
-    album: 'All',
+    category: 'All',
     year: 'All',
     status: 'All',
     search: '',
@@ -111,14 +111,14 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
 
   const uniqueGroups = useMemo(() => Array.from(new Set(photocards.map(pc => pc.group).filter(Boolean))) as string[], [photocards]);
   const uniqueMembers = useMemo(() => Array.from(new Set(photocards.map(pc => pc.member).filter(Boolean))) as string[], [photocards]);
-  const uniqueAlbums = useMemo(() => Array.from(new Set(photocards.map(pc => pc.album).filter(Boolean))) as string[], [photocards]);
+  const uniqueCategories = useMemo(() => Array.from(new Set(photocards.map(pc => getPhotocardCategory(pc)))), [photocards]);
   const uniqueYears = useMemo(() => Array.from(new Set(photocards.map(pc => pc.year))), [photocards]);
 
   const filteredPhotocards = useMemo(() => {
     return photocards.filter(pc => {
       const matchGroup = filters.group === 'All' || pc.group === filters.group;
       const matchMember = filters.member === 'All' || pc.member === filters.member;
-      const matchAlbum = filters.album === 'All' || pc.album === filters.album;
+      const matchCategory = filters.category === 'All' || getPhotocardCategory(pc) === filters.category;
       const matchYear = filters.year === 'All' || pc.year === filters.year;
       const matchStatus = filters.status === 'All' || pc.status === filters.status;
       const q = filters.search.toLowerCase();
@@ -127,14 +127,16 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
         pc.version.toLowerCase().includes(q) ||
         pc.member.toLowerCase().includes(q) ||
         (pc.group?.toLowerCase().includes(q)) ||
-        (pc.album?.toLowerCase().includes(q));
+        (pc.album?.toLowerCase().includes(q)) ||
+        (pc.source?.toLowerCase().includes(q)) ||
+        getPhotocardCategory(pc).toLowerCase().includes(q);
 
       let matchDrilldown = true;
       if (drilldownValue) {
         matchDrilldown = getGroupedViewKey(pc, viewMode) === drilldownValue;
       }
 
-      return matchGroup && matchMember && matchAlbum && matchYear && matchStatus && matchSearch && matchDrilldown;
+      return matchGroup && matchMember && matchCategory && matchYear && matchStatus && matchSearch && matchDrilldown;
     });
   }, [photocards, filters, drilldownValue, viewMode]);
 
@@ -184,7 +186,7 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
   const hasActiveFilters =
     filters.group !== 'All' ||
     filters.member !== 'All' ||
-    filters.album !== 'All' ||
+    filters.category !== 'All' ||
     filters.year !== 'All' ||
     filters.status !== 'All' ||
     filters.sortBy !== 'recently-added';
@@ -192,7 +194,7 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
   const activeFilterChips = [
     { label: 'Group', value: filters.group, key: 'group' as const },
     { label: 'Member', value: filters.member, key: 'member' as const },
-    { label: 'Album', value: filters.album, key: 'album' as const },
+    { label: 'Category', value: filters.category, key: 'category' as const },
     { label: 'Year', value: String(filters.year), key: 'year' as const },
     { label: 'Status', value: filters.status, key: 'status' as const },
   ].filter(f => f.value !== 'All');
@@ -202,7 +204,7 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
     { id: 'group', label: 'Group', icon: Users },
     { id: 'member', label: 'Member', icon: User2 },
     { id: 'era', label: 'Era', icon: Sparkles },
-    { id: 'album', label: 'Album', icon: Disc3 },
+    { id: 'category', label: 'Category', icon: Tags },
     { id: 'year', label: 'Year', icon: Calendar },
   ] as const;
 
@@ -280,7 +282,7 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
               onFilterChange={setFilters}
               uniqueGroups={uniqueGroups}
               uniqueMembers={uniqueMembers}
-              uniqueAlbums={uniqueAlbums}
+              uniqueCategories={uniqueCategories}
               uniqueYears={uniqueYears}
             />
           </motion.div>
@@ -301,7 +303,7 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
             </button>
           ))}
           <button
-            onClick={() => setFilters({ group: 'All', member: 'All', album: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' })}
+            onClick={() => setFilters({ group: 'All', member: 'All', category: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' })}
             className="text-[9px] font-black text-foreground/40 uppercase hover:text-red-400 p-2 italic bg-white/30 rounded-xl px-3 border border-white"
           >
             Clear All
@@ -429,7 +431,7 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
               <p className="font-black uppercase tracking-[0.3em] text-sm italic">Binder section is currently empty</p>
               {showReturnToFullView && (
                 <button
-                  onClick={() => setFilters({ group: 'All', member: 'All', album: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' })}
+                  onClick={() => setFilters({ group: 'All', member: 'All', category: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' })}
                   className="mt-8 px-8 py-4 bg-white text-primary border-2 border-primary/20 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-xl shadow-primary/10"
                 >
                   Return to Full View

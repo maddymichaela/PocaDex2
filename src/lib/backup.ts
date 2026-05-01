@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Photocard } from '../types';
+import { Photocard, PHOTOCARD_CATEGORIES } from '../types';
 
 export const validatePhotocards = (data: any): data is Photocard[] => {
   if (!Array.isArray(data)) return false;
@@ -18,6 +18,8 @@ export const validatePhotocards = (data: any): data is Photocard[] => {
       ['owned', 'on_the_way', 'wishlist'].includes(item.status) &&
       (item.imageUrl === undefined || typeof item.imageUrl === 'string') &&
       (item.group === undefined || typeof item.group === 'string') &&
+      (item.category === undefined || PHOTOCARD_CATEGORIES.includes(item.category)) &&
+      (item.source === undefined || typeof item.source === 'string') &&
       (item.era === undefined || typeof item.era === 'string') &&
       (item.condition === undefined || typeof item.condition === 'string') &&
       (item.isDuplicate === undefined || typeof item.isDuplicate === 'boolean') &&

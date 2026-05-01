@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Photocard } from '../types';
+import { normalizePhotocardForSave, normalizePhotocardUpdates, Photocard } from '../types';
 
 // ── Row ↔ Photocard mappers ────────────────────────────────────────────────
 
@@ -8,6 +8,8 @@ function rowToPhotocard(row: Record<string, unknown>): Photocard {
     id: row.id as string,
     group: (row.group_name as string) ?? undefined,
     member: row.member as string,
+    category: (row.category as Photocard['category']) ?? 'Album',
+    source: (row.source as string) ?? undefined,
     album: row.album as string,
     era: (row.era as string) ?? undefined,
     year: row.year as number,
@@ -23,20 +25,23 @@ function rowToPhotocard(row: Record<string, unknown>): Photocard {
 }
 
 function photocardToRow(pc: Omit<Photocard, 'id' | 'createdAt'>, userId: string) {
+  const normalized = normalizePhotocardForSave({ ...pc, id: '', createdAt: 0 });
   return {
     user_id: userId,
-    group_name: pc.group ?? null,
-    member: pc.member,
-    album: pc.album,
-    era: pc.era ?? null,
-    year: pc.year,
-    card_name: pc.cardName,
-    version: pc.version,
-    status: pc.status,
-    condition: pc.condition ?? null,
-    is_duplicate: pc.isDuplicate ?? false,
-    notes: pc.notes ?? null,
-    image_url: pc.imageUrl ?? null,
+    group_name: normalized.group ?? null,
+    member: normalized.member,
+    category: normalized.category ?? 'Album',
+    source: normalized.source ?? null,
+    album: normalized.album,
+    era: normalized.era ?? null,
+    year: normalized.year,
+    card_name: normalized.cardName,
+    version: normalized.version,
+    status: normalized.status,
+    condition: normalized.condition ?? null,
+    is_duplicate: normalized.isDuplicate ?? false,
+    notes: normalized.notes ?? null,
+    image_url: normalized.imageUrl ?? null,
   };
 }
 
@@ -118,18 +123,21 @@ export async function bulkUpdatePhotocards(
   ids: string[],
   updates: Partial<Photocard>,
 ): Promise<void> {
+  const normalizedUpdates = normalizePhotocardUpdates(updates);
   const dbUpdates: Record<string, unknown> = {};
-  if (updates.group !== undefined) dbUpdates.group_name = updates.group;
-  if (updates.member !== undefined) dbUpdates.member = updates.member;
-  if (updates.album !== undefined) dbUpdates.album = updates.album;
-  if (updates.era !== undefined) dbUpdates.era = updates.era;
-  if (updates.year !== undefined) dbUpdates.year = updates.year;
-  if (updates.cardName !== undefined) dbUpdates.card_name = updates.cardName;
-  if (updates.version !== undefined) dbUpdates.version = updates.version;
-  if (updates.status !== undefined) dbUpdates.status = updates.status;
-  if (updates.condition !== undefined) dbUpdates.condition = updates.condition;
-  if (updates.isDuplicate !== undefined) dbUpdates.is_duplicate = updates.isDuplicate;
-  if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+  if (normalizedUpdates.group !== undefined) dbUpdates.group_name = normalizedUpdates.group;
+  if (normalizedUpdates.member !== undefined) dbUpdates.member = normalizedUpdates.member;
+  if (normalizedUpdates.category !== undefined) dbUpdates.category = normalizedUpdates.category;
+  if ('source' in normalizedUpdates) dbUpdates.source = normalizedUpdates.source ?? null;
+  if (normalizedUpdates.album !== undefined) dbUpdates.album = normalizedUpdates.album;
+  if (normalizedUpdates.era !== undefined) dbUpdates.era = normalizedUpdates.era;
+  if (normalizedUpdates.year !== undefined) dbUpdates.year = normalizedUpdates.year;
+  if (normalizedUpdates.cardName !== undefined) dbUpdates.card_name = normalizedUpdates.cardName;
+  if (normalizedUpdates.version !== undefined) dbUpdates.version = normalizedUpdates.version;
+  if (normalizedUpdates.status !== undefined) dbUpdates.status = normalizedUpdates.status;
+  if (normalizedUpdates.condition !== undefined) dbUpdates.condition = normalizedUpdates.condition;
+  if (normalizedUpdates.isDuplicate !== undefined) dbUpdates.is_duplicate = normalizedUpdates.isDuplicate;
+  if (normalizedUpdates.notes !== undefined) dbUpdates.notes = normalizedUpdates.notes;
 
   const { error } = await supabase
     .from('photocards')

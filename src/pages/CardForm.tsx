@@ -1,7 +1,7 @@
 import { useState, useRef, FormEvent, ChangeEvent } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { ChevronLeft, Image as ImageIcon, Save, Upload, Trash2, Edit3 } from 'lucide-react';
-import { Status, Photocard, Condition } from '../types';
+import { Status, Photocard, Condition, PHOTOCARD_CATEGORIES, PhotocardCategory, getPhotocardCategory, normalizePhotocardForSave } from '../types';
 import { useImageUpload } from '../hooks/useImageUpload';
 import ImageEditor from '../components/ImageEditor';
 import { placeholderImage } from '../lib/assets';
@@ -18,6 +18,8 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
 
   const [group, setGroup] = useState(initialData?.group || '');
   const [member, setMember] = useState(initialData?.member || '');
+  const [category, setCategory] = useState<PhotocardCategory>(initialData ? getPhotocardCategory(initialData) : 'Album');
+  const [source, setSource] = useState(initialData?.source || '');
   const [album, setAlbum] = useState(initialData?.album || '');
   const [era, setEra] = useState(initialData?.era || '');
   const [year, setYear] = useState<number>(Number(initialData?.year) || new Date().getFullYear());
@@ -54,10 +56,12 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    onSubmit({
+    onSubmit(normalizePhotocardForSave({
       id: initialData?.id || Date.now().toString(),
       group,
       member,
+      category,
+      source,
       album,
       era,
       year: Number(year),
@@ -69,7 +73,7 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
       notes,
       imageUrl: previewUrl || undefined,
       createdAt: initialData?.createdAt || Date.now(),
-    });
+    }));
   };
 
   return (
@@ -198,9 +202,22 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
               <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-5">
                   <div>
-                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40">Album</label>
-                    <input type="text" value={album} onChange={e => setAlbum(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border-2 border-transparent rounded-xl text-sm focus:bg-white focus:border-primary/30 outline-none transition-all" placeholder="Album Title" />
+                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40">Category *</label>
+                    <select value={category} onChange={e => setCategory(e.target.value as PhotocardCategory)} className="w-full px-4 py-3 bg-gray-50 border-2 border-transparent rounded-xl text-sm focus:bg-white focus:border-primary/30 outline-none transition-all">
+                      {PHOTOCARD_CATEGORIES.map(option => <option key={option} value={option}>{option}</option>)}
+                    </select>
                   </div>
+                  {category === 'Album' ? (
+                  <div>
+                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40">Album *</label>
+                    <input required type="text" value={album} onChange={e => setAlbum(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border-2 border-transparent rounded-xl text-sm focus:bg-white focus:border-primary/30 outline-none transition-all" placeholder="Album Title" />
+                  </div>
+                  ) : (
+                  <div>
+                    <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40">Source *</label>
+                    <input required type="text" value={source} onChange={e => setSource(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border-2 border-transparent rounded-xl text-sm focus:bg-white focus:border-primary/30 outline-none transition-all" placeholder="Soundwave, Withmuu, Fanmeeting" />
+                  </div>
+                  )}
                   <div>
                     <label className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40">Era</label>
                     <input type="text" value={era} onChange={e => setEra(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border-2 border-transparent rounded-xl text-sm focus:bg-white focus:border-primary/30 outline-none transition-all" placeholder="Era" />

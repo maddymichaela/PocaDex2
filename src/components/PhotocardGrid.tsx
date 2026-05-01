@@ -6,7 +6,7 @@
 import { motion } from 'motion/react';
 import { Heart, Copy, Truck } from 'lucide-react';
 import { useEffect, useState, type CSSProperties } from 'react';
-import { Photocard } from '../types';
+import { getPhotocardCategory, Photocard } from '../types';
 import { placeholderImage } from '../lib/assets';
 import { STATUS_COLORS } from '../lib/statusStyles';
 
@@ -35,7 +35,9 @@ export function PhotocardCard({
   const [hasImageError, setHasImageError] = useState(false);
   const showPlaceholder = !photocard.imageUrl || hasImageError;
   const hasAlbum = !!photocard.album?.trim();
+  const hasSource = !!photocard.source?.trim();
   const hasEra = !!photocard.era?.trim();
+  const category = getPhotocardCategory(photocard);
 
   useEffect(() => {
     setHasImageError(false);
@@ -151,11 +153,11 @@ export function PhotocardCard({
         </div>
 
         <div className="flex flex-col gap-0.5">
-          {(hasAlbum || hasEra) && (
+          {(hasAlbum || hasSource || hasEra) && (
             <div className="text-xs font-medium text-foreground/50 line-clamp-1">
-              {hasAlbum && photocard.album}
-              {hasAlbum && hasEra && <span className="opacity-60 mx-1">•</span>}
-              {hasEra && <span className={hasAlbum ? 'opacity-60' : undefined}>{photocard.era}</span>}
+              {category !== 'Album' && hasSource ? photocard.source : hasAlbum && photocard.album}
+              {((category !== 'Album' && hasSource) || hasAlbum) && hasEra && <span className="opacity-60 mx-1">•</span>}
+              {hasEra && <span className={(category !== 'Album' && hasSource) || hasAlbum ? 'opacity-60' : undefined}>{photocard.era}</span>}
             </div>
           )}
           <div className="text-xs font-medium text-foreground/80 truncate tracking-normal">
