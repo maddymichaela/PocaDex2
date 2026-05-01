@@ -6,3 +6,4 @@ coverage/
 *.log
 .env*
 !.env.example
+PRIVATE_README.md
