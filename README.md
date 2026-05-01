@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="public/pocadex.png" alt="PocaDex" width="360" />
+</div>
+
 # PocaDex
 
 PocaDex is a web binder for K-pop photocard collectors. It helps you keep track of owned cards, wishlists, duplicates, cards on the way, and the little details that make a collection searchable: group, member, era, album, year, version, condition, notes, and images.
