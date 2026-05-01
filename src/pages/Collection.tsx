@@ -17,6 +17,32 @@ interface CollectionProps {
 
 type ViewMode = 'all' | 'group' | 'member' | 'era' | 'album' | 'year';
 
+const GROUP_FALLBACK_LABELS = {
+  era: 'No Era',
+  album: 'No Album',
+  year: 'UnknownYear',
+} as const;
+
+const hasGroupableValue = (value: unknown) =>
+  value !== null && value !== undefined && String(value).trim() !== '';
+
+const getGroupedViewKey = (photocard: Photocard, viewMode: ViewMode): string | number => {
+  switch (viewMode) {
+    case 'group':
+      return hasGroupableValue(photocard.group) ? photocard.group as string : 'Unknown';
+    case 'member':
+      return photocard.member;
+    case 'era':
+      return hasGroupableValue(photocard.era) ? photocard.era as string : GROUP_FALLBACK_LABELS.era;
+    case 'album':
+      return hasGroupableValue(photocard.album) ? photocard.album : GROUP_FALLBACK_LABELS.album;
+    case 'year':
+      return hasGroupableValue(photocard.year) ? photocard.year : GROUP_FALLBACK_LABELS.year;
+    default:
+      return 'All';
+  }
+};
+
 interface GroupTileProps {
   name: string;
   count: number;
@@ -101,15 +127,11 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
         pc.version.toLowerCase().includes(q) ||
         pc.member.toLowerCase().includes(q) ||
         (pc.group?.toLowerCase().includes(q)) ||
-        pc.album.toLowerCase().includes(q);
+        (pc.album?.toLowerCase().includes(q));
 
       let matchDrilldown = true;
       if (drilldownValue) {
-        if (viewMode === 'group') matchDrilldown = pc.group === drilldownValue;
-        if (viewMode === 'member') matchDrilldown = pc.member === drilldownValue;
-        if (viewMode === 'era') matchDrilldown = pc.era === drilldownValue;
-        if (viewMode === 'album') matchDrilldown = pc.album === drilldownValue;
-        if (viewMode === 'year') matchDrilldown = typeof drilldownValue === 'number' && pc.year === drilldownValue;
+        matchDrilldown = getGroupedViewKey(pc, viewMode) === drilldownValue;
       }
 
       return matchGroup && matchMember && matchAlbum && matchYear && matchStatus && matchSearch && matchDrilldown;
@@ -132,12 +154,7 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
     if (viewMode === 'all' || drilldownValue) return [];
     const groups = new Map<string | number, { count: number; imageUrl?: string }>();
     filteredPhotocards.forEach(pc => {
-      let key: string | number = 'Unknown';
-      if (viewMode === 'group') key = pc.group ?? 'Unknown';
-      if (viewMode === 'member') key = pc.member;
-      if (viewMode === 'era') key = pc.era ?? 'Unknown';
-      if (viewMode === 'album') key = pc.album;
-      if (viewMode === 'year') key = pc.year;
+      const key = getGroupedViewKey(pc, viewMode);
       const existing = groups.get(key) || { count: 0 };
       groups.set(key, { count: existing.count + 1, imageUrl: existing.imageUrl || pc.imageUrl });
     });
@@ -213,9 +230,8 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
               <button
                 key={m.id}
                 onClick={() => { setViewMode(m.id); setDrilldownValue(null); }}
-                className={`flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 text-[10px] font-black uppercase tracking-widest transition-all md:px-4 ${
-                  viewMode === m.id ? 'bg-primary text-white shadow-md' : 'text-foreground/40 hover:text-foreground'
-                }`}
+                className={`flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 text-[10px] font-black uppercase tracking-widest transition-all md:px-4 ${viewMode === m.id ? 'bg-primary text-white shadow-md' : 'text-foreground/40 hover:text-foreground'
+                  }`}
               >
                 <m.icon size={14} />
                 <span>{m.label}</span>
@@ -238,11 +254,10 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
           </div>
           <button
             onClick={() => setShowFilters(v => !v)}
-            className={`h-11 w-11 rounded-[14px] border-2 flex items-center justify-center shrink-0 transition-all ${
-              showFilters || hasActiveFilters
+            className={`h-11 w-11 rounded-[14px] border-2 flex items-center justify-center shrink-0 transition-all ${showFilters || hasActiveFilters
                 ? 'bg-primary text-white border-primary shadow-md'
                 : 'bg-white text-foreground/50 border-gray-100 hover:border-primary/30 hover:text-primary'
-            }`}
+              }`}
             aria-label="Toggle filters"
           >
             <Filter size={15} />
@@ -430,11 +445,10 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
         <button
           onClick={toggleSelectMode}
           aria-label={selectMode ? 'Cancel selection' : 'Select cards'}
-          className={`flex h-12 w-12 items-center justify-center rounded-full border-2 shadow-xl transition-all ${
-            selectMode
+          className={`flex h-12 w-12 items-center justify-center rounded-full border-2 shadow-xl transition-all ${selectMode
               ? 'bg-secondary text-white border-white/20 shadow-xl shadow-secondary/20'
               : 'bg-white text-foreground/40 border-gray-100 shadow-sm hover:text-secondary'
-          }`}
+            }`}
         >
           <CheckSquare className="w-5 h-5" />
         </button>

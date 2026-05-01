@@ -33,6 +33,8 @@ export function PhotocardCard({
   const delay = Math.min(index * 0.05, 0.5);
   const [hasImageError, setHasImageError] = useState(false);
   const showPlaceholder = !photocard.imageUrl || hasImageError;
+  const hasAlbum = !!photocard.album?.trim();
+  const hasEra = !!photocard.era?.trim();
 
   useEffect(() => {
     setHasImageError(false);
@@ -148,10 +150,13 @@ export function PhotocardCard({
         </div>
 
         <div className="flex flex-col gap-0.5">
-          <div className="text-xs font-medium text-foreground/50 line-clamp-1">
-            {photocard.album}
-            {photocard.era && <span className="opacity-60 ml-1">• {photocard.era}</span>}
-          </div>
+          {(hasAlbum || hasEra) && (
+            <div className="text-xs font-medium text-foreground/50 line-clamp-1">
+              {hasAlbum && photocard.album}
+              {hasAlbum && hasEra && <span className="opacity-60 mx-1">•</span>}
+              {hasEra && <span className={hasAlbum ? 'opacity-60' : undefined}>{photocard.era}</span>}
+            </div>
+          )}
           <div className="text-xs font-medium text-foreground/80 truncate tracking-normal">
             {photocard.cardName}
             {photocard.version && <span className="text-foreground/50"> • {photocard.version}</span>}
