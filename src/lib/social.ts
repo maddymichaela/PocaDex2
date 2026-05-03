@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { getPhotocardTemplateId, Photocard, Profile } from '../types';
+import { getPhotocardBaseIdentity, getPhotocardTemplateId, Photocard, Profile } from '../types';
 import { rowToPhotocard } from './db';
 
 export interface SocialCounts {
@@ -53,6 +53,7 @@ const PUBLIC_PHOTOCARD_SELECT = [
   'status',
   'condition',
   'is_duplicate',
+  'notes',
   'image_url',
   'created_at',
 ].join(',');
@@ -74,6 +75,106 @@ const LEGACY_PUBLIC_PHOTOCARD_SELECT = [
   'created_at',
 ].join(',');
 
+const GLOBAL_SEARCH_SUPABASE_FIELDS = [
+  'group_name',
+  'member',
+  'card_name',
+  'version',
+  'category',
+  'album',
+  'era',
+  'source',
+  'card_template_id',
+  'notes',
+] as const;
+
+const LEGACY_GLOBAL_SEARCH_SUPABASE_FIELDS = [
+  'group_name',
+  'member',
+  'card_name',
+  'version',
+  'album',
+  'era',
+] as const;
+
+const GLOBAL_SEARCH_DESCRIPTIVE_FIELDS = [
+  'source',
+  'sourceName',
+  'source_name',
+  'shop',
+  'store',
+  'event',
+  'benefit',
+  'pob',
+  'category',
+  'album',
+  'albumName',
+  'album_name',
+  'era',
+  'version',
+  'cardName',
+  'card_name',
+  'name',
+  'member',
+  'members',
+  'group',
+  'groupName',
+  'group_name',
+  'cardTemplateId',
+  'card_template_id',
+  'notes',
+] as const;
+
+const GLOBAL_SEARCH_CLIENT_SUPPLEMENT_LIMIT = 500;
+const GLOBAL_SEARCH_RESULT_LIMIT = 24;
+
+const GLOBAL_SEARCH_FIELD_WEIGHTS = {
+  member: 130,
+  group: 120,
+  alias: 115,
+  cardName: 100,
+  source: 70,
+  album: 65,
+  era: 55,
+  version: 55,
+  category: 50,
+  notes: 10,
+  other: 25,
+} as const;
+
+type GlobalSearchFieldWeight = keyof typeof GLOBAL_SEARCH_FIELD_WEIGHTS;
+type GlobalSearchFieldEntry = {
+  field: string;
+  weight: GlobalSearchFieldWeight;
+  values: string[];
+  aliasValues?: string[];
+};
+
+const MEMBER_ALIASES: Record<string, string[]> = {
+  'Bang Chan': ['chan', 'chris', 'christopher', 'channie'],
+  'Lee Know': ['leeknow', 'minho', 'lee minho'],
+  Changbin: ['binnie'],
+  Hyunjin: ['hyun jin', 'hyune'],
+  Han: ['jisung', 'han jisung'],
+  Felix: ['lix', 'yongbok', 'lee felix'],
+  Seungmin: ['seung min'],
+  'I.N': ['in', 'jeongin', 'yang jeongin', 'innie'],
+};
+
+const NORMALIZED_MEMBER_ALIASES = Object.entries(MEMBER_ALIASES).reduce((lookup, [canonical, aliases]) => {
+  const canonicalKey = normalizeSearchText(canonical);
+  const aliasValues = [canonical, ...aliases].map(normalizeSearchText).filter(Boolean);
+  aliasValues.forEach((alias) => lookup.set(alias, canonicalKey));
+  lookup.set(canonicalKey, canonicalKey);
+  return lookup;
+}, new Map<string, string>());
+
+const MEMBER_ALIAS_VALUES_BY_CANONICAL = Object.entries(MEMBER_ALIASES).reduce((lookup, [canonical, aliases]) => {
+  const canonicalKey = normalizeSearchText(canonical);
+  lookup.set(canonicalKey, Array.from(new Set([canonical, ...aliases].map(normalizeSearchText).filter(Boolean))));
+  return lookup;
+}, new Map<string, string[]>());
+
 export function normalizeUsername(username: string) {
   return username.trim().toLowerCase();
 }
@@ -85,6 +186,19 @@ export function getProfileUserId(profile: Pick<Profile, 'id'>) {
 function logSocialQuery(label: string, value: unknown) {
   if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
     console.debug(`[social] ${label}`, value);
+  }
+}
+
+function logGlobalSearchMetadata(label: string, value: unknown) {
+  if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
+    console.debug(`[PocaDex global search debug] ${label}`, value);
+    console.debug(`[PocaDex global search card display debug] ${label}`, value);
+  }
+}
+
+function logGlobalSearchQueryDebug(value: unknown) {
+  if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
+    console.debug('[PocaDex global search query debug]', value);
   }
 }
 
@@ -133,6 +247,49 @@ function createSocialDataError(context: {
 
 function escapeLikePattern(value: string) {
   return value.replace(/[%_]/g, '\\$&');
+}
+
+export function normalizeSearchText(value: unknown) {
+  return String(value ?? '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/['’]/g, '')
+    .replace(/&/g, 'and')
+    .replace(/[\s._-]+/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+function normalizeSearchWords(value: unknown) {
+  return String(value ?? '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/['’]/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .map(normalizeSearchText)
+    .filter(Boolean);
+}
+
+function getSearchTerms(query: string) {
+  const compactQuery = normalizeSearchText(query);
+  const wordTerms = normalizeSearchWords(query);
+  if (!compactQuery) return [];
+  if (wordTerms.length <= 1) return [compactQuery];
+  if (wordTerms.every((term) => term.length === 1)) return [compactQuery];
+  return Array.from(new Set(wordTerms));
+}
+
+function getAliasTerms(value: unknown) {
+  const normalized = normalizeSearchText(value);
+  const canonical = NORMALIZED_MEMBER_ALIASES.get(normalized);
+  if (!canonical) return [];
+  return MEMBER_ALIAS_VALUES_BY_CANONICAL.get(canonical) ?? [canonical];
 }
 
 function isMissingColumnError(error: unknown, columns: string[]) {
@@ -459,21 +616,173 @@ async function fetchProfilesById(ownerIds: string[]): Promise<Map<string, Profil
   }));
 }
 
+async function hydrateGlobalSearchRows(rows: unknown[]): Promise<unknown[]> {
+  const ids = Array.from(new Set(rows.map((row) => String((row as Record<string, unknown>).id ?? '')).filter(Boolean)));
+  if (ids.length === 0) return rows;
+
+  const { data, error } = await supabase
+    .from('photocards')
+    .select('*')
+    .in('id', ids);
+
+  logGlobalSearchMetadata('hydrated global search rows', {
+    ids,
+    data,
+    error: error ? getSupabaseErrorDetails(error) : null,
+  });
+
+  if (error || !data) return rows;
+  const hydratedById = new Map((data as unknown[]).map((row) => [String((row as Record<string, unknown>).id ?? ''), row]));
+  return rows.map((row) => hydratedById.get(String((row as Record<string, unknown>).id ?? '')) ?? row);
+}
+
+function normalizeSearchValue(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(normalizeSearchValue);
+  if (value === null || value === undefined) return [];
+  const normalized = normalizeSearchText(value);
+  return normalized ? [normalized] : [];
+}
+
+function getGlobalSearchFieldWeight(field: string): GlobalSearchFieldWeight {
+  if (field === 'member' || field === 'members') return 'member';
+  if (field === 'group' || field === 'groupName' || field === 'group_name') return 'group';
+  if (field === 'cardName' || field === 'card_name' || field === 'name') return 'cardName';
+  if (field === 'source' || field === 'sourceName' || field === 'source_name' || field === 'shop' || field === 'store' || field === 'event' || field === 'benefit' || field === 'pob') return 'source';
+  if (field === 'album' || field === 'albumName' || field === 'album_name') return 'album';
+  if (field === 'era') return 'era';
+  if (field === 'version') return 'version';
+  if (field === 'category') return 'category';
+  if (field === 'notes') return 'notes';
+  return 'other';
+}
+
+function getGlobalSearchFieldEntries(row: Record<string, unknown>, card: Photocard): GlobalSearchFieldEntry[] {
+  const cardRecord = card as Photocard & Record<string, unknown>;
+  return GLOBAL_SEARCH_DESCRIPTIVE_FIELDS.map((field) => {
+    const rawValue = row[field] ?? cardRecord[field];
+    const resolvedValue =
+      field === 'group' && rawValue === undefined ? row.group_name :
+      field === 'groupName' && rawValue === undefined ? row.group_name :
+      field === 'albumName' && rawValue === undefined ? row.album_name :
+      field === 'sourceName' && rawValue === undefined ? row.source_name :
+      field === 'cardName' && rawValue === undefined ? row.card_name :
+      field === 'cardTemplateId' && rawValue === undefined ? row.card_template_id :
+      rawValue;
+    const values = normalizeSearchValue(resolvedValue);
+    const weight = getGlobalSearchFieldWeight(field);
+    return {
+      field,
+      weight,
+      values,
+      aliasValues: weight === 'member' ? normalizeSearchValue(resolvedValue).flatMap(getAliasTerms) : undefined,
+    };
+  }).filter((entry) => entry.values.length > 0 || (entry.aliasValues?.length ?? 0) > 0);
+}
+
+function entryMatchesSearchTerm(entry: GlobalSearchFieldEntry, term: string) {
+  return entry.values.some((value) => value.includes(term))
+    || (entry.aliasValues ?? []).some((value) => value.includes(term));
+}
+
+function scoreGlobalSearchRow(row: Record<string, unknown>, card: Photocard, query: string) {
+  const terms = getSearchTerms(query);
+  if (terms.length === 0) return 0;
+
+  const entries = getGlobalSearchFieldEntries(row, card);
+  if (!terms.every((term) => entries.some((entry) => entryMatchesSearchTerm(entry, term)))) return 0;
+
+  const compactQuery = normalizeSearchText(query);
+  let score = 0;
+
+  terms.forEach((term) => {
+    let bestTermScore = 0;
+    entries.forEach((entry) => {
+      const baseWeight = GLOBAL_SEARCH_FIELD_WEIGHTS[entry.weight];
+      const exactValueMatch = entry.values.some((value) => value === term);
+      const partialValueMatch = entry.values.some((value) => value.includes(term));
+      const exactAliasMatch = (entry.aliasValues ?? []).some((value) => value === term);
+      const partialAliasMatch = (entry.aliasValues ?? []).some((value) => value.includes(term));
+      if (exactAliasMatch || partialAliasMatch) {
+        bestTermScore = Math.max(bestTermScore, GLOBAL_SEARCH_FIELD_WEIGHTS.alias + (exactAliasMatch ? 25 : 0));
+      }
+      if (exactValueMatch || partialValueMatch) {
+        bestTermScore = Math.max(bestTermScore, baseWeight + (exactValueMatch ? 30 : 0));
+      }
+    });
+    score += bestTermScore;
+  });
+
+  entries.forEach((entry) => {
+    const baseWeight = GLOBAL_SEARCH_FIELD_WEIGHTS[entry.weight];
+    if (entry.values.some((value) => value === compactQuery)) score += baseWeight + 40;
+    if ((entry.aliasValues ?? []).some((value) => value === compactQuery)) score += GLOBAL_SEARCH_FIELD_WEIGHTS.alias + 35;
+  });
+
+  if (card.imageUrl) score += 2;
+  return score;
+}
+
+function globalSearchRowMatches(row: Record<string, unknown>, card: Photocard, query: string) {
+  return scoreGlobalSearchRow(row, card, query) > 0;
+}
+
+function dedupeRowsById(rows: unknown[]) {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const rowId = String((row as Record<string, unknown>).id ?? '');
+    if (!rowId) return true;
+    if (seen.has(rowId)) return false;
+    seen.add(rowId);
+    return true;
+  });
+}
+
+async function fetchClientSearchSupplement(trimmed: string): Promise<unknown[]> {
+  const { data, error } = await supabase
+    .from('photocards')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(GLOBAL_SEARCH_CLIENT_SUPPLEMENT_LIMIT);
+
+  if (error) {
+    logGlobalSearchMetadata('client-side global search supplement failed', {
+      query: trimmed,
+      error: getSupabaseErrorDetails(error),
+    });
+    return [];
+  }
+
+  return ((data ?? []) as unknown[])
+    .filter((row) => {
+      const typedRow = row as Record<string, unknown>;
+      return globalSearchRowMatches(typedRow, rowToPhotocard(typedRow), trimmed);
+    });
+}
+
+function getSupabaseSearchTerms(query: string) {
+  const compactQuery = normalizeSearchText(query);
+  const aliases = getAliasTerms(query);
+  const aliasCanonicalTerms = aliases.flatMap((alias) => {
+    const canonical = NORMALIZED_MEMBER_ALIASES.get(alias);
+    return canonical ? [canonical] : [];
+  });
+
+  return Array.from(new Set([
+    query.trim(),
+    compactQuery,
+    ...getSearchTerms(query),
+    ...aliases,
+    ...aliasCanonicalTerms,
+  ].filter((term) => term.length >= 2))).slice(0, 8);
+}
+
 export async function searchPublicCardTemplates(query: string): Promise<PublicCardTemplate[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
 
-  const safeQuery = escapeLikePattern(trimmed);
-  const buildPhotocardSearch = (select: string, includeSource: boolean) => {
-    const fields = [
-      `group_name.ilike.%${safeQuery}%`,
-      `member.ilike.%${safeQuery}%`,
-      `card_name.ilike.%${safeQuery}%`,
-      `version.ilike.%${safeQuery}%`,
-      `album.ilike.%${safeQuery}%`,
-      `era.ilike.%${safeQuery}%`,
-      ...(includeSource ? [`source.ilike.%${safeQuery}%`] : []),
-    ];
+  const buildPhotocardSearch = (select: string, searchableFields: readonly string[], searchTerm: string) => {
+    const safeQuery = escapeLikePattern(searchTerm);
+    const fields = searchableFields.map((field) => `${field}.ilike.%${safeQuery}%`);
     return supabase
       .from('photocards')
       .select(select)
@@ -482,22 +791,39 @@ export async function searchPublicCardTemplates(query: string): Promise<PublicCa
   };
 
   let rows: unknown[] | null = null;
-  const { data, error } = await buildPhotocardSearch(PUBLIC_PHOTOCARD_SELECT, true);
-  if (error && isMissingColumnError(error, ['members', 'category', 'source', 'card_template_id'])) {
-    const { data: legacyData, error: legacyError } = await buildPhotocardSearch(LEGACY_PUBLIC_PHOTOCARD_SELECT, false);
-    if (legacyError) throw legacyError;
-    rows = legacyData as unknown[] | null;
-  } else {
-    if (error) throw error;
-    rows = data as unknown[] | null;
+  logGlobalSearchQueryDebug({
+    searchTerm: trimmed,
+    queryVariants: getSupabaseSearchTerms(trimmed),
+    supabaseFields: GLOBAL_SEARCH_SUPABASE_FIELDS,
+    clientSupplementFields: GLOBAL_SEARCH_DESCRIPTIVE_FIELDS,
+  });
+  const queryVariants = getSupabaseSearchTerms(trimmed);
+  const supabaseRows: unknown[] = [];
+  let usedLegacySearch = false;
+  for (const searchTerm of queryVariants) {
+    const { data, error } = await buildPhotocardSearch(PUBLIC_PHOTOCARD_SELECT, GLOBAL_SEARCH_SUPABASE_FIELDS, searchTerm);
+    logGlobalSearchMetadata('raw Supabase global search result', { query: trimmed, searchTerm, fields: GLOBAL_SEARCH_SUPABASE_FIELDS, data, error: error ? getSupabaseErrorDetails(error) : null });
+    if (error && isMissingColumnError(error, ['members', 'category', 'source', 'card_template_id', 'notes'])) {
+      usedLegacySearch = true;
+      const { data: legacyData, error: legacyError } = await buildPhotocardSearch(LEGACY_PUBLIC_PHOTOCARD_SELECT, LEGACY_GLOBAL_SEARCH_SUPABASE_FIELDS, searchTerm);
+      if (legacyError) throw legacyError;
+      logGlobalSearchMetadata('raw Supabase global search legacy result', { query: trimmed, searchTerm, fields: LEGACY_GLOBAL_SEARCH_SUPABASE_FIELDS, data: legacyData, error: null });
+      supabaseRows.push(...((legacyData ?? []) as unknown[]));
+    } else {
+      if (error) throw error;
+      supabaseRows.push(...((data ?? []) as unknown[]));
+    }
   }
+  rows = await hydrateGlobalSearchRows(dedupeRowsById([...supabaseRows, ...(await fetchClientSearchSupplement(trimmed))]));
 
-  const cardsWithOwners = (rows ?? [])
+  const cardsWithOwners = rows
     .map((row) => {
       const typedRow = row as unknown as Record<string, unknown>;
-      return { card: rowToPhotocard(typedRow), ownerId: String(typedRow.user_id ?? '') };
+      const card = rowToPhotocard(typedRow);
+      logGlobalSearchMetadata('mapped search card', { raw: typedRow, card });
+      return { card, ownerId: String(typedRow.user_id ?? typedRow.userId ?? ''), searchScore: scoreGlobalSearchRow(typedRow, card, trimmed) };
     })
-    .filter((entry) => entry.ownerId);
+    .filter((entry) => entry.ownerId && entry.searchScore > 0);
   if (cardsWithOwners.length === 0) return [];
 
   const ownerIds = Array.from(new Set(cardsWithOwners.map((entry) => entry.ownerId)));
@@ -512,31 +838,77 @@ export async function searchPublicCardTemplates(query: string): Promise<PublicCa
   const wishlistCounts = await fetchWishlistCountsForCards(publicEntries.map((entry) => entry.card));
   const grouped = new Map<string, PublicCardTemplate>();
 
-  publicEntries.forEach(({ card, ownerId }) => {
-    const identity = getCardTemplateId(card);
+  const getMetadataScore = (card: Photocard) => {
+    let score = 0;
+    if (card.category && card.category !== 'Album') score += 8;
+    if (card.source?.trim()) score += 6;
+    if (card.album?.trim()) score += 2;
+    if (card.imageUrl) score += 1;
+    return score;
+  };
+
+  publicEntries.forEach(({ card, ownerId, searchScore }) => {
+    const identity = getPhotocardBaseIdentity(card);
     const owner = profileById.get(ownerId) ?? null;
     const existing = grouped.get(identity);
+    const existingScore = existing ? scoreGlobalSearchRow(existing.card as Photocard & Record<string, unknown>, existing.card, trimmed) : 0;
+    const ownerPayload = owner && owner.is_collection_public !== false
+      ? {
+          id: owner.id,
+          username: owner.username,
+          nickname: owner.nickname,
+          display_name: owner.display_name,
+          avatar_url: owner.avatar_url,
+        }
+      : null;
     if (!existing) {
       grouped.set(identity, {
-        identity,
+        identity: getCardTemplateId(card),
         card,
-        wishlistCount: wishlistCounts.get(identity) ?? 0,
-        owner: owner && owner.is_collection_public !== false
-          ? {
-              id: owner.id,
-              username: owner.username,
-              nickname: owner.nickname,
-              display_name: owner.display_name,
-              avatar_url: owner.avatar_url,
-            }
-          : null,
+        wishlistCount: wishlistCounts.get(getCardTemplateId(card)) ?? 0,
+        owner: ownerPayload,
       });
-    } else if (!existing.card.imageUrl && card.imageUrl) {
-      grouped.set(identity, { ...existing, card });
+    } else if (searchScore > existingScore || (searchScore === existingScore && getMetadataScore(card) > getMetadataScore(existing.card))) {
+      grouped.set(identity, {
+        ...existing,
+        identity: getCardTemplateId(card),
+        card,
+        wishlistCount: Math.max(existing.wishlistCount, wishlistCounts.get(getCardTemplateId(card)) ?? 0),
+        owner: existing.owner ?? ownerPayload,
+      });
     }
   });
 
-  return Array.from(grouped.values()).slice(0, 24);
+  const results = Array.from(grouped.values())
+    .sort((a, b) => {
+      const scoreDelta = scoreGlobalSearchRow(b.card as Photocard & Record<string, unknown>, b.card, trimmed)
+        - scoreGlobalSearchRow(a.card as Photocard & Record<string, unknown>, a.card, trimmed);
+      if (scoreDelta !== 0) return scoreDelta;
+      return (b.card.createdAt ?? 0) - (a.card.createdAt ?? 0);
+    })
+    .slice(0, GLOBAL_SEARCH_RESULT_LIMIT);
+  logGlobalSearchQueryDebug({
+    searchTerm: trimmed,
+    fieldsBeingSearched: {
+      supabase: usedLegacySearch
+        ? LEGACY_GLOBAL_SEARCH_SUPABASE_FIELDS
+        : GLOBAL_SEARCH_SUPABASE_FIELDS,
+      clientSupplement: GLOBAL_SEARCH_DESCRIPTIVE_FIELDS,
+    },
+    resultCount: results.length,
+    matchedCardMetadata: results.map(({ card }) => ({
+      category: card.category,
+      source: card.source,
+      album: card.album,
+      era: card.era,
+      version: card.version,
+      cardName: card.cardName,
+      members: card.members,
+      group: card.group,
+    })),
+  });
+
+  return results;
 }
 
 export async function fetchWishlistCountForCard(card: Photocard): Promise<number> {

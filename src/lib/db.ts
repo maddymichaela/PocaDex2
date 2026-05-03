@@ -1,32 +1,65 @@
 import { supabase } from './supabase';
-import { getPhotocardBaseIdentity, getPhotocardCategory, getPhotocardMembers, getPhotocardTemplateId, normalizePhotocardForSave, normalizePhotocardUpdates, Photocard } from '../types';
+import { getKnownPhotocardCategory, getPhotocardBaseIdentity, getPhotocardMembers, getPhotocardTemplateId, getPhotocardTemplateMetadata, getSharedPhotocardIdentity, normalizePhotocardForSave, normalizePhotocardUpdates, Photocard } from '../types';
 
 // ── Row ↔ Photocard mappers ────────────────────────────────────────────────
 
 export function rowToPhotocard(row: Record<string, unknown>): Photocard {
   const id = row.id as string;
-  const ownerUserId = (row.user_id as string) ?? undefined;
-  return {
+  const ownerUserId = (row.user_id as string) ?? (row.userId as string) ?? undefined;
+  const storedCardTemplateId = (row.card_template_id as string) || (row.cardTemplateId as string) || undefined;
+  const templateMetadata = getPhotocardTemplateMetadata(storedCardTemplateId);
+  const group = (row.group_name as string) ?? (row.group as string) ?? (row.groupName as string) ?? undefined;
+  const rowSourceValue = row.source ?? row.shop ?? row.store ?? row.event ?? row.pob ?? row.benefit;
+  const rowSource = typeof rowSourceValue === 'string' ? rowSourceValue.trim() : '';
+  const rowCategory = getKnownPhotocardCategory(row.category ?? row.card_category ?? row.cardCategory ?? row.card_type ?? row.cardType);
+  const source = rowSource || (rowCategory === 'Album' ? undefined : templateMetadata.source);
+  const category = rowCategory && rowCategory !== 'Album'
+    ? rowCategory
+    : rowCategory === 'Album'
+      ? rowCategory
+      : templateMetadata.category && templateMetadata.category !== 'Album'
+        ? templateMetadata.category
+        : source
+          ? 'Other'
+          : rowCategory;
+  const album = String(row.album ?? row.album_name ?? row.albumName ?? '');
+  const imageUrl = (row.image_url as string) ?? (row.imageUrl as string) ?? undefined;
+  const cardName = String(row.card_name ?? row.cardName ?? row.name ?? '');
+  const createdAtValue = row.created_at ?? row.createdAt;
+
+  const mappedCard = {
     id,
-    cardTemplateId: (row.card_template_id as string) || undefined,
+    cardTemplateId: storedCardTemplateId,
     ownerUserId,
-    group: (row.group_name as string) ?? undefined,
+    group,
     members: getPhotocardMembers({ members: row.members as string[] | undefined, member: row.member as string | undefined }),
-    category: row.category
-      ? getPhotocardCategory({ category: row.category as Photocard['category'] })
-      : row.source ? 'Other' : 'Album',
-    source: (row.source as string) ?? undefined,
-    album: row.album as string,
+    category,
+    source,
+    album,
     era: (row.era as string) ?? undefined,
     year: row.year as number,
-    cardName: row.card_name as string,
+    cardName,
     version: row.version as string,
     status: row.status as Photocard['status'],
     condition: (row.condition as Photocard['condition']) ?? undefined,
     isDuplicate: (row.is_duplicate as boolean) ?? false,
     notes: (row.notes as string) ?? undefined,
-    imageUrl: (row.image_url as string) ?? undefined,
-    createdAt: new Date(row.created_at as string).getTime(),
+    imageUrl,
+    createdAt: createdAtValue ? new Date(createdAtValue as string).getTime() : Date.now(),
+  };
+  const repairedTemplateId = getSharedPhotocardIdentity(mappedCard);
+  const storedMetadata = getPhotocardTemplateMetadata(storedCardTemplateId);
+  const storedLooksStale = Boolean(
+    storedCardTemplateId &&
+    (
+      storedMetadata.category !== mappedCard.category ||
+      (storedMetadata.source ?? '') !== (mappedCard.source ?? '')
+    )
+  );
+
+  return {
+    ...mappedCard,
+    cardTemplateId: storedLooksStale || !storedCardTemplateId ? repairedTemplateId : storedCardTemplateId,
   };
 }
 

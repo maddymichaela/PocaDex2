@@ -1,11 +1,15 @@
-import { getPhotocardCategory, getPhotocardMembers, getPhotocardTemplateId, Photocard, PhotocardCategory } from '../types';
+import { getPhotocardCategory, getPhotocardMembers, getPhotocardTemplateId, getPhotocardTemplateMetadata, Photocard, PhotocardCategory } from '../types';
 
 export function isProfileOwner(currentUserId?: string | null, profileUserId?: string | null) {
   return Boolean(currentUserId && profileUserId && currentUserId === profileUserId);
 }
 
-export function isPhotocardOwner(currentUserId?: string | null, photocard?: Pick<Photocard, 'ownerUserId'> | null) {
-  return Boolean(currentUserId && photocard?.ownerUserId && currentUserId === photocard.ownerUserId);
+export function isPhotocardOwner(
+  currentUserId?: string | null,
+  photocard?: (Pick<Photocard, 'ownerUserId'> & { user_id?: unknown; userId?: unknown }) | null,
+) {
+  const ownerUserId = photocard?.ownerUserId ?? photocard?.user_id ?? photocard?.userId;
+  return Boolean(currentUserId && ownerUserId && currentUserId === ownerUserId);
 }
 
 export function getPhotocardMatchId(photocard: Photocard) {
@@ -27,29 +31,21 @@ function hasMeaningfulValue(value: unknown) {
   return value !== null && value !== undefined && String(value).trim() !== '';
 }
 
-function getTemplateMetadata(sourceCard: Photocard & Record<string, unknown>) {
-  const templateId = typeof sourceCard.cardTemplateId === 'string' ? sourceCard.cardTemplateId : '';
-  const parts = templateId.split('|');
-  if (parts.length < 9) return {};
-
-  const category = hasMeaningfulValue(parts[2]) ? getPhotocardCategory({ category: parts[2] as PhotocardCategory }) : undefined;
-  const source = hasMeaningfulValue(parts[4]) ? parts[4] : undefined;
-  return { category, source };
-}
-
 function resolveCloneCategory(sourceCard: Photocard & Record<string, unknown>): PhotocardCategory {
-  const templateMetadata = getTemplateMetadata(sourceCard);
+  const templateMetadata = getPhotocardTemplateMetadata(sourceCard.cardTemplateId);
+  const source = resolveCloneSource(sourceCard);
   if (templateMetadata.category && templateMetadata.category !== 'Album') return templateMetadata.category;
-  if (hasMeaningfulValue(sourceCard.category)) return getPhotocardCategory(sourceCard);
-  if (resolveCloneSource(sourceCard)) return 'Other';
-  return 'Album';
+  const explicitCategory = hasMeaningfulValue(sourceCard.category) ? getPhotocardCategory(sourceCard) : undefined;
+  if (explicitCategory && explicitCategory !== 'Album') return explicitCategory;
+  if (source) return 'Other';
+  return explicitCategory ?? 'Album';
 }
 
 function resolveCloneSource(sourceCard: Photocard & Record<string, unknown>) {
   const source = sourceCard.source ?? sourceCard.shop ?? sourceCard.store ?? sourceCard.event ?? sourceCard.pob ?? sourceCard.benefit;
   if (hasMeaningfulValue(source)) return String(source);
 
-  const templateMetadata = getTemplateMetadata(sourceCard);
+  const templateMetadata = getPhotocardTemplateMetadata(sourceCard.cardTemplateId);
   return templateMetadata.source;
 }
 

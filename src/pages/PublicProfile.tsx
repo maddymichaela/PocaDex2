@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Edit3, Heart, Lock, Plus, Sparkles, UserCheck, UserPlus, UsersRound } from 'lucide-react';
+import { Edit3, Heart, Lock, Sparkles, UserCheck, UserPlus, UsersRound } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { PhotocardCard, PhotocardGrid } from '../components/PhotocardGrid';
+import PublicCardAction from '../components/PublicCardAction';
 import { getProfileDisplayName, Photocard, Profile } from '../types';
 import { fetchPublicProfileBundle, followUser, getProfileUserId, PublicProfileBundle, unfollowUser } from '../lib/social';
-import { getPhotocardMatchId, isProfileOwner } from '../lib/ownership';
+import { isProfileOwner } from '../lib/ownership';
 
 type ProfileTab = 'collection' | 'wishlist' | 'about';
 
@@ -65,7 +66,6 @@ export default function PublicProfile({
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ProfileTab>('collection');
   const [followBusy, setFollowBusy] = useState(false);
-  const [collectedMatchIds, setCollectedMatchIds] = useState<Set<string>>(() => new Set());
 
   const isOwnProfileRoute = ownProfile?.username?.toLowerCase() === username.toLowerCase();
 
@@ -118,10 +118,6 @@ export default function PublicProfile({
   useEffect(() => {
     onProfileResolved?.(bundle?.profile ?? null);
   }, [bundle?.profile, onProfileResolved]);
-
-  useEffect(() => {
-    setCollectedMatchIds(new Set(ownPhotocards.map(getPhotocardMatchId)));
-  }, [ownPhotocards]);
 
   const cards = bundle?.cards ?? [];
   const ownedCards = useMemo(() => cards.filter((card) => card.status === 'owned'), [cards]);
@@ -198,28 +194,25 @@ export default function PublicProfile({
     return (
       <div className="grid grid-cols-2 items-stretch gap-3 md:grid-cols-4 md:max-lg:gap-4 xl:grid-cols-5 lg:gap-6">
         {nextCards.map((card, index) => {
-          const identity = getPhotocardMatchId(card);
-          const inCollection = collectedMatchIds.has(identity);
           return (
-            <div key={card.id} className="flex h-full flex-col gap-2">
-              <PhotocardCard photocard={card} index={index} infoMode="public-profile" className="flex-1" onClick={() => onOpenCard?.(card, nextCards)} />
-              <button
-                type="button"
-                disabled={inCollection}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  if (!currentUserId || !onAddToCollection) {
-                    setError('Sign in or create an account to add cards to your collection.');
-                    return;
-                  }
-                  onAddToCollection(card);
-                }}
-                className="flex h-10 items-center justify-center gap-1.5 rounded-2xl bg-primary px-2 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all disabled:bg-white disabled:text-primary disabled:ring-2 disabled:ring-primary/15"
-              >
-                {!inCollection && <Plus size={13} />}
-                {inCollection ? 'In Collection' : 'Add to My Collection'}
-              </button>
+            <div key={card.id} className="relative h-full">
+              <PhotocardCard
+                photocard={card}
+                index={index}
+                infoMode="public-profile"
+                context="public-profile"
+                onClick={() => onOpenCard?.(card, nextCards)}
+                actionFooter={(
+                  <PublicCardAction
+                    card={card}
+                    currentUserId={currentUserId}
+                    ownPhotocards={ownPhotocards}
+                    onAddToCollection={onAddToCollection}
+                    onRequireAuth={() => setError('Sign in or create an account to add cards to your collection.')}
+                    className="h-10 w-full rounded-xl bg-primary/95 text-[8px] shadow-sm backdrop-blur disabled:bg-white/95"
+                  />
+                )}
+              />
             </div>
           );
         })}

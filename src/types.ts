@@ -15,6 +15,7 @@ export const PHOTOCARD_CATEGORIES = [
   'Concert',
   'Event',
   'Lucky Draw',
+  'POB',
   'Collaboration',
   'Endorsement',
   'Other',
@@ -50,24 +51,23 @@ export interface Photocard {
   createdAt: number;
 }
 
-export type LegacyPhotocardInput = Partial<Photocard> & { member?: string };
+export type LegacyPhotocardInput = Partial<Photocard> & { member?: unknown };
 
 export function normalizeMembers(input: unknown): string[] {
-  if (Array.isArray(input)) {
-    return Array.from(new Set(input.map(member => String(member).trim()).filter(Boolean)));
-  }
-  if (typeof input === 'string') {
-    return input.split(',').map(member => member.trim()).filter(Boolean);
-  }
-  return [];
+  const splitMemberValue = (value: unknown): string[] => {
+    if (Array.isArray(value)) return value.flatMap(splitMemberValue);
+    if (typeof value !== 'string') return [];
+    return value.split(/[|,]/).map(member => member.trim()).filter(Boolean);
+  };
+
+  return Array.from(new Set(splitMemberValue(input)));
 }
 
 export function getPhotocardMembers(photocard: LegacyPhotocardInput): string[] {
   const members = normalizeMembers(photocard.members);
   if (members.length > 0) return members;
 
-  const legacyMember = typeof photocard.member === 'string' ? photocard.member.trim() : '';
-  return legacyMember ? [legacyMember] : [];
+  return normalizeMembers(photocard.member);
 }
 
 export function formatPhotocardMembers(photocard: LegacyPhotocardInput, maxNames = 3): string {
@@ -111,6 +111,15 @@ export function getPhotocardTemplateId(photocard: LegacyPhotocardInput) {
   return photocard.cardTemplateId || getSharedPhotocardIdentity(photocard);
 }
 
+export function getPhotocardTemplateMetadata(templateId?: string) {
+  const parts = String(templateId ?? '').split('|');
+  if (parts.length < 9) return {};
+
+  const category = getKnownPhotocardCategory(parts[2]);
+  const source = parts[4]?.trim() || undefined;
+  return { category, source };
+}
+
 export function getMissingRequiredPhotocardFields(
   photocard: Pick<Photocard, 'members' | 'category' | 'status'> & Partial<Pick<Photocard, 'album' | 'source'>> & { member?: string }
 ): string[] {
@@ -132,6 +141,14 @@ export function getPhotocardCategory(photocard: Pick<Photocard, 'category'>): Ph
 
   const normalizedCategory = rawCategory.toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
   return PHOTOCARD_CATEGORIES.find((category) => category.toLowerCase() === normalizedCategory) ?? 'Album';
+}
+
+export function getKnownPhotocardCategory(category: unknown): PhotocardCategory | undefined {
+  const rawCategory = String(category ?? '').trim();
+  if (!rawCategory) return undefined;
+
+  const normalizedCategory = rawCategory.toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+  return PHOTOCARD_CATEGORIES.find((knownCategory) => knownCategory.toLowerCase() === normalizedCategory);
 }
 
 export function normalizePhotocardForSave(photocard: Photocard): Photocard {

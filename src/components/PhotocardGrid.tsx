@@ -5,7 +5,7 @@
 
 import { motion } from 'motion/react';
 import { Heart, Copy, Truck } from 'lucide-react';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { formatPhotocardMembers, getPhotocardCategory, Photocard } from '../types';
 import { placeholderImage } from '../lib/assets';
 import { STATUS_COLORS } from '../lib/statusStyles';
@@ -18,6 +18,8 @@ interface PhotocardCardProps {
   onToggle?: (id: string) => void;
   onClick?: (pc: Photocard) => void;
   infoMode?: 'default' | 'public-profile';
+  context?: 'binder' | 'global-search' | 'public-profile';
+  actionFooter?: ReactNode;
   className?: string;
   key?: string;
 }
@@ -43,6 +45,8 @@ export function PhotocardCard({
   onToggle,
   onClick,
   infoMode = 'default',
+  context = 'binder',
+  actionFooter,
   className = '',
 }: PhotocardCardProps) {
   const isWishlist = photocard.status === 'wishlist';
@@ -56,12 +60,26 @@ export function PhotocardCard({
   const hasEra = !!photocard.era?.trim();
   const category = getPhotocardCategory(photocard);
   const memberLabel = formatPhotocardMembers(photocard);
-  const sourceOrAlbum = category !== 'Album' && hasSource ? photocard.source : photocard.album;
+  const sourceOrAlbum = category === 'Album' ? photocard.album : photocard.source;
+  const metadataParts = compactUnique([category, sourceOrAlbum, photocard.era]);
   const publicProfileDetail = compactUnique([sourceOrAlbum, photocard.cardName]).join(' · ');
 
   useEffect(() => {
     setHasImageError(false);
   }, [photocard.imageUrl]);
+
+  useEffect(() => {
+    if (context !== 'global-search' || !(import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) return;
+    const cardOwnerId = photocard.ownerUserId ?? (photocard as Photocard & { user_id?: unknown; userId?: unknown }).user_id ?? (photocard as Photocard & { userId?: unknown }).userId;
+    console.debug('[PocaDex global search layout/action debug]', {
+      cardId: photocard.id,
+      cardOwnerId,
+      cardHeightClassComponentUsed: 'PhotocardCard shared binder layout with footer slot',
+      imageAreaClass: 'aspect-[650/1000]',
+      contentAreaClass: 'min-h-[82px] md:min-h-[90px]',
+      footerAreaClass: actionFooter ? 'min-h-[52px] px-3 pb-3 md:px-4 md:pb-4' : null,
+    });
+  }, [actionFooter, context, photocard]);
 
   const getConditionLabel = (condition?: string) => {
     switch (condition) {
@@ -94,7 +112,7 @@ export function PhotocardCard({
           onClick(photocard);
         }
       }}
-      className={`glass-card rounded-[28px] shadow-md flex flex-col relative overflow-hidden group cursor-pointer border-2 transition-all hover:shadow-xl hover:shadow-primary/5 ${selectMode && isSelected ? 'border-primary ring-4 ring-primary/10' : statusCardClass} ${className}`}
+      className={`glass-card rounded-[28px] shadow-md flex h-full flex-col relative overflow-hidden group cursor-pointer border-2 transition-all hover:shadow-xl hover:shadow-primary/5 ${selectMode && isSelected ? 'border-primary ring-4 ring-primary/10' : statusCardClass} ${className}`}
     >
       {/* Selection UI */}
       {selectMode && (
@@ -164,7 +182,7 @@ export function PhotocardCard({
       </div>
 
       {/* Information Area */}
-      <div className="px-3 pb-3 pt-3 md:px-4 md:pb-4 space-y-1">
+      <div className="flex min-h-[82px] flex-col justify-start px-3 pb-3 pt-3 md:min-h-[90px] md:px-4 md:pb-4 space-y-1">
         <div className="flex flex-col">
           {photocard.group && (
             <span className="text-[11px] font-semibold text-primary/70 leading-relaxed pb-1 truncate">
@@ -184,11 +202,14 @@ export function PhotocardCard({
           )
         ) : (
           <div className="flex flex-col gap-0.5">
-            {(hasAlbum || hasSource || hasEra) && (
+            {metadataParts.length > 0 && (
               <div className="text-xs font-medium text-foreground/50 line-clamp-1">
-                {sourceOrAlbum}
-                {sourceOrAlbum && hasEra && <span className="opacity-60 mx-1">•</span>}
-                {hasEra && <span className={sourceOrAlbum ? 'opacity-60' : undefined}>{photocard.era}</span>}
+                {metadataParts.map((part, partIndex) => (
+                  <span key={`${part}-${partIndex}`} className={partIndex > 0 ? 'opacity-60' : undefined}>
+                    {partIndex > 0 && <span className="mx-1">•</span>}
+                    {part}
+                  </span>
+                ))}
               </div>
             )}
             <div className="text-xs font-medium text-foreground/80 truncate tracking-normal">
@@ -198,6 +219,12 @@ export function PhotocardCard({
           </div>
         )}
       </div>
+
+      {actionFooter && (
+        <div className="mt-auto min-h-[52px] px-3 pb-3 md:px-4 md:pb-4">
+          {actionFooter}
+        </div>
+      )}
     </motion.div>
   );
 }

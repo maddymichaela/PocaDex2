@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
 import Collection from './pages/Collection';
@@ -11,7 +11,7 @@ import Scan from './pages/Scan';
 import AccountSettings from './pages/AccountSettings';
 import PublicProfile from './pages/PublicProfile';
 import Social from './pages/Social';
-import FindCards from './pages/FindCards';
+import FindCards, { clearGlobalSearchState } from './pages/FindCards';
 import { normalizePhotocardForSave, normalizePhotocardUpdates, Photocard, Profile } from './types';
 import { useAuth } from './contexts/AuthContext';
 import {
@@ -93,33 +93,54 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedPublicCard, setSelectedPublicCard] = useState<Photocard | null>(null);
   const [selectedPublicCards, setSelectedPublicCards] = useState<Photocard[]>([]);
+  const [selectedCardBackLabel, setSelectedCardBackLabel] = useState('Back to Binder');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [formCard, setFormCard] = useState<Photocard | null>(null);
   const [photocards, setPhotocards] = useState<Photocard[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [viewedProfile, setViewedProfile] = useState<Profile | null>(null);
+  const currentPageRef = useRef(currentPage);
+
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+  }, [currentPage]);
 
   const handleAddCard = useCallback(() => {
+    if (currentPageRef.current === 'FindCards') {
+      clearGlobalSearchState('opened new-card form from Find Cards');
+    }
     setFormMode('create');
     setFormCard(null);
     setSelectedPublicCard(null);
     setSelectedPublicCards([]);
+    setSelectedCardBackLabel('Back to Binder');
     setIsFormOpen(true);
   }, []);
 
   const handleAddPublicCard = useCallback((sourceCard: Photocard) => {
     if (!user) return;
     if (hasMatchingPhotocard(photocards, sourceCard)) return;
+    if (currentPageRef.current === 'FindCards') {
+      clearGlobalSearchState('opened add-to-collection form from Global Search');
+    }
+    const draft = createPhotocardDraftFromPublicCard(sourceCard, user.id);
+    if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
+      console.debug('[PocaDex global search debug] clone/add payload', { sourceCard, draft });
+    }
     setFormMode('create');
-    setFormCard(createPhotocardDraftFromPublicCard(sourceCard, user.id));
+    setFormCard(draft);
     setSelectedPublicCard(null);
     setSelectedPublicCards([]);
+    setSelectedCardBackLabel('Back to Binder');
     setSelectedId(null);
     setIsFormOpen(true);
   }, [photocards, user]);
 
   const navigateToPage = useCallback((page: string, username?: string) => {
+    if (currentPageRef.current === 'FindCards' && page !== 'FindCards') {
+      clearGlobalSearchState(`navigated from Find Cards to ${page}`);
+    }
     setCurrentPage(page);
     setRouteUsername(username ?? '');
     if (page === 'Friends') setSocialTab('people');
@@ -127,6 +148,7 @@ export default function App() {
     setSelectedId(null);
     setSelectedPublicCard(null);
     setSelectedPublicCards([]);
+    setSelectedCardBackLabel('Back to Binder');
     setIsFormOpen(false);
     window.history.pushState({}, '', routeForPage(page, username));
   }, []);
@@ -134,6 +156,9 @@ export default function App() {
   useEffect(() => {
     const handlePopState = () => {
       const nextRoute = readRouteState();
+      if (currentPageRef.current === 'FindCards' && nextRoute.page !== 'FindCards') {
+        clearGlobalSearchState(`browser navigation from Find Cards to ${nextRoute.page}`);
+      }
       setCurrentPage(nextRoute.page);
       setRouteUsername(nextRoute.username ?? '');
       setSocialTab(nextRoute.socialTab ?? 'people');
@@ -141,6 +166,7 @@ export default function App() {
       setSelectedId(null);
       setSelectedPublicCard(null);
       setSelectedPublicCards([]);
+      setSelectedCardBackLabel('Back to Binder');
       setIsFormOpen(false);
     };
     window.addEventListener('popstate', handlePopState);
@@ -257,20 +283,6 @@ export default function App() {
     });
   }, []);
 
-  const handleCopyPublicCard = useCallback(async (sourceCard: Photocard, status: 'owned' | 'wishlist') => {
-    if (!user) return;
-    const sourceTemplateId = getCardTemplateId(sourceCard);
-    if (photocards.some((card) => getCardTemplateId(card) === sourceTemplateId)) return;
-
-    const copiedCard = normalizePhotocardForSave({
-      ...createPhotocardDraftFromPublicCard(sourceCard, user.id),
-      status,
-      condition: status === 'owned' ? sourceCard.condition ?? 'mint' : undefined,
-    });
-
-    await handleAddPhotocard(copiedCard);
-  }, [handleAddPhotocard, photocards, user]);
-
   // Auth loading
   if (authLoading) {
     return (
@@ -297,6 +309,7 @@ export default function App() {
                 photocard={selectedPublicCard}
                 onBack={() => { setSelectedId(null); setSelectedPublicCard(null); setSelectedPublicCards([]); }}
                 onEdit={() => undefined}
+                backLabel="Back to Profile"
                 hasPrev={publicCardIndex > 0}
                 hasNext={publicCardIndex >= 0 && publicCardIndex < selectedPublicCards.length - 1}
                 onPrev={() => {
@@ -314,6 +327,8 @@ export default function App() {
                   }
                 }}
                 isOwner={false}
+                currentUserId={null}
+                ownPhotocards={[]}
                 onRequireAuth={() => window.alert('Sign in or create an account to add cards to your collection.')}
               />
             ) : (
@@ -322,7 +337,7 @@ export default function App() {
                 currentUserId={null}
                 ownPhotocards={[]}
                 onEditProfile={() => setAuthScreen('login')}
-                onOpenCard={(pc, cards) => { setSelectedPublicCard(pc); setSelectedPublicCards(cards ?? []); setSelectedId(pc.id); }}
+                onOpenCard={(pc, cards) => { setSelectedPublicCard(pc); setSelectedPublicCards(cards ?? []); setSelectedCardBackLabel('Back to Profile'); setSelectedId(pc.id); }}
               />
             )}
           </main>
@@ -372,10 +387,12 @@ export default function App() {
               if (isViewingOwnProfile || isPhotocardOwner(user.id, pc)) {
                 setSelectedPublicCard(null);
                 setSelectedPublicCards([]);
+                setSelectedCardBackLabel('Back to Binder');
                 setSelectedId(pc.id);
               } else {
                 setSelectedPublicCard(pc);
                 setSelectedPublicCards(cards ?? []);
+                setSelectedCardBackLabel('Back to Profile');
                 setSelectedId(pc.id);
               }
             }}
@@ -386,8 +403,23 @@ export default function App() {
       case 'FindCards':
         return (
           <FindCards
+            currentUserId={user.id}
             ownPhotocards={photocards}
-            onCopyCard={handleCopyPublicCard}
+            onOpenCard={(pc, cards) => {
+              if (isPhotocardOwner(user.id, pc)) {
+                setSelectedPublicCard(null);
+                setSelectedPublicCards([]);
+                setSelectedCardBackLabel('Back to Search');
+                setSelectedId(pc.id);
+              } else {
+                setSelectedPublicCard(pc);
+                setSelectedPublicCards(cards ?? []);
+                setSelectedCardBackLabel('Back to Search');
+                setSelectedId(pc.id);
+              }
+            }}
+            onAddToCollection={handleAddPublicCard}
+            onRequireAuth={() => window.alert('Sign in or create an account to add cards to your collection.')}
           />
         );
       case 'Friends':
@@ -404,7 +436,7 @@ export default function App() {
             photocards={photocards}
             onDelete={handleDeletePhotocard}
             onBulkUpdate={handleBulkUpdatePartial}
-            onCardClick={(pc) => setSelectedId(pc.id)}
+            onCardClick={(pc) => { setSelectedCardBackLabel('Back to Binder'); setSelectedId(pc.id); }}
             onNewCard={handleAddCard}
           />
         );
@@ -442,7 +474,15 @@ export default function App() {
         profile={profile}
         onSignOut={signOut}
         onAddCard={handleAddCard}
-        onOpenSettings={() => { setCurrentPage('Account'); setSelectedId(null); setSelectedPublicCard(null); setIsFormOpen(false); }}
+        onOpenSettings={() => {
+          if (currentPageRef.current === 'FindCards') {
+            clearGlobalSearchState('opened account settings from Find Cards');
+          }
+          setCurrentPage('Account');
+          setSelectedId(null);
+          setSelectedPublicCard(null);
+          setIsFormOpen(false);
+        }}
       />
       <main className="relative z-10 flex-1 overflow-auto overflow-x-hidden">
         {profile?.deletion_requested_at && (
@@ -485,6 +525,7 @@ export default function App() {
             photocard={currentCard}
             onBack={() => { setSelectedId(null); setSelectedPublicCard(null); setSelectedPublicCards([]); }}
             onEdit={() => { setFormMode('edit'); setFormCard(currentCard); setIsFormOpen(true); }}
+            backLabel={selectedCardBackLabel}
             hasPrev={selectedPublicCard ? currentPublicCardIndex > 0 : currentCardIndex > 0}
             hasNext={selectedPublicCard ? currentPublicCardIndex >= 0 && currentPublicCardIndex < selectedPublicCards.length - 1 : currentCardIndex >= 0 && currentCardIndex < photocards.length - 1}
             onPrev={() => {
@@ -510,6 +551,8 @@ export default function App() {
               setSelectedId(photocards[currentCardIndex + 1].id);
             }}
             isOwner={!selectedPublicCard}
+            currentUserId={user.id}
+            ownPhotocards={photocards}
             onAddToCollection={handleAddPublicCard}
             isInCollection={selectedPublicCardInCollection}
           />

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Image as ImageIcon, Edit3, Copy, Heart, Truck, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Image as ImageIcon, Edit3, Copy, Heart, Truck } from 'lucide-react';
+import PublicCardAction from '../components/PublicCardAction';
 import { formatPhotocardMembers, getPhotocardCategory, Photocard } from '../types';
 import { placeholderImage } from '../lib/assets';
 import { fetchWishlistCountForCard } from '../lib/social';
@@ -16,6 +17,9 @@ interface CardDetailProps {
   onAddToCollection?: (card: Photocard) => void;
   onRequireAuth?: () => void;
   isInCollection?: boolean;
+  currentUserId?: string | null;
+  ownPhotocards?: Photocard[];
+  backLabel?: string;
 }
 
 export default function CardDetail({
@@ -30,6 +34,9 @@ export default function CardDetail({
   onAddToCollection,
   onRequireAuth,
   isInCollection = false,
+  currentUserId,
+  ownPhotocards,
+  backLabel = 'Back to Binder',
 }: CardDetailProps) {
   const category = getPhotocardCategory(photocard);
   const memberLabel = formatPhotocardMembers(photocard);
@@ -49,6 +56,28 @@ export default function CardDetail({
     };
   }, [photocard]);
 
+  useEffect(() => {
+    if (!(import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) return;
+    console.debug('[PocaDex CARD DETAIL DEBUG]', {
+      id: photocard.id,
+      category: photocard.category,
+      album: photocard.album,
+      albumName: (photocard as Photocard & Record<string, unknown>).albumName,
+      source: photocard.source,
+      sourceName: (photocard as Photocard & Record<string, unknown>).sourceName,
+      shop: (photocard as Photocard & Record<string, unknown>).shop,
+      event: (photocard as Photocard & Record<string, unknown>).event,
+      card: photocard,
+    });
+    console.debug('[PocaDex global search card display debug] card detail payload', {
+      photocard,
+      category: photocard.category,
+      album: photocard.album,
+      source: photocard.source,
+      backLabel,
+    });
+  }, [backLabel, photocard]);
+
   return (
     <div className="bg-gray-50/30">
       {/* Header */}
@@ -61,7 +90,7 @@ export default function CardDetail({
             >
               <ChevronLeft size={18} className="shrink-0 text-foreground/40 transition-colors group-hover:text-primary md:size-6" />
               <span className="text-[9px] font-black uppercase tracking-[0.12em] text-foreground/40 group-hover:text-foreground sm:text-[10px] sm:tracking-[0.2em]">
-                Back<span className="hidden sm:inline"> to Binder</span>
+                {backLabel}
               </span>
             </button>
 
@@ -94,19 +123,14 @@ export default function CardDetail({
               Edit<span className="hidden sm:inline"> Card</span>
             </button>
           ) : (
-            <button
-              disabled={isInCollection}
-              onClick={() => onAddToCollection ? onAddToCollection(photocard) : onRequireAuth?.()}
-              className={`flex shrink-0 items-center gap-1.5 rounded-xl border-2 px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] shadow-sm sm:text-[10px] sm:tracking-widest md:gap-2 md:px-5 md:py-2.5 ${
-                isInCollection
-                  ? 'border-primary/15 bg-white text-primary ring-2 ring-primary/10'
-                  : 'btn-primary-pink border-white/20'
-              }`}
-            >
-              {!isInCollection && <Plus size={14} />}
-              <span className="hidden sm:inline">{isInCollection ? 'In Collection' : 'Add to My Collection'}</span>
-              <span className="sm:hidden">{isInCollection ? 'Saved' : 'Add'}</span>
-            </button>
+            <PublicCardAction
+              card={photocard}
+              currentUserId={currentUserId}
+              ownPhotocards={ownPhotocards ?? (isInCollection ? [photocard] : [])}
+              onAddToCollection={onAddToCollection}
+              onRequireAuth={onRequireAuth}
+              className="h-auto shrink-0 rounded-xl border-2 border-white/20 px-3 py-2 text-[9px] tracking-[0.12em] sm:text-[10px] sm:tracking-widest md:gap-2 md:px-5 md:py-2.5"
+            />
           )}
         </div>
       </div>
