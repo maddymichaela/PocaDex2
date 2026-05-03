@@ -199,7 +199,6 @@ export default function PublicProfile({
               <PhotocardCard
                 photocard={card}
                 index={index}
-                infoMode="public-profile"
                 context="public-profile"
                 onClick={() => onOpenCard?.(card, nextCards)}
                 actionFooter={(

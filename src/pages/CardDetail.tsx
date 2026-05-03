@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Image as ImageIcon, Edit3, Copy, Heart, Truck } from 'lucide-react';
 import PublicCardAction from '../components/PublicCardAction';
-import { formatPhotocardMembers, getPhotocardCategory, Photocard } from '../types';
+import { formatPhotocardMembers, Photocard } from '../types';
 import { placeholderImage } from '../lib/assets';
 import { fetchWishlistCountForCard } from '../lib/social';
+import { getPhotocardDisplayMetadata } from '../lib/cardMetadata';
 
 interface CardDetailProps {
   photocard: Photocard;
@@ -38,7 +39,8 @@ export default function CardDetail({
   ownPhotocards,
   backLabel = 'Back to Binder',
 }: CardDetailProps) {
-  const category = getPhotocardCategory(photocard);
+  const displayMetadata = getPhotocardDisplayMetadata(photocard);
+  const category = displayMetadata.category;
   const memberLabel = formatPhotocardMembers(photocard);
   const [wishlistCount, setWishlistCount] = useState(0);
 
@@ -202,23 +204,23 @@ export default function CardDetail({
             </div>
 
             {/* Details card — only renders fields that have values */}
-            {(category || photocard.source || photocard.album || photocard.era || photocard.version || photocard.cardName) && (
+            {(category || displayMetadata.primaryDetail || photocard.era || photocard.version || photocard.cardName) && (
               <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-6">
                   <div>
                     <div className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40">Category</div>
                     <p className="text-base font-medium text-foreground/85">{category}</p>
                   </div>
-                  {category === 'Album' && photocard.album && (
+                  {category === 'Album' && displayMetadata.albumLabel && (
                     <div>
                       <div className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40">Album</div>
-                      <p className="text-base font-medium text-foreground/85">{photocard.album}</p>
+                      <p className="text-base font-medium text-foreground/85">{displayMetadata.albumLabel}</p>
                     </div>
                   )}
-                  {category !== 'Album' && photocard.source && (
+                  {category !== 'Album' && displayMetadata.sourceLabel && (
                     <div>
                       <div className="block mb-[5px] text-[9px] md:text-[10px] font-black uppercase tracking-widest text-foreground/40">Source</div>
-                      <p className="text-base font-medium text-foreground/85">{photocard.source}</p>
+                      <p className="text-base font-medium text-foreground/85">{displayMetadata.sourceLabel}</p>
                     </div>
                   )}
                   {photocard.era && (

@@ -475,7 +475,7 @@ async function fetchPublicPhotocards(profile: Profile, viewerId?: string | null)
 
   const request = applyVisibility(supabase
     .from('photocards')
-    .select(PUBLIC_PHOTOCARD_SELECT)
+    .select('*')
     .eq('user_id', getProfileUserId(profile))
     .order('created_at', { ascending: false }));
 
@@ -502,10 +502,48 @@ async function fetchPublicPhotocards(profile: Profile, viewerId?: string | null)
       returnedCount: legacyData?.length ?? 0,
       error: null,
     });
-    return ((legacyData ?? []) as unknown as Record<string, unknown>[]).map(rowToPhotocard);
+    return ((legacyData ?? []) as unknown as Record<string, unknown>[]).map((row) => {
+      const card = rowToPhotocard(row);
+      if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
+        console.debug('[PocaDex friend profile card metadata debug]', {
+          rawFriendProfileCardResult: row,
+          mappedCard: card,
+          category: card.category,
+          album: card.album,
+          albumName: row.albumName ?? row.album_name,
+          source: card.source,
+          sourceName: row.sourceName ?? row.source_name,
+          shop: row.shop,
+          store: row.store,
+          event: row.event,
+          benefit: row.benefit,
+          pob: row.pob,
+        });
+      }
+      return card;
+    });
   }
   if (error) throw error;
-  return ((data ?? []) as unknown as Record<string, unknown>[]).map(rowToPhotocard);
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map((row) => {
+    const card = rowToPhotocard(row);
+    if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
+      console.debug('[PocaDex friend profile card metadata debug]', {
+        rawFriendProfileCardResult: row,
+        mappedCard: card,
+        category: card.category,
+        album: card.album,
+        albumName: row.albumName ?? row.album_name,
+        source: card.source,
+        sourceName: row.sourceName ?? row.source_name,
+        shop: row.shop,
+        store: row.store,
+        event: row.event,
+        benefit: row.benefit,
+        pob: row.pob,
+      });
+    }
+    return card;
+  });
 }
 
 export async function followUser(followerId: string, followingId: string): Promise<void> {

@@ -9,19 +9,18 @@ export function rowToPhotocard(row: Record<string, unknown>): Photocard {
   const storedCardTemplateId = (row.card_template_id as string) || (row.cardTemplateId as string) || undefined;
   const templateMetadata = getPhotocardTemplateMetadata(storedCardTemplateId);
   const group = (row.group_name as string) ?? (row.group as string) ?? (row.groupName as string) ?? undefined;
-  const rowSourceValue = row.source ?? row.shop ?? row.store ?? row.event ?? row.pob ?? row.benefit;
+  const rowSourceValue = row.source ?? row.source_name ?? row.sourceName ?? row.shop ?? row.store ?? row.event ?? row.pob ?? row.benefit;
   const rowSource = typeof rowSourceValue === 'string' ? rowSourceValue.trim() : '';
   const rowCategory = getKnownPhotocardCategory(row.category ?? row.card_category ?? row.cardCategory ?? row.card_type ?? row.cardType);
-  const source = rowSource || (rowCategory === 'Album' ? undefined : templateMetadata.source);
+  const templateCategory = templateMetadata.category && templateMetadata.category !== 'Album' ? templateMetadata.category : undefined;
+  const source = rowSource || (templateCategory ? templateMetadata.source : undefined);
   const category = rowCategory && rowCategory !== 'Album'
     ? rowCategory
-    : rowCategory === 'Album'
-      ? rowCategory
-      : templateMetadata.category && templateMetadata.category !== 'Album'
-        ? templateMetadata.category
-        : source
-          ? 'Other'
-          : rowCategory;
+    : templateCategory
+      ? templateCategory
+      : source
+        ? 'Other'
+        : rowCategory;
   const album = String(row.album ?? row.album_name ?? row.albumName ?? '');
   const imageUrl = (row.image_url as string) ?? (row.imageUrl as string) ?? undefined;
   const cardName = String(row.card_name ?? row.cardName ?? row.name ?? '');

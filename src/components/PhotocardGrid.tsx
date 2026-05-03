@@ -6,9 +6,10 @@
 import { motion } from 'motion/react';
 import { Heart, Copy, Truck } from 'lucide-react';
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { formatPhotocardMembers, getPhotocardCategory, Photocard } from '../types';
+import { formatPhotocardMembers, Photocard } from '../types';
 import { placeholderImage } from '../lib/assets';
 import { STATUS_COLORS } from '../lib/statusStyles';
+import { getPhotocardDisplayMetadata } from '../lib/cardMetadata';
 
 interface PhotocardCardProps {
   photocard: Photocard;
@@ -17,7 +18,6 @@ interface PhotocardCardProps {
   isSelected?: boolean;
   onToggle?: (id: string) => void;
   onClick?: (pc: Photocard) => void;
-  infoMode?: 'default' | 'public-profile';
   context?: 'binder' | 'global-search' | 'public-profile';
   actionFooter?: ReactNode;
   className?: string;
@@ -44,7 +44,6 @@ export function PhotocardCard({
   isSelected = false,
   onToggle,
   onClick,
-  infoMode = 'default',
   context = 'binder',
   actionFooter,
   className = '',
@@ -55,14 +54,10 @@ export function PhotocardCard({
   const delay = Math.min(index * 0.05, 0.5);
   const [hasImageError, setHasImageError] = useState(false);
   const showPlaceholder = !photocard.imageUrl || hasImageError;
-  const hasAlbum = !!photocard.album?.trim();
-  const hasSource = !!photocard.source?.trim();
-  const hasEra = !!photocard.era?.trim();
-  const category = getPhotocardCategory(photocard);
+  const displayMetadata = getPhotocardDisplayMetadata(photocard);
+  const category = displayMetadata.category;
   const memberLabel = formatPhotocardMembers(photocard);
-  const sourceOrAlbum = category === 'Album' ? photocard.album : photocard.source;
-  const metadataParts = compactUnique([category, sourceOrAlbum, photocard.era]);
-  const publicProfileDetail = compactUnique([sourceOrAlbum, photocard.cardName]).join(' · ');
+  const metadataParts = compactUnique([category, displayMetadata.primaryDetail, displayMetadata.eraLabel]);
 
   useEffect(() => {
     setHasImageError(false);
@@ -80,6 +75,27 @@ export function PhotocardCard({
       footerAreaClass: actionFooter ? 'min-h-[52px] px-3 pb-3 md:px-4 md:pb-4' : null,
     });
   }, [actionFooter, context, photocard]);
+
+  useEffect(() => {
+    if (context !== 'public-profile' || !(import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) return;
+    const cardRecord = photocard as Photocard & Record<string, unknown>;
+    console.debug('[PocaDex friend profile card metadata debug]', {
+      mappedCardPropsPassedToCardComponent: photocard,
+      category,
+      album: photocard.album,
+      albumName: cardRecord.albumName ?? cardRecord.album_name,
+      source: photocard.source,
+      sourceName: cardRecord.sourceName ?? cardRecord.source_name,
+      shop: cardRecord.shop,
+      store: cardRecord.store,
+      event: cardRecord.event,
+      benefit: cardRecord.benefit,
+      pob: cardRecord.pob,
+      renderedDisplayCategory: category,
+      renderedDisplaySourceLabel: displayMetadata.primaryDetail,
+      metadataParts,
+    });
+  }, [category, context, displayMetadata.primaryDetail, metadataParts, photocard]);
 
   const getConditionLabel = (condition?: string) => {
     switch (condition) {
@@ -194,30 +210,22 @@ export function PhotocardCard({
           </div>
         </div>
 
-        {infoMode === 'public-profile' ? (
-          publicProfileDetail && (
-            <div className="text-xs font-medium text-foreground/80 truncate tracking-normal">
-              {publicProfileDetail}
+        <div className="flex flex-col gap-0.5">
+          {metadataParts.length > 0 && (
+            <div className="text-xs font-medium text-foreground/50 line-clamp-1">
+              {metadataParts.map((part, partIndex) => (
+                <span key={`${part}-${partIndex}`} className={partIndex > 0 ? 'opacity-60' : undefined}>
+                  {partIndex > 0 && <span className="mx-1">•</span>}
+                  {part}
+                </span>
+              ))}
             </div>
-          )
-        ) : (
-          <div className="flex flex-col gap-0.5">
-            {metadataParts.length > 0 && (
-              <div className="text-xs font-medium text-foreground/50 line-clamp-1">
-                {metadataParts.map((part, partIndex) => (
-                  <span key={`${part}-${partIndex}`} className={partIndex > 0 ? 'opacity-60' : undefined}>
-                    {partIndex > 0 && <span className="mx-1">•</span>}
-                    {part}
-                  </span>
-                ))}
-              </div>
-            )}
-            <div className="text-xs font-medium text-foreground/80 truncate tracking-normal">
-              {photocard.cardName}
-              {photocard.version && <span className="text-foreground/50"> • {photocard.version}</span>}
-            </div>
+          )}
+          <div className="text-xs font-medium text-foreground/80 truncate tracking-normal">
+            {displayMetadata.cardNameLabel}
+            {displayMetadata.versionLabel && <span className="text-foreground/50"> • {displayMetadata.versionLabel}</span>}
           </div>
-        )}
+        </div>
       </div>
 
       {actionFooter && (
