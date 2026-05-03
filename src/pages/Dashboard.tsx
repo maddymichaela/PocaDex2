@@ -4,7 +4,7 @@
  */
 
 import { useMemo } from 'react';
-import { Photocard } from '../types';
+import { Photocard, CollectionStats } from '../types';
 import { PhotocardGrid } from '../components/PhotocardGrid';
 import { Sidebar } from '../components/Sidebar';
 import BackupControls from '../components/BackupControls';
@@ -13,11 +13,10 @@ import { STATUS_COLORS } from '../lib/statusStyles';
 interface DashboardProps {
   photocards: Photocard[];
   onEdit: (pc: Photocard) => void;
-  onDelete: (id: string) => void;
   onImport: (newData: Photocard[], mode: 'replace' | 'merge') => void;
 }
 
-export default function Dashboard({ photocards, onEdit, onDelete, onImport }: DashboardProps) {
+export default function Dashboard({ photocards, onEdit, onImport }: DashboardProps) {
   const recentPhotocards = useMemo(() =>
     [...photocards].sort((a, b) => b.createdAt - a.createdAt).slice(0, 4),
     [photocards]
@@ -43,7 +42,7 @@ export default function Dashboard({ photocards, onEdit, onDelete, onImport }: Da
   const duplicatePercentage = totalCards > 0 ? (duplicateCount / totalCards) * 100 : 0;
   const formatPercentage = (value: number) => `${Math.round(value)}%`;
 
-  const stats = {
+  const stats: CollectionStats = {
     totalCollected: ownedCount,
     onTheWay: onTheWayCount,
     wishlistGoals: wishlistCount,

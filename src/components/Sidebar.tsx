@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { CollectionStats } from '../types';
 import { STATUS_COLORS } from '../lib/statusStyles';
 
 
@@ -31,7 +32,7 @@ export function StatCard({ label, value, highlightColor, isWishlist }: StatCardP
   );
 }
 
-export function Sidebar({ stats }: { stats: any }) {
+export function Sidebar({ stats }: { stats: CollectionStats }) {
   return (
     <aside className="w-full grid grid-cols-2 md:grid-cols-4 gap-4 items-start">
       <StatCard

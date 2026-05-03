@@ -9,13 +9,41 @@ import { placeholderImage } from '../lib/assets';
 
 interface CardFormProps {
   initialData?: Photocard | null;
+  mode?: 'create' | 'edit';
   onSubmit: (pc: Photocard) => void;
   onDelete?: (id: string) => void;
   onBack: () => void;
 }
 
-export default function CardForm({ initialData, onSubmit, onDelete, onBack }: CardFormProps) {
-  const isEditing = !!initialData;
+function getSafeInitialDataExtras(initialData?: Photocard | null) {
+  if (!initialData) return {};
+  const {
+    id: _id,
+    ownerUserId: _ownerUserId,
+    user_id: _userId,
+    binder_id: _binderId,
+    binderId: _binderIdCamel,
+    createdAt: _createdAt,
+    created_at: _createdAtSnake,
+    updatedAt: _updatedAt,
+    updated_at: _updatedAtSnake,
+    status: _status,
+    condition: _condition,
+    isDuplicate: _isDuplicate,
+    notes: _notes,
+    ...safeExtras
+  } = initialData as Photocard & Record<string, unknown>;
+  return safeExtras;
+}
+
+function logCloneMetadata(label: string, value: unknown) {
+  if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
+    console.debug(`[PocaDex clone metadata] ${label}`, value);
+  }
+}
+
+export default function CardForm({ initialData, mode, onSubmit, onDelete, onBack }: CardFormProps) {
+  const isEditing = mode ? mode === 'edit' : !!initialData;
 
   const [group, setGroup] = useState(initialData?.group || '');
   const [members, setMembers] = useState<string[]>(initialData ? getPhotocardMembers(initialData) : []);
@@ -58,10 +86,12 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (members.length === 0) return;
-    onSubmit(normalizePhotocardForSave({
-      id: initialData?.id || Date.now().toString(),
+    const now = Date.now();
+    const submitPayload = normalizePhotocardForSave({
+      ...(!isEditing ? getSafeInitialDataExtras(initialData) : {}),
+      id: isEditing && initialData ? initialData.id : now.toString(),
       cardTemplateId: initialData ? getPhotocardTemplateId(initialData) : undefined,
-      ownerUserId: initialData?.ownerUserId,
+      ownerUserId: isEditing ? initialData?.ownerUserId : undefined,
       group,
       members,
       category,
@@ -76,8 +106,10 @@ export default function CardForm({ initialData, onSubmit, onDelete, onBack }: Ca
       isDuplicate,
       notes,
       imageUrl: previewUrl || undefined,
-      createdAt: initialData?.createdAt || Date.now(),
-    }));
+      createdAt: isEditing && initialData ? initialData.createdAt : now,
+    });
+    if (!isEditing) logCloneMetadata('form submit payload', submitPayload);
+    onSubmit(submitPayload);
   };
 
   return (

@@ -14,6 +14,7 @@ export const PHOTOCARD_CATEGORIES = [
   'Fanmeeting',
   'Concert',
   'Event',
+  'Lucky Draw',
   'Collaboration',
   'Endorsement',
   'Other',
@@ -32,18 +33,18 @@ export interface Photocard {
   id: string;
   cardTemplateId?: string;
   ownerUserId?: string;
-  group?: string; // New field from old app
+  group?: string;
   members: string[];
   category?: PhotocardCategory;
   source?: string;
   album: string;
-  era?: string; // New field from old app
+  era?: string;
   year: number;
   cardName: string;
   version: string;
   status: Status;
-  condition?: Condition; // New field from old app
-  isDuplicate?: boolean; // New field from old app
+  condition?: Condition;
+  isDuplicate?: boolean;
   notes?: string;
   imageUrl?: string;
   createdAt: number;
@@ -93,6 +94,19 @@ export function getSharedPhotocardIdentity(photocard: LegacyPhotocardInput) {
   ].join('|');
 }
 
+// Identity without category/source — used to find stale Album-mislabeled cards during migration.
+export function getPhotocardBaseIdentity(photocard: LegacyPhotocardInput): string {
+  return [
+    normalizeIdentityPart(photocard.group),
+    normalizeIdentityPart(formatPhotocardMembers(photocard)),
+    normalizeIdentityPart(photocard.album),
+    normalizeIdentityPart(photocard.era),
+    normalizeIdentityPart(photocard.year),
+    normalizeIdentityPart(photocard.cardName),
+    normalizeIdentityPart(photocard.version),
+  ].join('|');
+}
+
 export function getPhotocardTemplateId(photocard: LegacyPhotocardInput) {
   return photocard.cardTemplateId || getSharedPhotocardIdentity(photocard);
 }
@@ -113,7 +127,11 @@ export function getMissingRequiredPhotocardFields(
 }
 
 export function getPhotocardCategory(photocard: Pick<Photocard, 'category'>): PhotocardCategory {
-  return photocard.category && PHOTOCARD_CATEGORIES.includes(photocard.category) ? photocard.category : 'Album';
+  const rawCategory = String(photocard.category ?? '').trim();
+  if (!rawCategory) return 'Album';
+
+  const normalizedCategory = rawCategory.toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+  return PHOTOCARD_CATEGORIES.find((category) => category.toLowerCase() === normalizedCategory) ?? 'Album';
 }
 
 export function normalizePhotocardForSave(photocard: Photocard): Photocard {
@@ -123,7 +141,7 @@ export function normalizePhotocardForSave(photocard: Photocard): Photocard {
     ...photocard,
     members,
     category,
-    album: category === 'Album' ? photocard.album : '',
+    album: photocard.album,
     source: category === 'Album' ? undefined : photocard.source?.trim() || undefined,
   };
 }
@@ -136,21 +154,21 @@ export function normalizePhotocardUpdates(updates: Partial<Photocard>): Partial<
   const nextUpdates: Partial<Photocard> = {
     ...normalizedBase,
     category,
-    ...(category === 'Album' ? { source: undefined } : { album: '' }),
+    ...(category === 'Album' ? { source: undefined } : {}),
   };
 
   if (category !== 'Album' && 'source' in normalizedBase) {
     nextUpdates.source = normalizedBase.source?.trim() || undefined;
   }
 
-  return {
-    ...nextUpdates,
-  };
+  return nextUpdates;
 }
 
 export interface CollectionStats {
   totalCollected: number;
+  onTheWay: number;
   wishlistGoals: number;
+  duplicates: number;
   collectionValue: number;
 }
 

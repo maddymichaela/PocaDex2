@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface CollectionProps {
   photocards: Photocard[];
+  isOwner?: boolean;
   onDelete: (id: string) => void;
   onBulkUpdate: (ids: string[], updates: Partial<Photocard>) => void;
   onCardClick: (pc: Photocard) => void;
@@ -81,7 +82,7 @@ function GroupTile({ name, count, imageUrl, onClick }: GroupTileProps) {
   );
 }
 
-export default function Collection({ photocards, onDelete, onBulkUpdate, onCardClick, onNewCard }: CollectionProps) {
+export default function Collection({ photocards, isOwner = true, onDelete, onBulkUpdate, onCardClick, onNewCard }: CollectionProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('all');
   const [drilldownValue, setDrilldownValue] = useState<string | number | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -178,6 +179,7 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
   const deleteSelected = () => {
+    if (!isOwner) return;
     if (window.confirm(`Delete ${selectedIds.length} photocard${selectedIds.length !== 1 ? 's' : ''}? This cannot be undone.`)) {
       selectedIds.forEach(id => onDelete(id));
       setSelectedIds([]);
@@ -186,6 +188,7 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
   };
 
   const toggleSelectMode = () => {
+    if (!isOwner) return;
     setSelectedIds([]);
     if (!selectMode) {
       setViewMode('all');
@@ -361,7 +364,7 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
 
       {/* Select mode toolbar */}
       <AnimatePresence>
-        {selectMode && (
+        {isOwner && selectMode && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -492,17 +495,19 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
 
       {/* Floating action buttons */}
       <div className="fixed bottom-5 right-4 z-40 flex flex-col items-end gap-2">
-        <button
-          onClick={toggleSelectMode}
-          aria-label={selectMode ? 'Cancel selection' : 'Select cards'}
-          className={`flex h-12 w-12 items-center justify-center rounded-full border-2 shadow-xl transition-all ${selectMode
-              ? 'bg-secondary text-white border-white/20 shadow-xl shadow-secondary/20'
-              : 'bg-white text-foreground/40 border-gray-100 shadow-sm hover:text-secondary'
-            }`}
-        >
-          <CheckSquare className="w-5 h-5" />
-        </button>
-        {!selectMode && (
+        {isOwner && (
+          <button
+              onClick={toggleSelectMode}
+              aria-label={selectMode ? 'Cancel selection' : 'Select cards'}
+              className={`flex h-12 w-12 items-center justify-center rounded-full border-2 shadow-xl transition-all ${selectMode
+                ? 'bg-secondary text-white border-white/20 shadow-xl shadow-secondary/20'
+                : 'bg-white text-foreground/40 border-gray-100 shadow-sm hover:text-secondary'
+              }`}
+          >
+            <CheckSquare className="w-5 h-5" />
+          </button>
+        )}
+        {isOwner && !selectMode && (
           <button
             onClick={onNewCard}
             aria-label="Add card"
@@ -529,7 +534,7 @@ export default function Collection({ photocards, onDelete, onBulkUpdate, onCardC
 
       {/* Bulk edit modal */}
       <AnimatePresence>
-        {isBulkEditing && (
+        {isOwner && isBulkEditing && (
           <BulkEditForm
             selectedCount={selectedIds.length}
             onClose={() => setIsBulkEditing(false)}

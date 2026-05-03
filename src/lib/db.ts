@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { getPhotocardMembers, getPhotocardTemplateId, normalizePhotocardForSave, normalizePhotocardUpdates, Photocard } from '../types';
+import { getPhotocardBaseIdentity, getPhotocardCategory, getPhotocardMembers, getPhotocardTemplateId, normalizePhotocardForSave, normalizePhotocardUpdates, Photocard } from '../types';
 
 // ── Row ↔ Photocard mappers ────────────────────────────────────────────────
 
@@ -12,7 +12,9 @@ export function rowToPhotocard(row: Record<string, unknown>): Photocard {
     ownerUserId,
     group: (row.group_name as string) ?? undefined,
     members: getPhotocardMembers({ members: row.members as string[] | undefined, member: row.member as string | undefined }),
-    category: (row.category as Photocard['category']) ?? 'Album',
+    category: row.category
+      ? getPhotocardCategory({ category: row.category as Photocard['category'] })
+      : row.source ? 'Other' : 'Album',
     source: (row.source as string) ?? undefined,
     album: row.album as string,
     era: (row.era as string) ?? undefined,
@@ -132,7 +134,43 @@ export async function insertPhotocard(userId: string, pc: Photocard): Promise<Ph
   const normalized = normalizePhotocardForSave(pc);
   const templateId = getPhotocardTemplateId(normalized);
   const existing = await findPhotocardByTemplateId(userId, templateId);
-  if (existing) return existing;
+  if (existing) {
+    // If the existing card has a different category/source than what we intend to insert,
+    // the stored data is stale. Update it so the DB stays consistent with the UI.
+    const categoryMismatch = existing.category !== normalized.category;
+    const sourceMismatch = (existing.source ?? '') !== (normalized.source ?? '');
+    if (categoryMismatch || sourceMismatch) {
+      try {
+        return await updatePhotocard(userId, {
+          ...existing,
+          category: normalized.category,
+          source: normalized.source,
+          album: normalized.album,
+        });
+      } catch {
+        // If update fails, return existing and let the UI layer handle display.
+        return existing;
+      }
+    }
+    return existing;
+  }
+
+  // Loose match: catch stale Album cards that were mislabeled due to old schema fallback.
+  // Only runs when inserting a non-Album card and no exact match was found above.
+  if (normalized.category !== 'Album') {
+    const allUserCards = await fetchPhotocards(userId);
+    const staleAlbum = allUserCards.find(
+      (c) => c.category === 'Album' && getPhotocardBaseIdentity(c) === getPhotocardBaseIdentity(normalized)
+    );
+    if (staleAlbum) {
+      return await updatePhotocard(userId, {
+        ...staleAlbum,
+        category: normalized.category,
+        source: normalized.source,
+        album: normalized.album,
+      });
+    }
+  }
 
   let imageUrl = normalized.imageUrl;
   if (imageUrl?.startsWith('data:')) {
@@ -143,6 +181,9 @@ export async function insertPhotocard(userId: string, pc: Photocard): Promise<Ph
     }
   }
   const row = photocardToRow({ ...normalized, cardTemplateId: templateId, imageUrl }, userId);
+  if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
+    console.debug('[PocaDex clone metadata] final insert payload', { photocard: normalizePhotocardForSave({ ...normalized, cardTemplateId: templateId, imageUrl }), row });
+  }
   const { data, error } = await supabase
     .from('photocards')
     .insert(row)

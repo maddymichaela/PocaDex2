@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Edit3, Heart, Lock, Plus, Sparkles, UserCheck, UserPlus, UsersRound } from 'lucide-react';
+import { Edit3, Heart, Lock, Plus, Sparkles, UserCheck, UserPlus, UsersRound } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { PhotocardCard, PhotocardGrid } from '../components/PhotocardGrid';
 import { getProfileDisplayName, Photocard, Profile } from '../types';
-import { fetchPublicProfileBundle, followUser, getCardTemplateId, getProfileUserId, PublicProfileBundle, unfollowUser } from '../lib/social';
+import { fetchPublicProfileBundle, followUser, getProfileUserId, PublicProfileBundle, unfollowUser } from '../lib/social';
+import { getPhotocardMatchId, isProfileOwner } from '../lib/ownership';
 
 type ProfileTab = 'collection' | 'wishlist' | 'about';
 
@@ -13,8 +14,8 @@ interface PublicProfileProps {
   ownProfile?: Profile | null;
   ownPhotocards: Photocard[];
   onEditProfile: () => void;
-  onOpenCard?: (card: Photocard) => void;
-  onCopyCard?: (card: Photocard, status: 'owned' | 'wishlist') => Promise<void>;
+  onOpenCard?: (card: Photocard, visibleCards?: Photocard[]) => void;
+  onAddToCollection?: (card: Photocard) => void;
   onProfileResolved?: (profile: Profile | null) => void;
 }
 
@@ -56,7 +57,7 @@ export default function PublicProfile({
   ownPhotocards,
   onEditProfile,
   onOpenCard,
-  onCopyCard,
+  onAddToCollection,
   onProfileResolved,
 }: PublicProfileProps) {
   const [bundle, setBundle] = useState<PublicProfileBundle | null>(null);
@@ -64,8 +65,7 @@ export default function PublicProfile({
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ProfileTab>('collection');
   const [followBusy, setFollowBusy] = useState(false);
-  const [collectedTemplateIds, setCollectedTemplateIds] = useState<Set<string>>(() => new Set());
-  const [wishlistTemplateIds, setWishlistTemplateIds] = useState<Set<string>>(() => new Set());
+  const [collectedMatchIds, setCollectedMatchIds] = useState<Set<string>>(() => new Set());
 
   const isOwnProfileRoute = ownProfile?.username?.toLowerCase() === username.toLowerCase();
 
@@ -120,16 +120,13 @@ export default function PublicProfile({
   }, [bundle?.profile, onProfileResolved]);
 
   useEffect(() => {
-    setCollectedTemplateIds(new Set(ownPhotocards.filter((card) => card.status === 'owned').map(getCardTemplateId)));
-    setWishlistTemplateIds(new Set(ownPhotocards.filter((card) => card.status === 'wishlist').map(getCardTemplateId)));
+    setCollectedMatchIds(new Set(ownPhotocards.map(getPhotocardMatchId)));
   }, [ownPhotocards]);
 
   const cards = bundle?.cards ?? [];
   const ownedCards = useMemo(() => cards.filter((card) => card.status === 'owned'), [cards]);
   const wishlistCards = useMemo(() => cards.filter((card) => card.status === 'wishlist'), [cards]);
   const onTheWayCount = useMemo(() => cards.filter((card) => card.status === 'on_the_way').length, [cards]);
-  const [copyingCardId, setCopyingCardId] = useState<string | null>(null);
-
   const handleFollowToggle = async () => {
     if (!bundle) return;
     if (!currentUserId) {
@@ -184,7 +181,8 @@ export default function PublicProfile({
   }
 
   const { profile, counts } = bundle;
-  const isViewingSelf = currentUserId === getProfileUserId(profile);
+  const profileUserId = getProfileUserId(profile);
+  const isViewingSelf = isProfileOwner(currentUserId, profileUserId);
   const cardLoadError = bundle.cardsError ?? null;
   const displayName = getProfileDisplayName(profile);
   const showBio = profile.is_bio_public !== false && Boolean(profile.bio);
@@ -195,76 +193,33 @@ export default function PublicProfile({
   ];
 
   const renderSharedGrid = (nextCards: Photocard[]) => {
-    if (isViewingSelf) return <PhotocardGrid photocards={nextCards} onCardClick={onOpenCard} />;
+    if (isViewingSelf) return <PhotocardGrid photocards={nextCards} onCardClick={(card) => onOpenCard?.(card, nextCards)} />;
 
     return (
       <div className="grid grid-cols-2 items-stretch gap-3 md:grid-cols-4 md:max-lg:gap-4 xl:grid-cols-5 lg:gap-6">
         {nextCards.map((card, index) => {
-          const identity = getCardTemplateId(card);
-          const inCollection = collectedTemplateIds.has(identity);
-          const inWishlist = wishlistTemplateIds.has(identity);
-          const alreadySaved = inCollection || inWishlist;
-          const collecting = copyingCardId === `${identity}:owned`;
-          const wishlisting = copyingCardId === `${identity}:wishlist`;
+          const identity = getPhotocardMatchId(card);
+          const inCollection = collectedMatchIds.has(identity);
           return (
             <div key={card.id} className="flex h-full flex-col gap-2">
-              <PhotocardCard photocard={card} index={index} infoMode="public-profile" className="flex-1" />
-              {currentUserId && onCopyCard && (
-                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    disabled={alreadySaved || collecting}
-                    onClick={async (event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setCopyingCardId(`${identity}:owned`);
-                      setCollectedTemplateIds((current) => new Set(current).add(identity));
-                      try {
-                        await onCopyCard(card, 'owned');
-                      } catch (err) {
-                        setCollectedTemplateIds((current) => {
-                          const next = new Set(current);
-                          next.delete(identity);
-                          return next;
-                        });
-                        setError(err instanceof Error ? err.message : 'Could not add card to your collection.');
-                      } finally {
-                        setCopyingCardId(null);
-                      }
-                    }}
-                    className="flex h-10 items-center justify-center gap-1.5 rounded-2xl bg-primary px-2 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all disabled:bg-white disabled:text-primary disabled:ring-2 disabled:ring-primary/15"
-                  >
-                    {inCollection ? <CheckCircle2 size={13} /> : <Plus size={13} />}
-                    {collecting ? 'Adding...' : inCollection ? 'In Collection' : inWishlist ? 'Wishlisted' : 'Collect'}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={alreadySaved || wishlisting}
-                    onClick={async (event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setCopyingCardId(`${identity}:wishlist`);
-                      setWishlistTemplateIds((current) => new Set(current).add(identity));
-                      try {
-                        await onCopyCard(card, 'wishlist');
-                      } catch (err) {
-                        setWishlistTemplateIds((current) => {
-                          const next = new Set(current);
-                          next.delete(identity);
-                          return next;
-                        });
-                        setError(err instanceof Error ? err.message : 'Could not add card to your wishlist.');
-                      } finally {
-                        setCopyingCardId(null);
-                      }
-                    }}
-                    className="flex h-10 items-center justify-center gap-1.5 rounded-2xl bg-[var(--wishlist-red)] px-2 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all disabled:bg-white disabled:text-[var(--wishlist-red)] disabled:ring-2 disabled:ring-red-100"
-                  >
-                    <Heart size={13} className={inWishlist ? 'fill-current' : undefined} />
-                    {wishlisting ? 'Adding...' : inCollection ? 'In Collection' : inWishlist ? 'Wishlisted' : 'Wishlist'}
-                  </button>
-                </div>
-              )}
+              <PhotocardCard photocard={card} index={index} infoMode="public-profile" className="flex-1" onClick={() => onOpenCard?.(card, nextCards)} />
+              <button
+                type="button"
+                disabled={inCollection}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (!currentUserId || !onAddToCollection) {
+                    setError('Sign in or create an account to add cards to your collection.');
+                    return;
+                  }
+                  onAddToCollection(card);
+                }}
+                className="flex h-10 items-center justify-center gap-1.5 rounded-2xl bg-primary px-2 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all disabled:bg-white disabled:text-primary disabled:ring-2 disabled:ring-primary/15"
+              >
+                {!inCollection && <Plus size={13} />}
+                {inCollection ? 'In Collection' : 'Add to My Collection'}
+              </button>
             </div>
           );
         })}

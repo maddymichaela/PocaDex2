@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Image as ImageIcon, Edit3, Copy, Heart, Truck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Image as ImageIcon, Edit3, Copy, Heart, Truck, Plus } from 'lucide-react';
 import { formatPhotocardMembers, getPhotocardCategory, Photocard } from '../types';
 import { placeholderImage } from '../lib/assets';
 import { fetchWishlistCountForCard } from '../lib/social';
@@ -12,9 +12,25 @@ interface CardDetailProps {
   hasNext: boolean;
   onPrev: () => void;
   onNext: () => void;
+  isOwner?: boolean;
+  onAddToCollection?: (card: Photocard) => void;
+  onRequireAuth?: () => void;
+  isInCollection?: boolean;
 }
 
-export default function CardDetail({ photocard, onBack, onEdit, hasPrev, hasNext, onPrev, onNext }: CardDetailProps) {
+export default function CardDetail({
+  photocard,
+  onBack,
+  onEdit,
+  hasPrev,
+  hasNext,
+  onPrev,
+  onNext,
+  isOwner = true,
+  onAddToCollection,
+  onRequireAuth,
+  isInCollection = false,
+}: CardDetailProps) {
   const category = getPhotocardCategory(photocard);
   const memberLabel = formatPhotocardMembers(photocard);
   const [wishlistCount, setWishlistCount] = useState(0);
@@ -69,13 +85,29 @@ export default function CardDetail({ photocard, onBack, onEdit, hasPrev, hasNext
             </div>
           </div>
 
-          <button
-            onClick={onEdit}
-            className="flex shrink-0 items-center gap-1.5 rounded-xl border-2 border-primary/20 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] text-primary shadow-sm transition-all hover:bg-primary hover:text-white sm:text-[10px] sm:tracking-widest md:gap-2 md:px-5 md:py-2.5"
-          >
-            <Edit3 size={14} />
-            Edit<span className="hidden sm:inline"> Card</span>
-          </button>
+          {isOwner ? (
+            <button
+              onClick={onEdit}
+              className="flex shrink-0 items-center gap-1.5 rounded-xl border-2 border-primary/20 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] text-primary shadow-sm transition-all hover:bg-primary hover:text-white sm:text-[10px] sm:tracking-widest md:gap-2 md:px-5 md:py-2.5"
+            >
+              <Edit3 size={14} />
+              Edit<span className="hidden sm:inline"> Card</span>
+            </button>
+          ) : (
+            <button
+              disabled={isInCollection}
+              onClick={() => onAddToCollection ? onAddToCollection(photocard) : onRequireAuth?.()}
+              className={`flex shrink-0 items-center gap-1.5 rounded-xl border-2 px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] shadow-sm sm:text-[10px] sm:tracking-widest md:gap-2 md:px-5 md:py-2.5 ${
+                isInCollection
+                  ? 'border-primary/15 bg-white text-primary ring-2 ring-primary/10'
+                  : 'btn-primary-pink border-white/20'
+              }`}
+            >
+              {!isInCollection && <Plus size={14} />}
+              <span className="hidden sm:inline">{isInCollection ? 'In Collection' : 'Add to My Collection'}</span>
+              <span className="sm:hidden">{isInCollection ? 'Saved' : 'Add'}</span>
+            </button>
+          )}
         </div>
       </div>
 

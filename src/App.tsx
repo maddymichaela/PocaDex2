@@ -22,6 +22,7 @@ import {
   bulkUpdatePhotocards,
 } from './lib/db';
 import { getCardTemplateId } from './lib/social';
+import { createPhotocardDraftFromPublicCard, hasMatchingPhotocard, isPhotocardOwner, isProfileOwner } from './lib/ownership';
 
 type AuthScreen = 'splash' | 'login' | 'signup';
 type RouteState = { page: string; username?: string; socialTab?: 'people' | 'following' | 'followers' };
@@ -90,16 +91,33 @@ export default function App() {
   const [routeUsername, setRouteUsername] = useState(initialRoute.username ?? '');
   const [socialTab, setSocialTab] = useState(initialRoute.socialTab ?? 'people');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedPublicCard, setSelectedPublicCard] = useState<Photocard | null>(null);
+  const [selectedPublicCards, setSelectedPublicCards] = useState<Photocard[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [formCard, setFormCard] = useState<Photocard | null>(null);
   const [photocards, setPhotocards] = useState<Photocard[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [viewedProfile, setViewedProfile] = useState<Profile | null>(null);
 
   const handleAddCard = useCallback(() => {
+    setFormMode('create');
     setFormCard(null);
+    setSelectedPublicCard(null);
+    setSelectedPublicCards([]);
     setIsFormOpen(true);
   }, []);
+
+  const handleAddPublicCard = useCallback((sourceCard: Photocard) => {
+    if (!user) return;
+    if (hasMatchingPhotocard(photocards, sourceCard)) return;
+    setFormMode('create');
+    setFormCard(createPhotocardDraftFromPublicCard(sourceCard, user.id));
+    setSelectedPublicCard(null);
+    setSelectedPublicCards([]);
+    setSelectedId(null);
+    setIsFormOpen(true);
+  }, [photocards, user]);
 
   const navigateToPage = useCallback((page: string, username?: string) => {
     setCurrentPage(page);
@@ -107,6 +125,8 @@ export default function App() {
     if (page === 'Friends') setSocialTab('people');
     if (page !== 'Profile') setViewedProfile(null);
     setSelectedId(null);
+    setSelectedPublicCard(null);
+    setSelectedPublicCards([]);
     setIsFormOpen(false);
     window.history.pushState({}, '', routeForPage(page, username));
   }, []);
@@ -119,6 +139,8 @@ export default function App() {
       setSocialTab(nextRoute.socialTab ?? 'people');
       setViewedProfile(null);
       setSelectedId(null);
+      setSelectedPublicCard(null);
+      setSelectedPublicCards([]);
       setIsFormOpen(false);
     };
     window.addEventListener('popstate', handlePopState);
@@ -164,11 +186,13 @@ export default function App() {
     setPhotocards(prev => prev.some((card) => getCardTemplateId(card) === templateId) ? prev : [normalizedPC, ...prev]);
     try {
       const saved = await insertPhotocard(user.id, normalizedPC);
-      const mergedSaved = normalizePhotocardForSave({ ...normalizedPC, ...saved });
+      // Merge: prefer normalizedPC for descriptive fields (category, source, etc.)
+      // but take saved.id so we use the DB's authoritative record identity.
+      const mergedSaved = normalizePhotocardForSave({ ...saved, ...normalizedPC, id: saved.id });
       const savedTemplateId = getCardTemplateId(mergedSaved);
       setPhotocards(prev => [
         mergedSaved,
-        ...prev.filter((pc) => pc.id !== normalizedPC.id && getCardTemplateId(pc) !== savedTemplateId),
+        ...prev.filter((pc) => pc.id !== normalizedPC.id && pc.id !== saved.id && getCardTemplateId(pc) !== savedTemplateId),
       ]);
     } catch (err) {
       console.error('Failed to add photocard:', err);
@@ -179,6 +203,7 @@ export default function App() {
   const handleUpdatePhotocard = useCallback(async (updatedPC: Photocard) => {
     if (!user) return;
     const normalizedPC = normalizePhotocardForSave(updatedPC);
+    if (normalizedPC.ownerUserId && normalizedPC.ownerUserId !== user.id) return;
     setPhotocards(prev => prev.map(pc => pc.id === normalizedPC.id ? normalizedPC : pc));
     try {
       const saved = await updatePhotocard(user.id, normalizedPC);
@@ -191,24 +216,31 @@ export default function App() {
 
   const handleDeletePhotocard = useCallback(async (id: string) => {
     if (!user) return;
+    const target = photocards.find(pc => pc.id === id);
+    if (target?.ownerUserId && target.ownerUserId !== user.id) return;
     try {
       await deletePhotocard(user.id, id);
       setPhotocards(prev => prev.filter(pc => pc.id !== id));
     } catch (err) {
       console.error('Failed to delete photocard:', err);
     }
-  }, [user]);
+  }, [photocards, user]);
 
   const handleBulkUpdatePartial = useCallback(async (ids: string[], updates: Partial<Photocard>) => {
     if (!user) return;
+    const ownedIds = ids.filter((id) => {
+      const target = photocards.find(pc => pc.id === id);
+      return !target?.ownerUserId || target.ownerUserId === user.id;
+    });
+    if (ownedIds.length === 0) return;
     const normalizedUpdates = normalizePhotocardUpdates(updates);
-    setPhotocards(prev => prev.map(pc => ids.includes(pc.id) ? normalizePhotocardForSave({ ...pc, ...normalizedUpdates }) : pc));
+    setPhotocards(prev => prev.map(pc => ownedIds.includes(pc.id) ? normalizePhotocardForSave({ ...pc, ...normalizedUpdates }) : pc));
     try {
-      await bulkUpdatePhotocards(user.id, ids, normalizedUpdates);
+      await bulkUpdatePhotocards(user.id, ownedIds, normalizedUpdates);
     } catch (err) {
       console.error('Failed to bulk update:', err);
     }
-  }, [user]);
+  }, [photocards, user]);
 
   const handleScanImported = useCallback((savedCards: Photocard[]) => {
     setPhotocards(prev => {
@@ -231,15 +263,9 @@ export default function App() {
     if (photocards.some((card) => getCardTemplateId(card) === sourceTemplateId)) return;
 
     const copiedCard = normalizePhotocardForSave({
-      ...sourceCard,
-      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      cardTemplateId: sourceTemplateId,
-      ownerUserId: user.id,
+      ...createPhotocardDraftFromPublicCard(sourceCard, user.id),
       status,
-      condition: status === 'owned' ? sourceCard.condition : undefined,
-      isDuplicate: false,
-      notes: '',
-      createdAt: Date.now(),
+      condition: status === 'owned' ? sourceCard.condition ?? 'mint' : undefined,
     });
 
     await handleAddPhotocard(copiedCard);
@@ -260,18 +286,45 @@ export default function App() {
   // Not authenticated
   if (!user) {
     if (currentPage === 'Profile' && routeUsername) {
+      const publicCardIndex = selectedPublicCard ? selectedPublicCards.findIndex(p => p.id === selectedPublicCard.id) : -1;
       return (
         <div className="relative min-h-screen overflow-auto bg-white">
           <div className="pointer-events-none absolute inset-0 app-shell-bg" />
           <div className="pointer-events-none absolute inset-0 app-shell-dots opacity-60" />
           <main className="relative z-10 px-4 py-5 xl:p-8">
-            <PublicProfile
-              username={routeUsername}
-              currentUserId={null}
-              ownPhotocards={[]}
-              onEditProfile={() => setAuthScreen('login')}
-              onCopyCard={handleCopyPublicCard}
-            />
+            {selectedPublicCard ? (
+              <CardDetail
+                photocard={selectedPublicCard}
+                onBack={() => { setSelectedId(null); setSelectedPublicCard(null); setSelectedPublicCards([]); }}
+                onEdit={() => undefined}
+                hasPrev={publicCardIndex > 0}
+                hasNext={publicCardIndex >= 0 && publicCardIndex < selectedPublicCards.length - 1}
+                onPrev={() => {
+                  const previousCard = selectedPublicCards[publicCardIndex - 1];
+                  if (previousCard) {
+                    setSelectedPublicCard(previousCard);
+                    setSelectedId(previousCard.id);
+                  }
+                }}
+                onNext={() => {
+                  const nextCard = selectedPublicCards[publicCardIndex + 1];
+                  if (nextCard) {
+                    setSelectedPublicCard(nextCard);
+                    setSelectedId(nextCard.id);
+                  }
+                }}
+                isOwner={false}
+                onRequireAuth={() => window.alert('Sign in or create an account to add cards to your collection.')}
+              />
+            ) : (
+              <PublicProfile
+                username={routeUsername}
+                currentUserId={null}
+                ownPhotocards={[]}
+                onEditProfile={() => setAuthScreen('login')}
+                onOpenCard={(pc, cards) => { setSelectedPublicCard(pc); setSelectedPublicCards(cards ?? []); setSelectedId(pc.id); }}
+              />
+            )}
           </main>
         </div>
       );
@@ -283,13 +336,14 @@ export default function App() {
   }
 
   // Compute card detail state
-  const currentCard = selectedId ? (photocards.find(p => p.id === selectedId) ?? null) : null;
-  const currentCardIndex = currentCard ? photocards.findIndex(p => p.id === selectedId) : -1;
+  const currentCard = selectedPublicCard ?? (selectedId ? (photocards.find(p => p.id === selectedId) ?? null) : null);
+  const currentCardIndex = currentCard && !selectedPublicCard ? photocards.findIndex(p => p.id === selectedId) : -1;
+  const currentPublicCardIndex = selectedPublicCard ? selectedPublicCards.findIndex(p => p.id === selectedPublicCard.id) : -1;
+  const selectedPublicCardInCollection = selectedPublicCard ? hasMatchingPhotocard(photocards, selectedPublicCard) : false;
   const isViewingOwnProfile = currentPage === 'Profile'
-    && (
-      viewedProfile?.id === user.id ||
-      (!viewedProfile && Boolean(profile?.username) && routeUsername.toLowerCase() === profile.username.toLowerCase())
-    );
+    && isProfileOwner(user.id, viewedProfile?.id ?? (
+      !viewedProfile && Boolean(profile?.username) && routeUsername.toLowerCase() === profile.username.toLowerCase() ? profile?.id : null
+    ));
   const navbarCurrentPage = currentPage === 'Profile' && !isViewingOwnProfile ? 'Friends' : currentPage;
 
   const renderPage = () => {
@@ -299,7 +353,6 @@ export default function App() {
           <Dashboard
             photocards={photocards}
             onEdit={(pc) => setSelectedId(pc.id)}
-            onDelete={handleDeletePhotocard}
             onImport={handleImportPhotocards}
           />
         );
@@ -315,8 +368,18 @@ export default function App() {
             ownProfile={profile}
             ownPhotocards={photocards}
             onEditProfile={() => navigateToPage('Account')}
-            onOpenCard={(pc) => setSelectedId(pc.id)}
-            onCopyCard={handleCopyPublicCard}
+            onOpenCard={(pc, cards) => {
+              if (isViewingOwnProfile || isPhotocardOwner(user.id, pc)) {
+                setSelectedPublicCard(null);
+                setSelectedPublicCards([]);
+                setSelectedId(pc.id);
+              } else {
+                setSelectedPublicCard(pc);
+                setSelectedPublicCards(cards ?? []);
+                setSelectedId(pc.id);
+              }
+            }}
+            onAddToCollection={handleAddPublicCard}
             onProfileResolved={setViewedProfile}
           />
         );
@@ -379,7 +442,7 @@ export default function App() {
         profile={profile}
         onSignOut={signOut}
         onAddCard={handleAddCard}
-        onOpenSettings={() => { setCurrentPage('Account'); setSelectedId(null); setIsFormOpen(false); }}
+        onOpenSettings={() => { setCurrentPage('Account'); setSelectedId(null); setSelectedPublicCard(null); setIsFormOpen(false); }}
       />
       <main className="relative z-10 flex-1 overflow-auto overflow-x-hidden">
         {profile?.deletion_requested_at && (
@@ -400,15 +463,16 @@ export default function App() {
           <CardForm
             key={formCard?.id ?? 'new'}
             initialData={formCard}
+            mode={formMode}
             onSubmit={async (pc) => {
-              if (formCard) {
+              if (formMode === 'edit') {
                 await handleUpdatePhotocard(pc);
               } else {
                 await handleAddPhotocard(pc);
               }
               setIsFormOpen(false);
             }}
-            onDelete={formCard ? async (id) => {
+            onDelete={formMode === 'edit' && formCard ? async (id) => {
               await handleDeletePhotocard(id);
               setSelectedId(null);
               setIsFormOpen(false);
@@ -419,12 +483,35 @@ export default function App() {
           <CardDetail
             key={selectedId}
             photocard={currentCard}
-            onBack={() => setSelectedId(null)}
-            onEdit={() => { setFormCard(currentCard); setIsFormOpen(true); }}
-            hasPrev={currentCardIndex > 0}
-            hasNext={currentCardIndex < photocards.length - 1}
-            onPrev={() => setSelectedId(photocards[currentCardIndex - 1].id)}
-            onNext={() => setSelectedId(photocards[currentCardIndex + 1].id)}
+            onBack={() => { setSelectedId(null); setSelectedPublicCard(null); setSelectedPublicCards([]); }}
+            onEdit={() => { setFormMode('edit'); setFormCard(currentCard); setIsFormOpen(true); }}
+            hasPrev={selectedPublicCard ? currentPublicCardIndex > 0 : currentCardIndex > 0}
+            hasNext={selectedPublicCard ? currentPublicCardIndex >= 0 && currentPublicCardIndex < selectedPublicCards.length - 1 : currentCardIndex >= 0 && currentCardIndex < photocards.length - 1}
+            onPrev={() => {
+              if (selectedPublicCard) {
+                const previousCard = selectedPublicCards[currentPublicCardIndex - 1];
+                if (previousCard) {
+                  setSelectedPublicCard(previousCard);
+                  setSelectedId(previousCard.id);
+                }
+                return;
+              }
+              setSelectedId(photocards[currentCardIndex - 1].id);
+            }}
+            onNext={() => {
+              if (selectedPublicCard) {
+                const nextCard = selectedPublicCards[currentPublicCardIndex + 1];
+                if (nextCard) {
+                  setSelectedPublicCard(nextCard);
+                  setSelectedId(nextCard.id);
+                }
+                return;
+              }
+              setSelectedId(photocards[currentCardIndex + 1].id);
+            }}
+            isOwner={!selectedPublicCard}
+            onAddToCollection={handleAddPublicCard}
+            isInCollection={selectedPublicCardInCollection}
           />
         ) : (
           <div className="px-4 py-5 xl:p-8 max-w-6xl mx-auto w-full">
