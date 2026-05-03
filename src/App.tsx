@@ -22,7 +22,7 @@ import {
   bulkUpdatePhotocards,
 } from './lib/db';
 import { getCardTemplateId } from './lib/social';
-import { createPhotocardDraftFromPublicCard, hasMatchingPhotocard, isPhotocardOwner, isProfileOwner } from './lib/ownership';
+import { createPhotocardDraftFromPublicCard, getCollectionMatchState, isPhotocardOwner, isProfileOwner } from './lib/ownership';
 
 type AuthScreen = 'splash' | 'login' | 'signup';
 type RouteState = { page: string; username?: string; socialTab?: 'people' | 'following' | 'followers' };
@@ -120,7 +120,7 @@ export default function App() {
 
   const handleAddPublicCard = useCallback((sourceCard: Photocard) => {
     if (!user) return;
-    if (hasMatchingPhotocard(photocards, sourceCard)) return;
+    if (getCollectionMatchState(sourceCard, photocards, user.id).alreadyInCollection) return;
     if (currentPageRef.current === 'FindCards') {
       clearGlobalSearchState('opened add-to-collection form from Global Search');
     }
@@ -354,7 +354,9 @@ export default function App() {
   const currentCard = selectedPublicCard ?? (selectedId ? (photocards.find(p => p.id === selectedId) ?? null) : null);
   const currentCardIndex = currentCard && !selectedPublicCard ? photocards.findIndex(p => p.id === selectedId) : -1;
   const currentPublicCardIndex = selectedPublicCard ? selectedPublicCards.findIndex(p => p.id === selectedPublicCard.id) : -1;
-  const selectedPublicCardInCollection = selectedPublicCard ? hasMatchingPhotocard(photocards, selectedPublicCard) : false;
+  const selectedPublicCardMatchState = selectedPublicCard ? getCollectionMatchState(selectedPublicCard, photocards, user.id) : null;
+  const selectedPublicCardInCollection = selectedPublicCardMatchState?.alreadyInCollection ?? false;
+  const currentCardIsOwner = currentCard ? isPhotocardOwner(user.id, currentCard) : false;
   const isViewingOwnProfile = currentPage === 'Profile'
     && isProfileOwner(user.id, viewedProfile?.id ?? (
       !viewedProfile && Boolean(profile?.username) && routeUsername.toLowerCase() === profile.username.toLowerCase() ? profile?.id : null
@@ -550,7 +552,7 @@ export default function App() {
               }
               setSelectedId(photocards[currentCardIndex + 1].id);
             }}
-            isOwner={!selectedPublicCard}
+            isOwner={!selectedPublicCard || currentCardIsOwner}
             currentUserId={user.id}
             ownPhotocards={photocards}
             onAddToCollection={handleAddPublicCard}

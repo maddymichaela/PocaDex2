@@ -1,4 +1,6 @@
-import { getPhotocardCategory, getPhotocardMembers, getPhotocardTemplateId, getPhotocardTemplateMetadata, Photocard, PhotocardCategory } from '../types';
+import { getPhotocardBaseIdentity, getPhotocardCategory, getPhotocardMembers, getPhotocardTemplateId, getPhotocardTemplateMetadata, Photocard, PhotocardCategory } from '../types';
+
+export type CollectionMatchType = 'owner' | 'exact' | 'base' | 'none';
 
 export function isProfileOwner(currentUserId?: string | null, profileUserId?: string | null) {
   return Boolean(currentUserId && profileUserId && currentUserId === profileUserId);
@@ -17,8 +19,35 @@ export function getPhotocardMatchId(photocard: Photocard) {
 }
 
 export function hasMatchingPhotocard(photocards: Photocard[], target: Photocard) {
-  const targetMatchId = getPhotocardMatchId(target);
-  return photocards.some((card) => getPhotocardMatchId(card) === targetMatchId);
+  return getCollectionMatchState(target, photocards).alreadyInCollection;
+}
+
+export function getCollectionMatchState(
+  publicCard: Photocard,
+  currentUserCards: Photocard[],
+  currentUserId?: string | null,
+) {
+  const ownerMatch = isPhotocardOwner(currentUserId, publicCard);
+  const exactMatchId = getPhotocardMatchId(publicCard);
+  const baseMatchId = getPhotocardBaseIdentity(publicCard);
+  const exactMatch = currentUserCards.find((card) => getPhotocardMatchId(card) === exactMatchId);
+  const baseMatch = exactMatch ? undefined : currentUserCards.find((card) => getPhotocardBaseIdentity(card) === baseMatchId);
+  const matchedOwnedCard = exactMatch ?? baseMatch ?? (ownerMatch ? publicCard : undefined);
+  const matchType: CollectionMatchType = ownerMatch ? 'owner' : exactMatch ? 'exact' : baseMatch ? 'base' : 'none';
+  const alreadyInCollection = matchType !== 'none';
+
+  return {
+    isOwner: ownerMatch,
+    exactMatch,
+    baseMatch,
+    alreadyInCollection,
+    inCollection: alreadyInCollection,
+    actionLabel: alreadyInCollection ? 'In Collection' : 'Add to My Collection',
+    canAdd: Boolean(currentUserId && !alreadyInCollection),
+    requiresAuth: !currentUserId,
+    matchedOwnedCard,
+    matchType,
+  };
 }
 
 function logCloneMetadata(label: string, value: unknown) {

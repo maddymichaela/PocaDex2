@@ -78,6 +78,31 @@ const LEGACY_PUBLIC_PHOTOCARD_SELECT = [
 const GLOBAL_SEARCH_SUPABASE_FIELDS = [
   'group_name',
   'member',
+  'members',
+  'card_name',
+  'name',
+  'version',
+  'category',
+  'album',
+  'album_name',
+  'albumName',
+  'era',
+  'source',
+  'source_name',
+  'sourceName',
+  'shop',
+  'store',
+  'event',
+  'benefit',
+  'pob',
+  'card_template_id',
+  'cardTemplateId',
+  'notes',
+] as const;
+
+const GLOBAL_SEARCH_CORE_SUPABASE_FIELDS = [
+  'group_name',
+  'member',
   'card_name',
   'version',
   'category',
@@ -86,6 +111,21 @@ const GLOBAL_SEARCH_SUPABASE_FIELDS = [
   'source',
   'card_template_id',
   'notes',
+] as const;
+
+const GLOBAL_SEARCH_OPTIONAL_SUPABASE_FIELDS = [
+  'members',
+  'name',
+  'album_name',
+  'albumName',
+  'source_name',
+  'sourceName',
+  'shop',
+  'store',
+  'event',
+  'benefit',
+  'pob',
+  'cardTemplateId',
 ] as const;
 
 const LEGACY_GLOBAL_SEARCH_SUPABASE_FIELDS = [
@@ -301,6 +341,12 @@ function isMissingColumnError(error: unknown, columns: string[]) {
     message.includes(`.${column}`) ||
     message.includes(` ${column} `)
   ));
+}
+
+function isUnsupportedSearchFieldError(error: unknown) {
+  if (!error || typeof error !== 'object' || !('message' in error)) return false;
+  const message = String((error as { message: unknown }).message).toLowerCase();
+  return message.includes('operator does not exist') || message.includes('invalid input syntax');
 }
 
 function withPublicProfileDefaults(profile: Partial<Profile>): Profile {
@@ -790,6 +836,26 @@ export async function searchPublicCardTemplates(query: string): Promise<PublicCa
       .limit(80);
   };
 
+  const searchRowsByFields = async (searchableFields: readonly string[], searchTerm: string, allowLegacyFallback: boolean) => {
+    const { data, error } = await buildPhotocardSearch(PUBLIC_PHOTOCARD_SELECT, searchableFields, searchTerm);
+    logGlobalSearchMetadata('raw Supabase global search result', { query: trimmed, searchTerm, fields: searchableFields, data, error: error ? getSupabaseErrorDetails(error) : null });
+    if (!error) return { rows: (data ?? []) as unknown[], usedLegacy: false };
+
+    if (isMissingColumnError(error, ['members', 'category', 'source', 'card_template_id', 'notes', ...searchableFields]) || isUnsupportedSearchFieldError(error)) {
+      if (!allowLegacyFallback) {
+        logGlobalSearchMetadata('skipped missing optional global search fields', { query: trimmed, searchTerm, fields: searchableFields, error: getSupabaseErrorDetails(error) });
+        return { rows: [], usedLegacy: false };
+      }
+
+      const { data: legacyData, error: legacyError } = await buildPhotocardSearch(LEGACY_PUBLIC_PHOTOCARD_SELECT, LEGACY_GLOBAL_SEARCH_SUPABASE_FIELDS, searchTerm);
+      if (legacyError) throw legacyError;
+      logGlobalSearchMetadata('raw Supabase global search legacy result', { query: trimmed, searchTerm, fields: LEGACY_GLOBAL_SEARCH_SUPABASE_FIELDS, data: legacyData, error: null });
+      return { rows: (legacyData ?? []) as unknown[], usedLegacy: true };
+    }
+
+    throw error;
+  };
+
   let rows: unknown[] | null = null;
   logGlobalSearchQueryDebug({
     searchTerm: trimmed,
@@ -801,18 +867,14 @@ export async function searchPublicCardTemplates(query: string): Promise<PublicCa
   const supabaseRows: unknown[] = [];
   let usedLegacySearch = false;
   for (const searchTerm of queryVariants) {
-    const { data, error } = await buildPhotocardSearch(PUBLIC_PHOTOCARD_SELECT, GLOBAL_SEARCH_SUPABASE_FIELDS, searchTerm);
-    logGlobalSearchMetadata('raw Supabase global search result', { query: trimmed, searchTerm, fields: GLOBAL_SEARCH_SUPABASE_FIELDS, data, error: error ? getSupabaseErrorDetails(error) : null });
-    if (error && isMissingColumnError(error, ['members', 'category', 'source', 'card_template_id', 'notes'])) {
-      usedLegacySearch = true;
-      const { data: legacyData, error: legacyError } = await buildPhotocardSearch(LEGACY_PUBLIC_PHOTOCARD_SELECT, LEGACY_GLOBAL_SEARCH_SUPABASE_FIELDS, searchTerm);
-      if (legacyError) throw legacyError;
-      logGlobalSearchMetadata('raw Supabase global search legacy result', { query: trimmed, searchTerm, fields: LEGACY_GLOBAL_SEARCH_SUPABASE_FIELDS, data: legacyData, error: null });
-      supabaseRows.push(...((legacyData ?? []) as unknown[]));
-    } else {
-      if (error) throw error;
-      supabaseRows.push(...((data ?? []) as unknown[]));
-    }
+    const { rows: coreRows, usedLegacy } = await searchRowsByFields(GLOBAL_SEARCH_CORE_SUPABASE_FIELDS, searchTerm, true);
+    usedLegacySearch = usedLegacySearch || usedLegacy;
+    supabaseRows.push(...coreRows);
+
+    const optionalResults = await Promise.all(
+      GLOBAL_SEARCH_OPTIONAL_SUPABASE_FIELDS.map((searchableField) => searchRowsByFields([searchableField], searchTerm, false))
+    );
+    optionalResults.forEach(({ rows: fieldRows }) => supabaseRows.push(...fieldRows));
   }
   rows = await hydrateGlobalSearchRows(dedupeRowsById([...supabaseRows, ...(await fetchClientSearchSupplement(trimmed))]));
 

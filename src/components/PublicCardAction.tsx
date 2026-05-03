@@ -1,6 +1,6 @@
 import { Plus } from 'lucide-react';
 import { Photocard } from '../types';
-import { getPhotocardMatchId, isPhotocardOwner } from '../lib/ownership';
+import { getCollectionMatchState, getPhotocardMatchId } from '../lib/ownership';
 
 interface PublicCardActionProps {
   card: Photocard;
@@ -16,20 +16,7 @@ export function getPublicCardActionState(
   currentUserId: string | null | undefined,
   ownPhotocards: Photocard[],
 ) {
-  const isOwner = isPhotocardOwner(currentUserId, card);
-  const matchId = getPhotocardMatchId(card);
-  const alreadyInCollection = ownPhotocards.some((ownedCard) => getPhotocardMatchId(ownedCard) === matchId);
-  const inCollection = isOwner || alreadyInCollection;
-  const actionLabel = inCollection ? 'In Collection' : 'Add to My Collection';
-
-  return {
-    isOwner,
-    alreadyInCollection,
-    inCollection,
-    actionLabel,
-    canAdd: Boolean(currentUserId && !inCollection),
-    requiresAuth: !currentUserId,
-  };
+  return getCollectionMatchState(card, ownPhotocards, currentUserId);
 }
 
 export default function PublicCardAction({
@@ -51,6 +38,7 @@ export default function PublicCardAction({
       matchId: getPhotocardMatchId(card),
       isOwnCard: actionState.isOwner,
       alreadyInCollection: actionState.alreadyInCollection,
+      matchType: actionState.matchType,
       renderedActionLabel: actionState.actionLabel,
       cardHeightClassComponentUsed: 'PhotocardCard shared binder layout footer action',
     });

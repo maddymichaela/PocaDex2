@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { PhotocardCard } from '../components/PhotocardGrid';
 import PublicCardAction, { getPublicCardActionState } from '../components/PublicCardAction';
 import { Photocard } from '../types';
 import { PublicCardTemplate, searchPublicCardTemplates } from '../lib/social';
-import { getPhotocardMatchId } from '../lib/ownership';
+import { getCollectionMatchState } from '../lib/ownership';
 
 const GLOBAL_SEARCH_STATE_KEY = 'pocadex:global-search-state:v1';
 
@@ -59,9 +59,12 @@ export default function FindCards({ currentUserId, ownPhotocards, onOpenCard, on
   const [results, setResults] = useState<PublicCardTemplate[]>(() => readStoredGlobalSearchState().results);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const searchRequestIdRef = useRef(0);
 
   const runSearch = useCallback(async () => {
     const trimmed = query.trim();
+    const requestId = searchRequestIdRef.current + 1;
+    searchRequestIdRef.current = requestId;
     if (!trimmed) {
       setResults([]);
       setLoading(false);
@@ -70,16 +73,18 @@ export default function FindCards({ currentUserId, ownPhotocards, onOpenCard, on
     setLoading(true);
     setError(null);
     try {
-      setResults(await searchPublicCardTemplates(trimmed));
+      const nextResults = await searchPublicCardTemplates(trimmed);
+      if (searchRequestIdRef.current === requestId) setResults(nextResults);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load results.');
+      if (searchRequestIdRef.current === requestId) setError(err instanceof Error ? err.message : 'Could not load results.');
     } finally {
-      setLoading(false);
+      if (searchRequestIdRef.current === requestId) setLoading(false);
     }
   }, [query]);
 
   useEffect(() => {
     if (!query.trim()) {
+      searchRequestIdRef.current += 1;
       setResults([]);
       setLoading(false);
       return;
@@ -153,13 +158,10 @@ export default function FindCards({ currentUserId, ownPhotocards, onOpenCard, on
       ) : results.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:max-lg:gap-4 xl:grid-cols-5 lg:gap-6">
           {results.map((result, index) => {
-            const ownCard = ownPhotocards.find((card) => card.id === result.card.id)
-              ?? ownPhotocards.find((card) => getPhotocardMatchId(card) === getPhotocardMatchId(result.card));
+            const ownCard = getCollectionMatchState(result.card, ownPhotocards, currentUserId).matchedOwnedCard;
             const displayCard = ownCard ?? result.card;
             const visibleCards = results.map((nextResult) => {
-              return ownPhotocards.find((card) => card.id === nextResult.card.id)
-                ?? ownPhotocards.find((card) => getPhotocardMatchId(card) === getPhotocardMatchId(nextResult.card))
-                ?? nextResult.card;
+              return getCollectionMatchState(nextResult.card, ownPhotocards, currentUserId).matchedOwnedCard ?? nextResult.card;
             });
             const actionState = getPublicCardActionState(displayCard, currentUserId, ownPhotocards);
             const handleOpenCard = (card: Photocard) => {
