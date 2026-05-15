@@ -28,6 +28,7 @@ interface AuthContextType {
   checkUsernameAvailability: (username: string) => Promise<{ available: boolean; error: string | null; normalized: string }>;
   updateEmail: (email: string) => Promise<{ error: string | null }>;
   updatePassword: (password: string) => Promise<{ error: string | null }>;
+  linkGoogleAccount: () => Promise<{ error: string | null }>;
   unlinkGoogleAccount: () => Promise<{ error: string | null }>;
   requestAccountDeletion: () => Promise<{ error: string | null }>;
   cancelAccountDeletion: () => Promise<{ error: string | null }>;
@@ -353,6 +354,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const linkGoogleAccount = async () => {
+    if (!user) return { error: 'You need to be signed in to link Google.' };
+    const { error } = await supabase.auth.linkIdentity({
+      provider: 'google',
+      options: { redirectTo: getAuthCallbackUrl() },
+    });
+    return { error: error?.message ?? null };
+  };
+
   const unlinkGoogleAccount = async () => {
     if (!user) return { error: 'You need to be signed in to unlink Google.' };
 
@@ -410,8 +420,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       session, user, profile, loading,
       signInWithGoogle, signInWithEmail, signUpWithEmail, updateProfile, checkUsernameAvailability,
-      resendEmailConfirmation, updateEmail, updatePassword, unlinkGoogleAccount, requestAccountDeletion,
-      cancelAccountDeletion, signOut, refreshProfile,
+      resendEmailConfirmation, updateEmail, updatePassword, linkGoogleAccount, unlinkGoogleAccount,
+      requestAccountDeletion, cancelAccountDeletion, signOut, refreshProfile,
     }}>
       {children}
     </AuthContext.Provider>

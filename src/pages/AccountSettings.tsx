@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { AlertCircle, CheckCircle2, Download, KeyRound, Mail, ShieldAlert, Unlink, UserRound, Upload } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Download, KeyRound, Link2, Mail, ShieldAlert, Unlink, UserRound, Upload } from 'lucide-react';
 import ModalShell from '../components/ModalShell';
 import { BIO_MAX_LENGTH, useAuth } from '../contexts/AuthContext';
 import { exportCollection } from '../lib/backup';
@@ -63,6 +63,7 @@ export default function AccountSettings({ photocards }: AccountSettingsProps) {
     checkUsernameAvailability,
     updateEmail,
     updatePassword,
+    linkGoogleAccount,
     unlinkGoogleAccount,
     requestAccountDeletion,
     cancelAccountDeletion,
@@ -87,6 +88,7 @@ export default function AccountSettings({ photocards }: AccountSettingsProps) {
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingSecurity, setSavingSecurity] = useState(false);
   const [settingGooglePassword, setSettingGooglePassword] = useState(false);
+  const [linkingGoogle, setLinkingGoogle] = useState(false);
   const [unlinkingGoogle, setUnlinkingGoogle] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showUnlinkDialog, setShowUnlinkDialog] = useState(false);
@@ -345,6 +347,16 @@ export default function AccountSettings({ photocards }: AccountSettingsProps) {
     setConnectedStatus({ type: 'success', message: 'Google account unlinked. Use email and password to log in.' });
   };
 
+  const handleLinkGoogle = async () => {
+    setConnectedStatus(null);
+    setLinkingGoogle(true);
+    const { error } = await linkGoogleAccount();
+    setLinkingGoogle(false);
+    if (error) {
+      setConnectedStatus({ type: 'error', message: error });
+    }
+  };
+
   const handleExport = () => {
     exportCollection(photocards);
     setDeletionStatus({ type: 'success', message: 'Backup downloaded.' });
@@ -540,28 +552,30 @@ export default function AccountSettings({ photocards }: AccountSettingsProps) {
         </div>
       </form>
 
-      {hasGoogleLogin && (
-        <section className="glass-card rounded-[32px] border-2 border-white p-5 shadow-sm md:p-8">
-          <div className="mb-6 flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <Unlink size={20} />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold leading-tight text-foreground">Connected Accounts</h2>
-              <p className="text-xs font-bold text-foreground/35">Manage Google login</p>
-            </div>
+      <section className="glass-card rounded-[32px] border-2 border-white p-5 shadow-sm md:p-8">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            {hasGoogleLogin ? <Unlink size={20} /> : <Link2 size={20} />}
           </div>
+          <div>
+            <h2 className="text-xl font-bold leading-tight text-foreground">Connected Accounts</h2>
+            <p className="text-xs font-bold text-foreground/35">Manage Google login</p>
+          </div>
+        </div>
 
-          <div className="rounded-[24px] border-2 border-gray-100 bg-white p-4 md:p-5">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-sm font-black text-foreground">Google</p>
-                <p className="mt-1 text-sm font-medium text-foreground/45">
-                  {hasPassword
+        <div className="rounded-[24px] border-2 border-gray-100 bg-white p-4 md:p-5">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-black text-foreground">Google</p>
+              <p className="mt-1 text-sm font-medium text-foreground/45">
+                {hasGoogleLogin
+                  ? hasPassword
                     ? "You can unlink your Google account. You'll continue to log in using your email and password."
-                    : 'Set a password before unlinking your Google account.'}
-                </p>
-              </div>
+                    : 'Set a password before unlinking your Google account.'
+                  : 'Link Google so you can sign in to this account with Google.'}
+              </p>
+            </div>
+            {hasGoogleLogin ? (
               <button
                 type="button"
                 onClick={handleUnlinkGoogleClick}
@@ -569,48 +583,57 @@ export default function AccountSettings({ photocards }: AccountSettingsProps) {
               >
                 Unlink Google
               </button>
-            </div>
-
-            {!hasPassword && (
-              <form onSubmit={handleSetPasswordForGoogle} className="mt-5 grid gap-4 md:grid-cols-2">
-                <label className="space-y-2">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-foreground/35">New Password</span>
-                  <input
-                    className={inputClass}
-                    type="password"
-                    value={googlePassword}
-                    onChange={(e) => setGooglePassword(e.target.value)}
-                    placeholder="Create a password"
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-foreground/35">Confirm Password</span>
-                  <input
-                    className={inputClass}
-                    type="password"
-                    value={googlePasswordConfirm}
-                    onChange={(e) => setGooglePasswordConfirm(e.target.value)}
-                    placeholder="Confirm password"
-                  />
-                </label>
-                <div className="md:col-span-2">
-                  <button
-                    type="submit"
-                    disabled={settingGooglePassword}
-                    className="w-full rounded-[22px] bg-primary px-5 py-4 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-primary/20 transition-all hover:scale-[1.01] disabled:opacity-60 md:w-auto"
-                  >
-                    {settingGooglePassword ? 'Saving...' : 'Set Password'}
-                  </button>
-                </div>
-              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={handleLinkGoogle}
+                disabled={linkingGoogle}
+                className="rounded-[22px] bg-primary px-5 py-4 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-primary/20 transition-all hover:scale-[1.01] disabled:opacity-60"
+              >
+                {linkingGoogle ? 'Opening Google...' : 'Link Google'}
+              </button>
             )}
-
-            <div className="mt-4">
-              <AnimatePresence><StatusMessage status={connectedStatus} /></AnimatePresence>
-            </div>
           </div>
-        </section>
-      )}
+
+          {hasGoogleLogin && !hasPassword && (
+            <form onSubmit={handleSetPasswordForGoogle} className="mt-5 grid gap-4 md:grid-cols-2">
+              <label className="space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-foreground/35">New Password</span>
+                <input
+                  className={inputClass}
+                  type="password"
+                  value={googlePassword}
+                  onChange={(e) => setGooglePassword(e.target.value)}
+                  placeholder="Create a password"
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-foreground/35">Confirm Password</span>
+                <input
+                  className={inputClass}
+                  type="password"
+                  value={googlePasswordConfirm}
+                  onChange={(e) => setGooglePasswordConfirm(e.target.value)}
+                  placeholder="Confirm password"
+                />
+              </label>
+              <div className="md:col-span-2">
+                <button
+                  type="submit"
+                  disabled={settingGooglePassword}
+                  className="w-full rounded-[22px] bg-primary px-5 py-4 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-primary/20 transition-all hover:scale-[1.01] disabled:opacity-60 md:w-auto"
+                >
+                  {settingGooglePassword ? 'Saving...' : 'Set Password'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          <div className="mt-4">
+            <AnimatePresence><StatusMessage status={connectedStatus} /></AnimatePresence>
+          </div>
+        </div>
+      </section>
 
       <section className="rounded-[32px] border-2 border-red-100 bg-red-50/70 p-5 shadow-sm md:p-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
