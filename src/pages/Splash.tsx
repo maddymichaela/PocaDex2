@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Cloud, Heart, Sparkles, Star } from 'lucide-react';
 import { pocadexLogo } from '../lib/assets';
 
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export default function Splash({ onGetStarted, onSignIn }: Props) {
+  const [logoSrc, setLogoSrc] = useState(pocadexLogo);
   const decorations = [
     { icon: Cloud, size: 82, className: 'top-[8%] left-[5%] rotate-[-8deg]' },
     { icon: Star, size: 54, className: 'top-[18%] right-[10%] rotate-[12deg]' },
@@ -65,8 +67,11 @@ export default function Splash({ onGetStarted, onSignIn }: Props) {
       <div className="relative z-10 flex min-h-screen items-center justify-center px-5 py-10 sm:px-8">
         <div className="mx-auto flex w-full max-w-xl flex-col items-center text-center">
           <img
-            src={pocadexLogo}
+            src={logoSrc}
             alt="PocaDex"
+            onError={() => {
+              if (logoSrc !== './pocadex.png') setLogoSrc('./pocadex.png');
+            }}
             className="mb-5 h-auto w-[min(100%,26rem)] drop-shadow-[0_18px_30px_rgba(245,130,195,0.24)]"
           />
 

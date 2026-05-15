@@ -455,7 +455,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
       setDetectionFeedback(null);
       setStep('review');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Grid detection failed.');
+      setError(err instanceof Error ? err.message : 'Grid split failed.');
       setDetectionFeedback(null);
       setStep('upload');
     }
@@ -467,7 +467,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
 
   const tryDifferentDetection = useCallback(() => {
     const nextStrategyIndex = (detectionStrategyIndex + 1) % DETECTION_STRATEGIES.length;
-    void runGridDetect(nextStrategyIndex, 'Trying a different grid detection…');
+    void runGridDetect(nextStrategyIndex, 'Trying another grid pass…');
   }, [detectionStrategyIndex, runGridDetect]);
 
   // ── Manual grid (no image analysis) ──────────────────────────────────────
@@ -745,8 +745,8 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onFileInput} />
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-foreground tracking-tight">Import Template</h2>
-          <p className="text-sm text-foreground/40 font-medium mt-1">Upload a fan template to auto-split and import photocards</p>
+          <h2 className="text-3xl font-bold text-foreground tracking-tight">Import from Grid</h2>
+          <p className="text-sm text-foreground/40 font-medium mt-1">Upload a grid image and split it into individual photocards</p>
         </div>
       </div>
 
@@ -817,13 +817,13 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
 
                 <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_auto_minmax(0,3fr)] lg:items-start">
                   <div className="space-y-3">
-                    <p className="text-xs font-black uppercase tracking-widest text-foreground/40">Auto Grid Splicing</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-foreground/40">Quick Grid Splicing</p>
                     <p className="text-xs text-foreground/40 font-medium">
-                      Automatically detect rows and columns from your template
+                      Find rows and columns from your template image.
                     </p>
                     <button onClick={runDefaultGridDetect}
                       className={secondaryButtonClass}>
-                      <Grid3x3 size={14} /> Auto-detect Grid
+                      <Grid3x3 size={14} /> Split Grid
                     </button>
 
                   </div>
@@ -897,10 +897,10 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
           </div>
           <div className="text-center">
             <p className="font-black text-foreground uppercase tracking-tight text-xl">
-              Splicing template…
+              Processing image…
             </p>
             <p className="text-sm text-foreground/40 font-medium mt-1">
-              {detectionFeedback ?? 'Detecting grid lines and cropping cards'}
+              {detectionFeedback ?? 'Splitting cards from template'}
             </p>
           </div>
         </div>
@@ -939,7 +939,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
                       onClick={tryDifferentDetection}
                       className={`${secondaryButtonClass} w-full sm:w-auto`}
                     >
-                      <Grid3x3 size={14} /> Try Different Detection
+                      <Grid3x3 size={14} /> Try Another Grid Pass
                     </button>
                     <button
                       type="button"
@@ -1220,7 +1220,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
             onSubmit={handleSaveCardDetails}
             onClose={() => setEditingDetailsId(null)}
             title="Edit Card Details"
-            subtitle="Updating Scanned Card"
+            subtitle="Updating Imported Card"
             allowImageEditing={false}
           />
         )}

@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default function Login({ onBack, initialMode = 'signin' }: Props) {
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
+  const { signInWithGoogle, signInWithEmail, signUpWithEmail, resendEmailConfirmation } = useAuth();
   const decorations = [
     { icon: Cloud, size: 76, className: 'top-[8%] left-[6%] rotate-[-8deg]' },
     { icon: Star, size: 50, className: 'top-[18%] right-[10%] rotate-[12deg]' },
@@ -26,17 +26,26 @@ export default function Login({ onBack, initialMode = 'signin' }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [resendStatus, setResendStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [existingAccount, setExistingAccount] = useState(false);
   const [signupSuccess, setSignupSuccess] = useState(false);
 
   const handleEmailSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    setResendStatus(null);
+    setExistingAccount(false);
     setLoading(true);
     if (mode === 'signup') {
-      const { error } = await signUpWithEmail(email, password, nickname);
+      const { error, needsConfirmation, accountExists } = await signUpWithEmail(email, password, nickname);
       if (error) setError(error);
-      else setSignupSuccess(true);
+      else if (accountExists) {
+        setExistingAccount(true);
+        setError('This email already has a PocaDex account. Sign in instead, or resend the confirmation email if you never activated it.');
+      }
+      else if (needsConfirmation) setSignupSuccess(true);
     } else {
       const { error } = await signInWithEmail(email, password);
       if (error) setError(error);
@@ -48,6 +57,24 @@ export default function Login({ onBack, initialMode = 'signin' }: Props) {
     setError(null);
     setLoading(true);
     await signInWithGoogle();
+  };
+
+  const handleResendConfirmation = async () => {
+    setError(null);
+    setResendStatus(null);
+    setResendLoading(true);
+    const { error } = await resendEmailConfirmation(email);
+    if (error) setError(error);
+    else setResendStatus('Confirmation email resent. Check your inbox and spam folder.');
+    setResendLoading(false);
+  };
+
+  const showSignIn = () => {
+    setMode('signin');
+    setSignupSuccess(false);
+    setResendStatus(null);
+    setExistingAccount(false);
+    setError(null);
   };
 
   return (
@@ -108,9 +135,23 @@ export default function Login({ onBack, initialMode = 'signin' }: Props) {
               <div className="text-center py-4">
                 <div className="text-4xl mb-4">📬</div>
                 <h2 className="text-lg font-bold text-foreground tracking-tight mb-2">Check your email!</h2>
-                <p className="text-sm text-foreground/60">We sent a confirmation link to <strong>{email}</strong>. Click it to activate your account.</p>
-                <button onClick={() => setSignupSuccess(false)}
-                  className="mt-6 text-primary font-bold text-sm hover:underline">
+                <p className="text-sm text-foreground/60">Supabase accepted your signup for <strong>{email}</strong>. Click the confirmation link to activate your account.</p>
+                <p className="mt-3 text-xs font-medium text-foreground/45">No email yet? Check spam, then resend the confirmation link.</p>
+                {error && (
+                  <p className="mt-4 text-xs font-bold text-red-500 bg-red-50 rounded-xl px-4 py-3">{error}</p>
+                )}
+                {resendStatus && (
+                  <p className="mt-4 text-xs font-bold text-emerald-600 bg-emerald-50 rounded-xl px-4 py-3">{resendStatus}</p>
+                )}
+                <button
+                  onClick={handleResendConfirmation}
+                  disabled={resendLoading}
+                  className="mt-6 btn-primary-pink w-full rounded-[1.65rem] py-3 text-sm font-black uppercase tracking-tight disabled:opacity-60"
+                >
+                  {resendLoading ? 'Sending…' : 'Resend Email'}
+                </button>
+                <button onClick={showSignIn}
+                  className="mt-4 text-primary font-bold text-sm hover:underline">
                   Back to Sign In
                 </button>
               </div>
@@ -169,6 +210,30 @@ export default function Login({ onBack, initialMode = 'signin' }: Props) {
                     <p className="text-xs font-bold text-red-500 bg-red-50 rounded-xl px-4 py-3">{error}</p>
                   )}
 
+                  {existingAccount && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={showSignIn}
+                        className="rounded-xl border-2 border-gray-200 bg-white px-3 py-2.5 text-xs font-black uppercase tracking-tight text-foreground hover:bg-gray-50 transition-colors"
+                      >
+                        Sign In
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleResendConfirmation}
+                        disabled={resendLoading}
+                        className="rounded-xl border-2 border-primary/20 bg-primary/5 px-3 py-2.5 text-xs font-black uppercase tracking-tight text-primary hover:bg-primary/10 transition-colors disabled:opacity-60"
+                      >
+                        {resendLoading ? 'Sending…' : 'Resend Email'}
+                      </button>
+                    </div>
+                  )}
+
+                  {resendStatus && !signupSuccess && (
+                    <p className="text-xs font-bold text-emerald-600 bg-emerald-50 rounded-xl px-4 py-3">{resendStatus}</p>
+                  )}
+
                   <button type="submit" disabled={loading}
                     className="btn-primary-pink mt-1 w-full rounded-[1.65rem] py-3.5 text-sm font-black uppercase tracking-tight disabled:opacity-60">
                     {loading ? 'Loading…' : mode === 'signin' ? 'Sign In' : 'Create Account'}
@@ -178,7 +243,7 @@ export default function Login({ onBack, initialMode = 'signin' }: Props) {
                 {/* Toggle */}
                 <p className="text-center text-xs font-medium text-foreground/50 mt-5">
                   {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
-                  <button onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(null); }}
+                  <button onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(null); setResendStatus(null); setExistingAccount(false); }}
                     className="text-primary font-bold hover:underline">
                     {mode === 'signin' ? 'Sign Up' : 'Sign In'}
                   </button>

@@ -17,7 +17,7 @@ const NAV_ITEMS = [
   { id: 'Dashboard', label: 'Dashboard', icon: LayoutGrid },
   { id: 'Collection', label: 'My Binder', icon: BookOpen },
   { id: 'FindCards', label: 'Find Cards', icon: Search },
-  { id: 'Scan', label: 'Import', icon: ScanLine },
+  { id: 'Import', label: 'Import', icon: ScanLine },
   { id: 'Profile', label: 'My Profile', icon: UserRound },
   { id: 'Friends', label: 'Friends', icon: UsersRound },
 ] as const;

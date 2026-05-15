@@ -22,7 +22,8 @@ interface AuthContextType {
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUpWithEmail: (email: string, password: string, nickname: string) => Promise<{ error: string | null }>;
+  signUpWithEmail: (email: string, password: string, nickname: string) => Promise<{ error: string | null; needsConfirmation: boolean; accountExists: boolean }>;
+  resendEmailConfirmation: (email: string) => Promise<{ error: string | null }>;
   updateProfile: (updates: ProfileUpdates) => Promise<{ error: string | null }>;
   checkUsernameAvailability: (username: string) => Promise<{ available: boolean; error: string | null; normalized: string }>;
   updateEmail: (email: string) => Promise<{ error: string | null }>;
@@ -42,6 +43,10 @@ function normalizeUsername(username: string) {
 
 function isValidUsername(username: string) {
   return /^[a-z0-9_-]{3,24}$/.test(username);
+}
+
+function getAuthCallbackUrl() {
+  return `${window.location.origin}/auth/callback`;
 }
 
 async function fetchProfile(userId: string): Promise<Profile | null> {
@@ -185,7 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: getAuthCallbackUrl() },
     });
   };
 
@@ -195,13 +200,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUpWithEmail = async (email: string, password: string, nickname: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
-        options: {
+      options: {
         data: { full_name: nickname },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: getAuthCallbackUrl(),
       },
+    });
+    const accountExists = Boolean(data.user && data.user.identities && data.user.identities.length === 0);
+    return { error: error?.message ?? null, needsConfirmation: !data.session, accountExists };
+  };
+
+  const resendEmailConfirmation = async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: getAuthCallbackUrl() },
     });
     return { error: error?.message ?? null };
   };
@@ -395,8 +410,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       session, user, profile, loading,
       signInWithGoogle, signInWithEmail, signUpWithEmail, updateProfile, checkUsernameAvailability,
-      updateEmail, updatePassword, unlinkGoogleAccount, requestAccountDeletion, cancelAccountDeletion,
-      signOut, refreshProfile,
+      resendEmailConfirmation, updateEmail, updatePassword, unlinkGoogleAccount, requestAccountDeletion,
+      cancelAccountDeletion, signOut, refreshProfile,
     }}>
       {children}
     </AuthContext.Provider>

@@ -12,6 +12,7 @@ import AccountSettings from './pages/AccountSettings';
 import PublicProfile from './pages/PublicProfile';
 import Social from './pages/Social';
 import FindCards, { clearGlobalSearchState } from './pages/FindCards';
+import { Grid3x3, ImagePlus } from 'lucide-react';
 import { normalizePhotocardForSave, normalizePhotocardUpdates, Photocard, Profile } from './types';
 import { useAuth } from './contexts/AuthContext';
 import {
@@ -70,6 +71,7 @@ function readRouteState(): RouteState {
     return username ? { page: 'Profile', username } : { page: 'Collection' };
   }
   if (path === '/discover') return { page: 'FindCards' };
+  if (path === '/import' || path === '/scan') return { page: 'Import' };
   if (path === '/friends' || path === '/social') return { page: 'Friends' };
   if (path === '/find-cards') return { page: 'FindCards' };
   return { page: 'Collection' };
@@ -79,8 +81,76 @@ function routeForPage(page: string, username?: string) {
   if (page === 'Profile' && username) return `/u/${encodeURIComponent(username)}`;
   if (page === 'Friends') return '/friends';
   if (page === 'FindCards') return '/find-cards';
+  if (page === 'Import') return '/import';
   if (page === 'Dashboard') return '/';
   return '/';
+}
+
+function AddCardEntry({ onManualAdd, onImportGrid, onBack }: {
+  onManualAdd: () => void;
+  onImportGrid: () => void;
+  onBack: () => void;
+}) {
+  return (
+    <div className="min-h-[calc(100dvh-4rem)] bg-gray-50/30">
+      <div className="sticky top-0 z-40 border-b border-gray-100 bg-white/90 shadow-sm backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
+          <button
+            type="button"
+            onClick={onBack}
+            className="group flex items-center gap-2 rounded-2xl px-4 py-2 transition-all hover:bg-gray-100"
+          >
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/40 group-hover:text-foreground">
+              Back to Binder
+            </span>
+          </button>
+          <div className="min-w-0 text-center">
+            <h2 className="truncate text-xl font-bold tracking-tight text-foreground md:text-2xl">Add Card</h2>
+            <p className="hidden text-[9px] font-black uppercase tracking-[0.2em] text-foreground/30 sm:block">
+              Choose how to add to your binder
+            </p>
+          </div>
+          <div className="w-24" />
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-12">
+        <div className="grid gap-4 md:grid-cols-2">
+          <button
+            type="button"
+            onClick={onManualAdd}
+            className="group flex min-h-56 flex-col items-start justify-between rounded-[28px] border-2 border-white bg-white/80 p-6 text-left shadow-sm transition-all hover:-translate-y-1 hover:border-primary/25 hover:shadow-xl hover:shadow-primary/10"
+          >
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary transition-all group-hover:bg-primary group-hover:text-white">
+              <ImagePlus size={24} />
+            </span>
+            <span className="space-y-2">
+              <span className="block text-2xl font-bold tracking-tight text-foreground">Add Card</span>
+              <span className="block text-sm font-medium leading-6 text-foreground/50">
+                Add a card manually or upload a single photocard and edit/crop it.
+              </span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onImportGrid}
+            className="group flex min-h-56 flex-col items-start justify-between rounded-[28px] border-2 border-white bg-white/80 p-6 text-left shadow-sm transition-all hover:-translate-y-1 hover:border-primary/25 hover:shadow-xl hover:shadow-primary/10"
+          >
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary transition-all group-hover:bg-primary group-hover:text-white">
+              <Grid3x3 size={24} />
+            </span>
+            <span className="space-y-2">
+              <span className="block text-2xl font-bold tracking-tight text-foreground">Import from Grid</span>
+              <span className="block text-sm font-medium leading-6 text-foreground/50">
+                Upload a template/grid image and split it into multiple photocards.
+              </span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
@@ -94,6 +164,7 @@ export default function App() {
   const [selectedPublicCard, setSelectedPublicCard] = useState<Photocard | null>(null);
   const [selectedPublicCards, setSelectedPublicCards] = useState<Photocard[]>([]);
   const [selectedCardBackLabel, setSelectedCardBackLabel] = useState('Back to Binder');
+  const [isAddCardEntryOpen, setIsAddCardEntryOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [formCard, setFormCard] = useState<Photocard | null>(null);
@@ -115,6 +186,17 @@ export default function App() {
     setSelectedPublicCard(null);
     setSelectedPublicCards([]);
     setSelectedCardBackLabel('Back to Binder');
+    setIsAddCardEntryOpen(true);
+    setIsFormOpen(false);
+  }, []);
+
+  const openManualAddForm = useCallback(() => {
+    setFormMode('create');
+    setFormCard(null);
+    setSelectedPublicCard(null);
+    setSelectedPublicCards([]);
+    setSelectedCardBackLabel('Back to Binder');
+    setIsAddCardEntryOpen(false);
     setIsFormOpen(true);
   }, []);
 
@@ -149,6 +231,7 @@ export default function App() {
     setSelectedPublicCard(null);
     setSelectedPublicCards([]);
     setSelectedCardBackLabel('Back to Binder');
+    setIsAddCardEntryOpen(false);
     setIsFormOpen(false);
     window.history.pushState({}, '', routeForPage(page, username));
   }, []);
@@ -167,6 +250,7 @@ export default function App() {
       setSelectedPublicCard(null);
       setSelectedPublicCards([]);
       setSelectedCardBackLabel('Back to Binder');
+      setIsAddCardEntryOpen(false);
       setIsFormOpen(false);
     };
     window.addEventListener('popstate', handlePopState);
@@ -373,8 +457,8 @@ export default function App() {
             onImport={handleImportPhotocards}
           />
         );
-      case 'Scan':
-        return <Scan onDone={() => setCurrentPage('Collection')} onImported={handleScanImported} />;
+      case 'Import':
+        return <Scan onDone={() => navigateToPage('Collection')} onImported={handleScanImported} />;
       case 'Account':
         return <AccountSettings photocards={photocards} />;
       case 'Profile':
@@ -483,6 +567,7 @@ export default function App() {
           setCurrentPage('Account');
           setSelectedId(null);
           setSelectedPublicCard(null);
+          setIsAddCardEntryOpen(false);
           setIsFormOpen(false);
         }}
       />
@@ -501,6 +586,15 @@ export default function App() {
         )}
         {dataLoading ? (
           <div className="px-4 py-5 xl:p-8 max-w-6xl mx-auto w-full">{loadingSpinner}</div>
+        ) : isAddCardEntryOpen ? (
+          <AddCardEntry
+            onManualAdd={openManualAddForm}
+            onImportGrid={() => {
+              setIsAddCardEntryOpen(false);
+              navigateToPage('Import');
+            }}
+            onBack={() => setIsAddCardEntryOpen(false)}
+          />
         ) : isFormOpen ? (
           <CardForm
             key={formCard?.id ?? 'new'}

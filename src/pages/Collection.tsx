@@ -476,11 +476,29 @@ export default function Collection({ photocards, isOwner = true, onDelete, onBul
               key="empty-view"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col items-center justify-center px-6 py-32 text-center md:px-10 glass-card border-white border-8 rounded-[48px] shadow-sm text-foreground/20"
+              className="flex flex-col items-center justify-center px-6 py-28 text-center md:px-10 glass-card border-white border-8 rounded-[48px] shadow-sm"
             >
               <div className="text-8xl mb-6 grayscale opacity-30 animate-bounce">📔</div>
-              <p className="font-black uppercase tracking-[0.3em] text-sm italic">Binder section is currently empty</p>
-              {showReturnToFullView && (
+              {photocards.length === 0 ? (
+                <>
+                  <h2 className="font-heading text-3xl font-bold tracking-tight text-foreground">Start your first binder 💗</h2>
+                  <p className="mt-3 max-w-md text-sm font-medium leading-6 text-foreground/45">
+                    You can add cards manually, upload an image, or import from a grid.
+                  </p>
+                  {isOwner && (
+                    <button
+                      onClick={onNewCard}
+                      className="btn-primary-pink mt-8 inline-flex items-center gap-2 rounded-2xl px-8 py-4 text-xs font-black uppercase tracking-widest shadow-xl shadow-primary/10"
+                    >
+                      <Plus size={16} />
+                      Add Card
+                    </button>
+                  )}
+                </>
+              ) : (
+                <p className="font-black uppercase tracking-[0.3em] text-sm italic text-foreground/20">Binder section is currently empty</p>
+              )}
+              {photocards.length > 0 && showReturnToFullView && (
                 <button
                   onClick={() => setFilters({ group: 'All', member: 'All', category: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' })}
                   className="mt-8 px-8 py-4 bg-white text-primary border-2 border-primary/20 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-xl shadow-primary/10"
