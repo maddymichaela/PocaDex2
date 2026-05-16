@@ -5,7 +5,7 @@ import { PhotocardCard, PhotocardGrid } from '../components/PhotocardGrid';
 import PublicCardAction from '../components/PublicCardAction';
 import { getProfileDisplayName, Photocard, Profile } from '../types';
 import { fetchPublicProfileBundle, followUser, getProfileUserId, PublicProfileBundle, unfollowUser } from '../lib/social';
-import { isProfileOwner } from '../lib/ownership';
+import { getCollectionMatchState, isProfileOwner } from '../lib/ownership';
 
 type ProfileTab = 'collection' | 'wishlist' | 'about';
 
@@ -17,6 +17,8 @@ interface PublicProfileProps {
   onEditProfile: () => void;
   onOpenCard?: (card: Photocard, visibleCards?: Photocard[]) => void;
   onAddToCollection?: (card: Photocard) => void;
+  onAddToWishlist?: (card: Photocard) => void;
+  onRemoveFromWishlist?: (card: Photocard) => void;
   onProfileResolved?: (profile: Profile | null) => void;
 }
 
@@ -59,6 +61,8 @@ export default function PublicProfile({
   onEditProfile,
   onOpenCard,
   onAddToCollection,
+  onAddToWishlist,
+  onRemoveFromWishlist,
   onProfileResolved,
 }: PublicProfileProps) {
   const [bundle, setBundle] = useState<PublicProfileBundle | null>(null);
@@ -120,7 +124,7 @@ export default function PublicProfile({
   }, [bundle?.profile, onProfileResolved]);
 
   const cards = bundle?.cards ?? [];
-  const ownedCards = useMemo(() => cards.filter((card) => card.status === 'owned'), [cards]);
+  const ownedCards = useMemo(() => cards.filter((card) => card.status === 'owned' || card.status === 'on_the_way'), [cards]);
   const wishlistCards = useMemo(() => cards.filter((card) => card.status === 'wishlist'), [cards]);
   const onTheWayCount = useMemo(() => cards.filter((card) => card.status === 'on_the_way').length, [cards]);
   const handleFollowToggle = async () => {
@@ -183,7 +187,7 @@ export default function PublicProfile({
   const displayName = getProfileDisplayName(profile);
   const showBio = profile.is_bio_public !== false && Boolean(profile.bio);
   const tabs: { id: ProfileTab; label: string }[] = [
-    { id: 'collection', label: 'Collection' },
+    { id: 'collection', label: 'Binder' },
     { id: 'wishlist', label: 'Wishlist' },
     { id: 'about', label: 'About' },
   ];
@@ -194,6 +198,9 @@ export default function PublicProfile({
     return (
       <div className="grid grid-cols-2 items-stretch gap-3 md:grid-cols-4 md:max-lg:gap-4 xl:grid-cols-5 lg:gap-6">
         {nextCards.map((card, index) => {
+          const actionState = getCollectionMatchState(card, ownPhotocards, currentUserId);
+          const isWishlisted = actionState.isWishlisted;
+          const isTrackedInBinder = actionState.isTrackedInBinder;
           return (
             <div key={card.id} className="relative h-full">
               <PhotocardCard
@@ -201,6 +208,14 @@ export default function PublicProfile({
                 index={index}
                 context="public-profile"
                 onClick={() => onOpenCard?.(card, nextCards)}
+                showDuplicateBadge={false}
+                wishlistToggle={isTrackedInBinder ? undefined : {
+                  isWishlisted,
+                  onToggle: isWishlisted
+                    ? (nextCard) => onRemoveFromWishlist?.(nextCard)
+                    : (nextCard) => currentUserId ? onAddToWishlist?.(nextCard) : setError('Sign in or create an account to add cards to your wishlist.'),
+                  label: isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist',
+                }}
                 actionFooter={(
                   <PublicCardAction
                     card={card}
@@ -208,7 +223,7 @@ export default function PublicProfile({
                     ownPhotocards={ownPhotocards}
                     onAddToCollection={onAddToCollection}
                     onRequireAuth={() => setError('Sign in or create an account to add cards to your collection.')}
-                    className="h-10 w-full rounded-xl bg-primary/95 text-[8px] shadow-sm backdrop-blur disabled:bg-white/95"
+                    className="w-full"
                   />
                 )}
               />
@@ -281,7 +296,7 @@ export default function PublicProfile({
 
             <div className="grid grid-cols-3 gap-2 rounded-[26px] bg-white/75 p-2 shadow-sm">
               {[
-                { label: 'Owned', value: ownedCards.length },
+                { label: 'Binder', value: ownedCards.length },
                 { label: 'Wishlist', value: wishlistCards.length },
                 { label: 'OTW', value: onTheWayCount },
               ].map((stat) => (
@@ -319,7 +334,7 @@ export default function PublicProfile({
               ? <PrivateState label="collection" />
               : ownedCards.length > 0
                 ? renderSharedGrid(ownedCards)
-                : <EmptyState label="collection cards" />
+                : <EmptyState label="binder cards" />
           )}
           {activeTab === 'wishlist' && (
             cardLoadError

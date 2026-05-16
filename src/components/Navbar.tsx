@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { LayoutGrid, BookOpen, ScanLine, Plus, LogOut, ChevronUp, Settings, UsersRound, UserRound, Search } from 'lucide-react';
+import { LayoutGrid, BookOpen, ScanLine, Plus, LogOut, ChevronUp, Settings, UsersRound, UserRound, Search, Heart } from 'lucide-react';
 import { Profile } from '../types';
 import { pocadexLogo } from '../lib/assets';
 
@@ -17,6 +17,7 @@ interface NavbarProps {
 const NAV_ITEMS = [
   { id: 'Dashboard', label: 'Dashboard', icon: LayoutGrid },
   { id: 'Collection', label: 'My Binder', icon: BookOpen },
+  { id: 'Wishlist', label: 'Wishlist', icon: Heart },
   { id: 'FindCards', label: 'Find Cards', icon: Search },
   { id: 'Import', label: 'Import', icon: ScanLine },
   { id: 'Profile', label: 'My Profile', icon: UserRound },

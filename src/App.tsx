@@ -8,11 +8,13 @@ import Splash from './pages/Splash';
 import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
 import Scan from './pages/Scan';
+import Pricing from './pages/Pricing';
+import Wishlist from './pages/Wishlist';
 import AccountSettings from './pages/AccountSettings';
 import PublicProfile from './pages/PublicProfile';
 import Social from './pages/Social';
 import FindCards, { clearGlobalSearchState } from './pages/FindCards';
-import { Grid3x3, ImagePlus, X } from 'lucide-react';
+import { Grid3x3, ImagePlus, X, PackageCheck, Truck } from 'lucide-react';
 import { normalizePhotocardForSave, normalizePhotocardUpdates, Photocard, Profile } from './types';
 import { useAuth } from './contexts/AuthContext';
 import {
@@ -24,6 +26,10 @@ import {
 } from './lib/db';
 import { fetchUnreadFollowNotificationCount, getCardTemplateId } from './lib/social';
 import { createPhotocardDraftFromPublicCard, getCollectionMatchState, isPhotocardOwner, isProfileOwner } from './lib/ownership';
+import { countTrackedCollectionCards, isTrackedCollectionCard } from './lib/plan';
+import { usePlan } from './hooks/usePlan';
+import UpgradePrompt from './components/UpgradePrompt';
+import ModalShell from './components/ModalShell';
 
 type AuthScreen = 'splash' | 'login' | 'signup';
 type RouteState = { page: string; username?: string; socialTab?: 'people' | 'following' | 'followers' };
@@ -72,16 +78,20 @@ function readRouteState(): RouteState {
   }
   if (path === '/discover') return { page: 'FindCards' };
   if (path === '/import' || path === '/scan') return { page: 'Import' };
+  if (path === '/wishlist') return { page: 'Wishlist' };
   if (path === '/friends' || path === '/social') return { page: 'Friends' };
   if (path === '/find-cards') return { page: 'FindCards' };
+  if (path === '/pricing') return { page: 'Pricing' };
   return { page: 'Collection' };
 }
 
 function routeForPage(page: string, username?: string) {
   if (page === 'Profile' && username) return `/u/${encodeURIComponent(username)}`;
   if (page === 'Friends') return '/friends';
+  if (page === 'Wishlist') return '/wishlist';
   if (page === 'FindCards') return '/find-cards';
   if (page === 'Import') return '/import';
+  if (page === 'Pricing') return '/pricing';
   if (page === 'Dashboard') return '/';
   return '/';
 }
@@ -177,8 +187,58 @@ function AppToast({ message, onClick, onDismiss }: { message: string; onClick?: 
   );
 }
 
+function MoveToBinderPrompt({ card, onClose, onMove }: {
+  card: Photocard;
+  onClose: () => void;
+  onMove: (status: 'owned' | 'on_the_way') => void;
+}) {
+  return (
+    <ModalShell
+      title="Move to Binder"
+      subtitle="Choose tracking status"
+      icon={<PackageCheck size={19} />}
+      onClose={onClose}
+      maxWidth="md:max-w-sm"
+      overlayClassName="bg-primary/10 backdrop-blur-md"
+    >
+      <div className="space-y-6 p-6 text-center md:p-8">
+        <p className="text-sm font-semibold leading-6 text-foreground/55">
+          How do you want to track this card?
+        </p>
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={() => onMove('owned')}
+            className="flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-primary/20 bg-white px-5 py-4 text-xs font-black uppercase tracking-widest text-primary shadow-sm transition-all hover:bg-primary hover:text-white"
+          >
+            <PackageCheck size={17} />
+            Owned
+          </button>
+          <button
+            type="button"
+            onClick={() => onMove('on_the_way')}
+            className="flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-accent-blue/20 bg-white px-5 py-4 text-xs font-black uppercase tracking-widest text-accent-blue shadow-sm transition-all hover:bg-accent-blue hover:text-white"
+          >
+            <Truck size={17} />
+            On the Way
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full rounded-2xl px-5 py-3 text-[10px] font-black uppercase tracking-widest text-foreground/35 transition-all hover:bg-gray-50 hover:text-foreground/60"
+          >
+            Cancel
+          </button>
+        </div>
+        <p className="sr-only">{card.cardName}</p>
+      </div>
+    </ModalShell>
+  );
+}
+
 export default function App() {
   const { user, profile, loading: authLoading, signOut, cancelAccountDeletion } = useAuth();
+  const plan = usePlan();
   const [authScreen, setAuthScreen] = useState<AuthScreen>('splash');
   const initialRoute = readRouteState();
   const [currentPage, setCurrentPage] = useState(initialRoute.page);
@@ -196,6 +256,8 @@ export default function App() {
   const [dataLoading, setDataLoading] = useState(false);
   const [viewedProfile, setViewedProfile] = useState<Profile | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [upgradePromptReason, setUpgradePromptReason] = useState<string | null>(null);
+  const [moveToBinderCard, setMoveToBinderCard] = useState<Photocard | null>(null);
   const [friendsUnreadCount, setFriendsUnreadCount] = useState(0);
   const binderReadyToastUserRef = useRef<string | null>(null);
   const currentPageRef = useRef(currentPage);
@@ -203,6 +265,13 @@ export default function App() {
   useEffect(() => {
     currentPageRef.current = currentPage;
   }, [currentPage]);
+
+  const trackedCardCount = countTrackedCollectionCards(photocards);
+
+  const showUpgradePrompt = useCallback((reason: string) => {
+    setUpgradePromptReason(reason);
+  }, []);
+
 
   const handleAddCard = useCallback(() => {
     if (currentPageRef.current === 'FindCards') {
@@ -227,9 +296,32 @@ export default function App() {
     setIsFormOpen(true);
   }, []);
 
+  const getTrackedCountAfterSave = useCallback((nextCard: Photocard, currentCards = photocards) => {
+    const nextIsTracked = isTrackedCollectionCard(nextCard);
+    const existing = currentCards.find((card) => card.id === nextCard.id || getCardTemplateId(card) === getCardTemplateId(nextCard));
+    const countWithoutExistingTrackedCard = existing && isTrackedCollectionCard(existing)
+      ? countTrackedCollectionCards(currentCards.filter((card) => card.id !== existing.id))
+      : countTrackedCollectionCards(currentCards);
+
+    return countWithoutExistingTrackedCard + (nextIsTracked ? 1 : 0);
+  }, [photocards]);
+
+  const guardTrackedCardLimit = useCallback((nextCard: Photocard) => {
+    const nextTrackedCount = getTrackedCountAfterSave(nextCard);
+    if (plan.canAddMoreCards(nextTrackedCount - (isTrackedCollectionCard(nextCard) ? 1 : 0))) return true;
+    if (!isTrackedCollectionCard(nextCard)) return true;
+
+    showUpgradePrompt(`Free plans include ${plan.cardLimit} owned or on-the-way cards. Wishlist cards do not count, but this card would become tracked card ${nextTrackedCount}.`);
+    return false;
+  }, [getTrackedCountAfterSave, plan, showUpgradePrompt]);
+
   const handleAddPublicCard = useCallback((sourceCard: Photocard) => {
     if (!user) return;
-    if (getCollectionMatchState(sourceCard, photocards, user.id).alreadyInCollection) return;
+    if (getCollectionMatchState(sourceCard, photocards, user.id).isTrackedInBinder) return;
+    if (!plan.canAddMoreCards(trackedCardCount)) {
+      showUpgradePrompt(`You have ${trackedCardCount} owned or on-the-way cards, which reaches the Free plan limit of ${plan.cardLimit}. Upgrade to Pro before adding another tracked card.`);
+      return;
+    }
     if (currentPageRef.current === 'FindCards') {
       clearGlobalSearchState('opened add-to-collection form from Global Search');
     }
@@ -244,7 +336,82 @@ export default function App() {
     setSelectedCardBackLabel('Back to Binder');
     setSelectedId(null);
     setIsFormOpen(true);
+  }, [photocards, plan, showUpgradePrompt, trackedCardCount, user]);
+
+  const handleAddWishlistCard = useCallback(async (sourceCard: Photocard) => {
+    if (!user) return;
+    const matchState = getCollectionMatchState(sourceCard, photocards, user.id);
+    if (matchState.isWishlisted || matchState.isTrackedInBinder) return;
+
+    const draft = normalizePhotocardForSave({
+      ...createPhotocardDraftFromPublicCard(sourceCard, user.id),
+      status: 'wishlist',
+      condition: undefined,
+      isDuplicate: false,
+      notes: '',
+    });
+    setPhotocards(prev => [draft, ...prev]);
+    try {
+      const saved = await insertPhotocard(user.id, draft);
+      const mergedSaved = normalizePhotocardForSave({ ...saved, ...draft, id: saved.id });
+      const savedTemplateId = getCardTemplateId(mergedSaved);
+      setPhotocards(prev => [
+        mergedSaved,
+        ...prev.filter((pc) => pc.id !== draft.id && pc.id !== saved.id && getCardTemplateId(pc) !== savedTemplateId),
+      ]);
+      setToastMessage('Added to Wishlist');
+    } catch (err) {
+      console.error('Failed to wishlist photocard:', err);
+      setPhotocards(prev => prev.filter(pc => pc.id !== draft.id));
+    }
   }, [photocards, user]);
+
+  const handleRemoveWishlistCard = useCallback(async (sourceCard: Photocard) => {
+    if (!user) return;
+    const matchState = getCollectionMatchState(sourceCard, photocards, user.id);
+    const wishlistCard = matchState.matchedOwnedCard?.status === 'wishlist' ? matchState.matchedOwnedCard : null;
+    if (!wishlistCard) return;
+
+    setPhotocards(prev => prev.filter(card => card.id !== wishlistCard.id));
+    if (selectedId === wishlistCard.id) setSelectedId(null);
+    if (selectedPublicCard?.id === sourceCard.id) setSelectedPublicCard(null);
+    try {
+      await deletePhotocard(user.id, wishlistCard.id);
+      setToastMessage('Removed from Wishlist');
+    } catch (err) {
+      console.error('Failed to remove wishlist photocard:', err);
+      setPhotocards(prev => [wishlistCard, ...prev]);
+    }
+  }, [photocards, selectedId, selectedPublicCard, user]);
+
+  const handleMoveWishlistToBinder = useCallback(async (status: 'owned' | 'on_the_way') => {
+    if (!user || !moveToBinderCard) return;
+    const wishlistCard = photocards.find(card => card.id === moveToBinderCard.id) ?? moveToBinderCard;
+    if (wishlistCard.status !== 'wishlist') {
+      setMoveToBinderCard(null);
+      return;
+    }
+
+    const nextCard = normalizePhotocardForSave({
+      ...wishlistCard,
+      status,
+      condition: status === 'owned' ? wishlistCard.condition ?? 'mint' : undefined,
+    });
+    if (!guardTrackedCardLimit(nextCard)) return;
+
+    setMoveToBinderCard(null);
+    setPhotocards(prev => prev.map(card => card.id === nextCard.id ? nextCard : card));
+    try {
+      const saved = await updatePhotocard(user.id, nextCard);
+      const mergedSaved = normalizePhotocardForSave({ ...saved, ...nextCard });
+      setPhotocards(prev => prev.map(card => card.id === mergedSaved.id ? mergedSaved : card));
+      setToastMessage('Moved to Binder');
+      setSelectedId(mergedSaved.id);
+    } catch (err) {
+      console.error('Failed to move wishlist card to binder:', err);
+      setPhotocards(prev => prev.map(card => card.id === wishlistCard.id ? wishlistCard : card));
+    }
+  }, [guardTrackedCardLimit, moveToBinderCard, photocards, user]);
 
   const navigateToPage = useCallback((page: string, username?: string) => {
     if (currentPageRef.current === 'FindCards' && page !== 'FindCards') {
@@ -260,8 +427,14 @@ export default function App() {
     setSelectedCardBackLabel('Back to Binder');
     setIsAddCardEntryOpen(false);
     setIsFormOpen(false);
+    setMoveToBinderCard(null);
     window.history.pushState({}, '', routeForPage(page, username));
   }, []);
+
+  const openPricingPage = useCallback(() => {
+    setUpgradePromptReason(null);
+    navigateToPage('Pricing');
+  }, [navigateToPage]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -279,6 +452,7 @@ export default function App() {
       setSelectedCardBackLabel('Back to Binder');
       setIsAddCardEntryOpen(false);
       setIsFormOpen(false);
+      setMoveToBinderCard(null);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -354,7 +528,8 @@ export default function App() {
   }, [dataLoading, photocards.length, userId]);
 
   const handleAddPhotocard = useCallback(async (newPC: Photocard) => {
-    if (!user) return;
+    if (!user) return false;
+    if (!guardTrackedCardLimit(newPC)) return false;
     const wasEmpty = photocards.length === 0;
     const normalizedPC = normalizePhotocardForSave(newPC);
     const templateId = getCardTemplateId(normalizedPC);
@@ -370,25 +545,30 @@ export default function App() {
         ...prev.filter((pc) => pc.id !== normalizedPC.id && pc.id !== saved.id && getCardTemplateId(pc) !== savedTemplateId),
       ]);
       if (wasEmpty) setToastMessage('✨ Explore Find Cards to discover more photocards');
+      return true;
     } catch (err) {
       console.error('Failed to add photocard:', err);
       setPhotocards(prev => prev.filter(pc => pc.id !== normalizedPC.id));
+      return false;
     }
-  }, [photocards.length, user]);
+  }, [guardTrackedCardLimit, photocards.length, user]);
 
   const handleUpdatePhotocard = useCallback(async (updatedPC: Photocard) => {
-    if (!user) return;
+    if (!user) return false;
     const normalizedPC = normalizePhotocardForSave(updatedPC);
-    if (normalizedPC.ownerUserId && normalizedPC.ownerUserId !== user.id) return;
+    if (normalizedPC.ownerUserId && normalizedPC.ownerUserId !== user.id) return false;
+    if (!guardTrackedCardLimit(normalizedPC)) return false;
     setPhotocards(prev => prev.map(pc => pc.id === normalizedPC.id ? normalizedPC : pc));
     try {
       const saved = await updatePhotocard(user.id, normalizedPC);
       const mergedSaved = normalizePhotocardForSave({ ...saved, ...normalizedPC });
       setPhotocards(prev => prev.map(pc => pc.id === mergedSaved.id ? mergedSaved : pc));
+      return true;
     } catch (err) {
       console.error('Failed to update photocard:', err);
+      return false;
     }
-  }, [user]);
+  }, [guardTrackedCardLimit, user]);
 
   const handleDeletePhotocard = useCallback(async (id: string) => {
     if (!user) return;
@@ -404,6 +584,10 @@ export default function App() {
 
   const handleBulkUpdatePartial = useCallback(async (ids: string[], updates: Partial<Photocard>) => {
     if (!user) return;
+    if (!plan.canUseBulkEdit) {
+      showUpgradePrompt('Bulk edit is a Pro feature. Upgrade to Pro to update many photocards at once.');
+      return;
+    }
     const ownedIds = ids.filter((id) => {
       const target = photocards.find(pc => pc.id === id);
       return !target?.ownerUserId || target.ownerUserId === user.id;
@@ -416,7 +600,7 @@ export default function App() {
     } catch (err) {
       console.error('Failed to bulk update:', err);
     }
-  }, [photocards, user]);
+  }, [photocards, plan.canUseBulkEdit, showUpgradePrompt, user]);
 
   const handleScanImported = useCallback((savedCards: Photocard[]) => {
     const wasEmpty = photocards.length === 0;
@@ -428,12 +612,23 @@ export default function App() {
   }, [photocards.length]);
 
   const handleImportPhotocards = useCallback((newData: Photocard[], mode: 'replace' | 'merge') => {
+    const nextCards = mode === 'replace'
+      ? dedupePhotocardsByTemplateId(newData)
+      : (() => {
+        const existingTemplateIds = new Set(photocards.map(getCardTemplateId));
+        return dedupePhotocardsByTemplateId([...newData.filter(card => !existingTemplateIds.has(getCardTemplateId(card))), ...photocards]);
+      })();
+    const nextTrackedCount = countTrackedCollectionCards(nextCards);
+    if (plan.cardLimit !== null && nextTrackedCount > plan.cardLimit) {
+      showUpgradePrompt(`This backup would put your binder at ${nextTrackedCount} owned or on-the-way cards. Free plans include ${plan.cardLimit} tracked cards.`);
+      return;
+    }
     setPhotocards(prev => {
       if (mode === 'replace') return dedupePhotocardsByTemplateId(newData);
       const existingTemplateIds = new Set(prev.map(getCardTemplateId));
       return dedupePhotocardsByTemplateId([...newData.filter(card => !existingTemplateIds.has(getCardTemplateId(card))), ...prev]);
     });
-  }, []);
+  }, [photocards, plan.cardLimit, showUpgradePrompt]);
 
   // Auth loading
   if (authLoading) {
@@ -507,7 +702,7 @@ export default function App() {
   const currentCardIndex = currentCard && !selectedPublicCard ? photocards.findIndex(p => p.id === selectedId) : -1;
   const currentPublicCardIndex = selectedPublicCard ? selectedPublicCards.findIndex(p => p.id === selectedPublicCard.id) : -1;
   const selectedPublicCardMatchState = selectedPublicCard ? getCollectionMatchState(selectedPublicCard, photocards, user.id) : null;
-  const selectedPublicCardInCollection = selectedPublicCardMatchState?.alreadyInCollection ?? false;
+  const selectedPublicCardInCollection = selectedPublicCardMatchState?.isTrackedInBinder ?? false;
   const currentCardIsOwner = currentCard ? isPhotocardOwner(user.id, currentCard) : false;
   const isViewingOwnProfile = currentPage === 'Profile'
     && isProfileOwner(user.id, viewedProfile?.id ?? (
@@ -526,7 +721,35 @@ export default function App() {
           />
         );
       case 'Import':
-        return <Scan onDone={() => navigateToPage('Collection')} onImported={handleScanImported} />;
+        if (!plan.canUseImport) {
+          return (
+            <div className="flex min-h-[420px] flex-col items-center justify-center rounded-[36px] border-2 border-white bg-white/75 px-6 py-16 text-center shadow-sm">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-3xl bg-primary/10 text-primary">
+                <Grid3x3 size={24} />
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">Import from Grid is a Pro feature</h1>
+              <p className="mt-3 max-w-md text-sm font-medium leading-6 text-foreground/50">
+                Free users can preview this feature, but grid import saves are reserved for Pro.
+              </p>
+              <button
+                type="button"
+                onClick={() => showUpgradePrompt('Import from Grid is included with Pro, along with unlimited cards, bulk edit, and multiple binders.')}
+                className="btn-primary-pink mt-7 rounded-2xl px-7 py-4 text-xs font-black uppercase tracking-widest"
+              >
+                View Pro
+              </button>
+            </div>
+          );
+        }
+        return (
+          <Scan
+            onDone={() => navigateToPage('Collection')}
+            onImported={handleScanImported}
+            plan={plan}
+            trackedCardCount={trackedCardCount}
+            onUpgradeRequired={showUpgradePrompt}
+          />
+        );
       case 'Account':
         return <AccountSettings photocards={photocards} />;
       case 'Profile':
@@ -551,6 +774,8 @@ export default function App() {
               }
             }}
             onAddToCollection={handleAddPublicCard}
+            onAddToWishlist={handleAddWishlistCard}
+            onRemoveFromWishlist={handleRemoveWishlistCard}
             onProfileResolved={setViewedProfile}
           />
         );
@@ -573,10 +798,21 @@ export default function App() {
               }
             }}
             onAddToCollection={handleAddPublicCard}
+            onAddToWishlist={handleAddWishlistCard}
+            onRemoveFromWishlist={handleRemoveWishlistCard}
             onRequireAuth={() => window.alert('Sign in or create an account to add cards to your collection.')}
             onSearchInteract={() => {
               if (toastMessage?.includes('Explore Find Cards')) setToastMessage(null);
             }}
+          />
+        );
+      case 'Wishlist':
+        return (
+          <Wishlist
+            photocards={photocards}
+            onCardClick={(pc) => { setSelectedCardBackLabel('Back to Wishlist'); setSelectedId(pc.id); }}
+            onFindCards={() => navigateToPage('FindCards')}
+            onRemoveFromWishlist={handleRemoveWishlistCard}
           />
         );
       case 'Friends':
@@ -588,15 +824,22 @@ export default function App() {
             onNotificationsRead={handleNotificationsRead}
           />
         );
+      case 'Pricing':
+        return <Pricing />;
       case 'Collection':
         return (
           <Collection
-            photocards={photocards}
+            photocards={photocards.filter(card => card.status === 'owned' || card.status === 'on_the_way')}
             onDelete={handleDeletePhotocard}
             onBulkUpdate={handleBulkUpdatePartial}
             onCardClick={(pc) => { setSelectedCardBackLabel('Back to Binder'); setSelectedId(pc.id); }}
             onNewCard={handleAddCard}
             onImportGrid={() => navigateToPage('Import')}
+            canUseBulkEdit={plan.canUseBulkEdit}
+            onUpgradeRequired={showUpgradePrompt}
+            trackedCardCount={trackedCardCount}
+            cardLimit={plan.cardLimit}
+            shouldShowUpgradePrompt={plan.shouldShowUpgradePrompt(trackedCardCount)}
           />
         );
       default:
@@ -675,12 +918,10 @@ export default function App() {
             initialData={formCard}
             mode={formMode}
             onSubmit={async (pc) => {
-              if (formMode === 'edit') {
-                await handleUpdatePhotocard(pc);
-              } else {
-                await handleAddPhotocard(pc);
-              }
-              setIsFormOpen(false);
+              const saved = formMode === 'edit'
+                ? await handleUpdatePhotocard(pc)
+                : await handleAddPhotocard(pc);
+              if (saved) setIsFormOpen(false);
             }}
             onDelete={formMode === 'edit' && formCard ? async (id) => {
               await handleDeletePhotocard(id);
@@ -724,6 +965,9 @@ export default function App() {
             currentUserId={user.id}
             ownPhotocards={photocards}
             onAddToCollection={handleAddPublicCard}
+            onAddToWishlist={handleAddWishlistCard}
+            onRemoveFromWishlist={handleRemoveWishlistCard}
+            onMoveToBinder={setMoveToBinderCard}
             isInCollection={selectedPublicCardInCollection}
           />
         ) : (
@@ -740,6 +984,20 @@ export default function App() {
             navigateToPage('FindCards');
           } : undefined}
           onDismiss={() => setToastMessage(null)}
+        />
+      )}
+      {upgradePromptReason && (
+        <UpgradePrompt
+          reason={upgradePromptReason}
+          onClose={() => setUpgradePromptReason(null)}
+          onViewPro={openPricingPage}
+        />
+      )}
+      {moveToBinderCard && (
+        <MoveToBinderPrompt
+          card={moveToBinderCard}
+          onClose={() => setMoveToBinderCard(null)}
+          onMove={handleMoveWishlistToBinder}
         />
       )}
     </div>

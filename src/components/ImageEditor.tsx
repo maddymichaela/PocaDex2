@@ -157,10 +157,12 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = CAR
     const naturalW = mediaSize.naturalWidth;
     const naturalH = mediaSize.naturalHeight;
 
-    console.log('[EditCrop] naturalSize:', naturalW, '×', naturalH);
-    console.log('[EditCrop] renderedMediaSize:', mediaSize.width, '×', mediaSize.height);
-    console.log('[EditCrop] savedCropRect:', JSON.stringify(initialArea));
-    console.log('[EditCrop] cropFrameSize:', cropSize.width, '×', cropSize.height);
+    if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
+      console.debug('[EditCrop] naturalSize:', naturalW, '×', naturalH);
+      console.debug('[EditCrop] renderedMediaSize:', mediaSize.width, '×', mediaSize.height);
+      console.debug('[EditCrop] savedCropRect:', JSON.stringify(initialArea));
+      console.debug('[EditCrop] cropFrameSize:', cropSize.width, '×', cropSize.height);
+    }
 
     // For contain mode, both axes give the same display scale; min handles edge cases safely.
     const displayScale = naturalW > 0 && naturalH > 0
@@ -181,9 +183,11 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = CAR
       y: ((naturalH - initialArea.height) / 2 - initialArea.y) * cropZoom,
     };
 
-    console.log('[EditCrop] displayScale:', displayScale, '| scaleX:', scaleX.toFixed(4), '| scaleY:', scaleY.toFixed(4));
-    console.log('[EditCrop] initialZoom:', zoom.toFixed(4), '| cropZoom:', cropZoom.toFixed(4));
-    console.log('[EditCrop] initialCrop:', JSON.stringify(crop));
+    if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
+      console.debug('[EditCrop] displayScale:', displayScale, '| scaleX:', scaleX.toFixed(4), '| scaleY:', scaleY.toFixed(4));
+      console.debug('[EditCrop] initialZoom:', zoom.toFixed(4), '| cropZoom:', cropZoom.toFixed(4));
+      console.debug('[EditCrop] initialCrop:', JSON.stringify(crop));
+    }
 
     hasAppliedInitialAreaRef.current = true;
     cropRef.current = crop;

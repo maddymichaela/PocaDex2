@@ -447,7 +447,7 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
             className="btn-primary-pink group flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border-2 border-white/10 text-xs font-black uppercase tracking-widest md:h-14 md:gap-3 md:rounded-2xl md:border-4 md:text-sm"
           >
             {isEditing ? <Save size={20} /> : <Upload size={20} className="group-hover:translate-y-[-2px] transition-transform" />}
-            {isEditing ? 'Save Changes' : 'Add to Collection'}
+            {isEditing ? 'Save Changes' : 'Add to Binder'}
           </button>
         </div>
 

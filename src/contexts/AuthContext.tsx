@@ -115,6 +115,8 @@ function profileFromUser(user: User): Profile {
     is_bio_public: true,
     has_password: Boolean(metadata.has_password || metadata.password_set_at),
     deletion_requested_at: (metadata.deletion_requested_at as string | undefined) ?? null,
+    subscription_tier: 'free',
+    subscription_expires_at: null,
     created_at: user.created_at,
     updated_at: user.updated_at ?? user.created_at,
   };
@@ -134,6 +136,8 @@ function mergeProfileFallback(profile: Profile | null, fallback: Profile): Profi
     is_bio_public: profile.is_bio_public ?? true,
     has_password: profile.has_password ?? fallback.has_password ?? null,
     deletion_requested_at: profile.deletion_requested_at ?? fallback.deletion_requested_at ?? null,
+    subscription_tier: profile.subscription_tier ?? fallback.subscription_tier ?? 'free',
+    subscription_expires_at: profile.subscription_expires_at ?? fallback.subscription_expires_at ?? null,
   };
 }
 
@@ -259,6 +263,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         is_bio_public: updates.isBioPublic ?? profile?.is_bio_public ?? true,
         has_password: profile?.has_password ?? null,
         deletion_requested_at: profile?.deletion_requested_at ?? null,
+        subscription_tier: profile?.subscription_tier ?? 'free',
+        subscription_expires_at: profile?.subscription_expires_at ?? null,
         created_at: profile?.created_at ?? user.created_at,
         updated_at: new Date().toISOString(),
       };

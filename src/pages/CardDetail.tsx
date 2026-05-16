@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Image as ImageIcon, Edit3, Copy, Heart, Truck } from 'lucide-react';
-import PublicCardAction from '../components/PublicCardAction';
+import { ChevronLeft, ChevronRight, Image as ImageIcon, Edit3, Copy, Heart, Truck, Plus } from 'lucide-react';
 import { formatPhotocardMembers, Photocard } from '../types';
 import { placeholderImage } from '../lib/assets';
 import { fetchWishlistCountForCard } from '../lib/social';
 import { getPhotocardDisplayMetadata } from '../lib/cardMetadata';
+import { getCollectionMatchState } from '../lib/ownership';
 
 interface CardDetailProps {
   photocard: Photocard;
@@ -16,11 +16,23 @@ interface CardDetailProps {
   onNext: () => void;
   isOwner?: boolean;
   onAddToCollection?: (card: Photocard) => void;
+  onAddToWishlist?: (card: Photocard) => void;
+  onRemoveFromWishlist?: (card: Photocard) => void;
+  onMoveToBinder?: (card: Photocard) => void;
   onRequireAuth?: () => void;
   isInCollection?: boolean;
   currentUserId?: string | null;
   ownPhotocards?: Photocard[];
   backLabel?: string;
+}
+
+function ResponsiveButtonLabel({ desktop, mobile }: { desktop: string; mobile: string }) {
+  return (
+    <>
+      <span className="hidden sm:inline">{desktop}</span>
+      <span className="sm:hidden">{mobile}</span>
+    </>
+  );
 }
 
 export default function CardDetail({
@@ -33,6 +45,9 @@ export default function CardDetail({
   onNext,
   isOwner = true,
   onAddToCollection,
+  onAddToWishlist,
+  onRemoveFromWishlist,
+  onMoveToBinder,
   onRequireAuth,
   isInCollection = false,
   currentUserId,
@@ -43,6 +58,12 @@ export default function CardDetail({
   const category = displayMetadata.category;
   const memberLabel = formatPhotocardMembers(photocard);
   const [wishlistCount, setWishlistCount] = useState(0);
+  const actionState = getCollectionMatchState(photocard, ownPhotocards ?? [], currentUserId);
+  const isWishlistedByCurrentUser = actionState.isWishlisted;
+  const isTrackedInBinder = isInCollection || actionState.isTrackedInBinder;
+  const actionButtonClass = 'flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-[9px] font-black uppercase tracking-[0.12em] shadow-sm transition-all sm:text-[10px] sm:tracking-widest md:px-4';
+  const binderButtonClass = `${actionButtonClass} border-2 border-primary/25 bg-white text-primary hover:bg-primary hover:text-white disabled:bg-white disabled:text-primary disabled:opacity-60`;
+  const wishlistButtonClass = `${actionButtonClass} border-2 border-[var(--wishlist-red)]/20 bg-white text-[var(--wishlist-red)] hover:bg-[var(--wishlist-red)] hover:text-white disabled:opacity-60`;
 
   useEffect(() => {
     let isCurrent = true;
@@ -116,23 +137,74 @@ export default function CardDetail({
             </div>
           </div>
 
-          {isOwner ? (
+          {isOwner && photocard.status === 'wishlist' ? (
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onRemoveFromWishlist?.(photocard)}
+                className={wishlistButtonClass}
+              >
+                <Heart size={14} className="fill-current" />
+                <ResponsiveButtonLabel desktop="Remove from Wishlist" mobile="Remove" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onMoveToBinder?.(photocard)}
+                className={binderButtonClass}
+              >
+                <Plus size={14} />
+                <ResponsiveButtonLabel desktop="Move to Binder" mobile="Move" />
+              </button>
+            </div>
+          ) : isOwner ? (
             <button
               onClick={onEdit}
               className="flex shrink-0 items-center gap-1.5 rounded-xl border-2 border-primary/20 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] text-primary shadow-sm transition-all hover:bg-primary hover:text-white sm:text-[10px] sm:tracking-widest md:gap-2 md:px-5 md:py-2.5"
             >
               <Edit3 size={14} />
-              Edit<span className="hidden sm:inline"> Card</span>
+              <ResponsiveButtonLabel desktop="Edit Card" mobile="Edit" />
             </button>
           ) : (
-            <PublicCardAction
-              card={photocard}
-              currentUserId={currentUserId}
-              ownPhotocards={ownPhotocards ?? (isInCollection ? [photocard] : [])}
-              onAddToCollection={onAddToCollection}
-              onRequireAuth={onRequireAuth}
-              className="h-auto shrink-0 rounded-xl border-2 border-white/20 px-3 py-2 text-[9px] tracking-[0.12em] sm:text-[10px] sm:tracking-widest md:gap-2 md:px-5 md:py-2.5"
-            />
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!currentUserId) {
+                    onRequireAuth?.();
+                    return;
+                  }
+                  if (isWishlistedByCurrentUser) {
+                    onRemoveFromWishlist?.(photocard);
+                    return;
+                  }
+                  onAddToWishlist?.(photocard);
+                }}
+                className={wishlistButtonClass}
+              >
+                <Heart size={14} className={isWishlistedByCurrentUser ? 'fill-current' : undefined} />
+                <ResponsiveButtonLabel
+                  desktop={isWishlistedByCurrentUser ? 'Remove from Wishlist' : 'Add to Wishlist'}
+                  mobile={isWishlistedByCurrentUser ? 'Remove' : 'Wishlist'}
+                />
+              </button>
+              <button
+                type="button"
+                disabled={isTrackedInBinder}
+                onClick={() => {
+                  if (isTrackedInBinder) return;
+                  if (!currentUserId) {
+                    onRequireAuth?.();
+                    return;
+                  }
+                  onAddToCollection?.(photocard);
+                }}
+                className={binderButtonClass}
+              >
+                {!isTrackedInBinder && <Plus size={14} />}
+                <span>{isTrackedInBinder ? 'In Binder' : 'Add to Binder'}</span>
+              </button>
+
+            </div>
           )}
         </div>
       </div>
@@ -196,7 +268,7 @@ export default function CardDetail({
                   <Heart className="h-3 w-3 fill-current" /> Wishlisted by {wishlistCount} {wishlistCount === 1 ? 'collector' : 'collectors'}
                 </span>
               )}
-              {photocard.isDuplicate && (
+              {isOwner && photocard.isDuplicate && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-primary">
                   <Copy className="h-3 w-3" /> Duplicate
                 </span>

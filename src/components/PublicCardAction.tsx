@@ -47,21 +47,21 @@ export default function PublicCardAction({
   return (
     <button
       type="button"
-      disabled={actionState.inCollection}
+      disabled={actionState.isTrackedInBinder}
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        if (actionState.inCollection) return;
+        if (actionState.isTrackedInBinder) return;
         if (actionState.requiresAuth) {
           onRequireAuth?.();
           return;
         }
         onAddToCollection?.(card);
       }}
-      className={`flex h-10 items-center justify-center gap-1.5 rounded-2xl bg-primary px-2 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all disabled:bg-white disabled:text-primary disabled:ring-2 disabled:ring-primary/15 ${className}`}
+      className={`flex h-10 w-full min-w-0 items-center justify-center gap-1.5 rounded-xl border-2 border-primary/25 bg-white px-2 text-[8px] font-black uppercase tracking-widest text-primary shadow-sm transition-all hover:bg-primary hover:text-white disabled:border-primary/15 disabled:bg-white disabled:text-primary disabled:opacity-70 ${className}`}
     >
-      {!actionState.inCollection && <Plus size={13} />}
-      {actionState.actionLabel}
+      {!actionState.isTrackedInBinder && <Plus size={13} />}
+      <span className="truncate">{actionState.actionLabel}</span>
     </button>
   );
 }

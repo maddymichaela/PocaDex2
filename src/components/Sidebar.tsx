@@ -37,8 +37,8 @@ export function Sidebar({ stats }: { stats: CollectionStats }) {
   return (
     <aside className="w-full grid grid-cols-2 md:grid-cols-4 gap-4 items-start">
       <StatCard
-        label="Total Cards"
-        value={(stats.totalCollected + stats.onTheWay + stats.wishlistGoals).toLocaleString()}
+        label="Tracked Cards"
+        value={(stats.totalCollected + stats.onTheWay).toLocaleString()}
         highlightColor={SOFT_PRIMARY_MIX}
       />
       <StatCard

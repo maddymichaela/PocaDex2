@@ -51,11 +51,13 @@ interface FindCardsProps {
   ownPhotocards: Photocard[];
   onOpenCard?: (card: Photocard, visibleCards?: Photocard[]) => void;
   onAddToCollection: (card: Photocard) => void;
+  onAddToWishlist?: (card: Photocard) => void;
+  onRemoveFromWishlist?: (card: Photocard) => void;
   onRequireAuth?: () => void;
   onSearchInteract?: () => void;
 }
 
-export default function FindCards({ currentUserId, ownPhotocards, onOpenCard, onAddToCollection, onRequireAuth, onSearchInteract }: FindCardsProps) {
+export default function FindCards({ currentUserId, ownPhotocards, onOpenCard, onAddToCollection, onAddToWishlist, onRemoveFromWishlist, onRequireAuth, onSearchInteract }: FindCardsProps) {
   const [query, setQuery] = useState(() => readStoredGlobalSearchState().query);
   const [results, setResults] = useState<PublicCardTemplate[]>(() => readStoredGlobalSearchState().results);
   const [loading, setLoading] = useState(false);
@@ -230,6 +232,14 @@ export default function FindCards({ currentUserId, ownPhotocards, onOpenCard, on
                   index={index}
                   onClick={handleOpenCard}
                   context="global-search"
+                  showDuplicateBadge={actionState.isOwner}
+                  wishlistToggle={actionState.isTrackedInBinder ? undefined : {
+                    isWishlisted: actionState.isWishlisted,
+                    onToggle: actionState.isWishlisted
+                      ? (card) => onRemoveFromWishlist?.(card)
+                      : (card) => currentUserId ? onAddToWishlist?.(card) : onRequireAuth?.(),
+                    label: actionState.isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist',
+                  }}
                   actionFooter={(
                     <PublicCardAction
                       card={displayCard}
@@ -237,7 +247,7 @@ export default function FindCards({ currentUserId, ownPhotocards, onOpenCard, on
                       ownPhotocards={ownPhotocards}
                       onAddToCollection={onAddToCollection}
                       onRequireAuth={onRequireAuth ?? (() => setError('Sign in or create an account to add cards to your collection.'))}
-                      className="h-10 w-full rounded-xl bg-primary/95 text-[8px] shadow-sm backdrop-blur disabled:bg-white/95"
+                      className="w-full"
                     />
                   )}
                 />

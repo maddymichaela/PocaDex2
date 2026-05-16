@@ -140,7 +140,7 @@ export default function CardForm({ initialData, mode, onSubmit, onDelete, onBack
             className="btn-primary-pink flex items-center gap-2 rounded-xl px-4 py-2.5 text-[10px] font-black uppercase tracking-widest md:px-6"
           >
             {isEditing ? <Save size={14} /> : <Upload size={14} />}
-            {isEditing ? 'Save Changes' : 'Add to Collection'}
+            {isEditing ? 'Save Changes' : 'Add to Binder'}
           </button>
         </div>
       </div>

@@ -20,6 +20,13 @@ interface PhotocardCardProps {
   onClick?: (pc: Photocard) => void;
   context?: 'binder' | 'global-search' | 'public-profile';
   actionFooter?: ReactNode;
+  showDuplicateBadge?: boolean;
+  wishlistToggle?: {
+    isWishlisted: boolean;
+    onToggle: (card: Photocard) => void;
+    disabled?: boolean;
+    label?: string;
+  };
   className?: string;
   key?: string;
 }
@@ -46,11 +53,13 @@ export function PhotocardCard({
   onClick,
   context = 'binder',
   actionFooter,
+  showDuplicateBadge = true,
+  wishlistToggle,
   className = '',
 }: PhotocardCardProps) {
   const isWishlist = photocard.status === 'wishlist';
   const isOnTheWay = photocard.status === 'on_the_way';
-  const isDuplicate = !!photocard.isDuplicate;
+  const isDuplicate = showDuplicateBadge && !!photocard.isDuplicate;
   const delay = Math.min(index * 0.05, 0.5);
   const [hasImageError, setHasImageError] = useState(false);
   const showPlaceholder = !photocard.imageUrl || hasImageError;
@@ -142,9 +151,29 @@ export function PhotocardCard({
         </div>
       )}
 
+      {wishlistToggle && (
+        <button
+          type="button"
+          disabled={wishlistToggle.disabled}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!wishlistToggle.disabled) wishlistToggle.onToggle(photocard);
+          }}
+          className={`absolute right-2.5 top-2.5 z-20 flex h-7 w-7 items-center justify-center rounded-full shadow-md backdrop-blur transition-all disabled:cursor-default disabled:opacity-80 ${wishlistToggle.isWishlisted
+              ? 'bg-[var(--wishlist-red)] text-white opacity-100'
+              : 'bg-white/95 text-[var(--wishlist-red)] opacity-0 ring-1 ring-black/5 hover:bg-[var(--wishlist-red)] hover:text-white hover:ring-0 group-hover:opacity-100'
+            }`}
+          aria-label={wishlistToggle.label ?? (wishlistToggle.isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist')}
+          title={wishlistToggle.label ?? (wishlistToggle.isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist')}
+        >
+          <Heart size={13} className={wishlistToggle.isWishlisted ? 'fill-current' : ''} />
+        </button>
+      )}
+
       {/* Status Badges Overlay */}
-      <div className="absolute top-3 right-3 z-10 flex flex-col gap-2">
-        {isWishlist && (
+      <div className={`absolute right-3 z-10 flex flex-col gap-2 ${wishlistToggle ? 'top-14' : 'top-3'}`}>
+        {isWishlist && !wishlistToggle && (
           <div className={`${STATUS_COLORS.wishlist.bgClass} text-white p-2 rounded-full shadow-xl shadow-red-300/20 scale-90 md:scale-100`} title="Wishlist">
             <Heart size={14} className="fill-current" />
           </div>
@@ -244,13 +273,17 @@ export function PhotocardGrid({
   selectedIds = [],
   onToggle,
   layout = 'fixed',
+  showDuplicateBadge = true,
+  getWishlistToggle,
 }: {
   photocards: Photocard[],
   onCardClick?: (pc: Photocard) => void,
   selectMode?: boolean,
   selectedIds?: string[],
   onToggle?: (id: string) => void,
-  layout?: 'fixed' | 'auto-fit' | 'four-up'
+  layout?: 'fixed' | 'auto-fit' | 'four-up',
+  showDuplicateBadge?: boolean,
+  getWishlistToggle?: (pc: Photocard) => PhotocardCardProps['wishlistToggle'],
 }) {
   const gridStyle: CSSProperties | undefined =
     layout === 'auto-fit'
@@ -276,6 +309,8 @@ export function PhotocardGrid({
           selectMode={selectMode}
           isSelected={selectedIds.includes(pc.id)}
           onToggle={onToggle}
+          showDuplicateBadge={showDuplicateBadge}
+          wishlistToggle={getWishlistToggle?.(pc)}
         />
       ))}
     </div>

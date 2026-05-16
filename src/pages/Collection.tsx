@@ -4,7 +4,7 @@ import { PhotocardGrid } from '../components/PhotocardGrid';
 import BulkEditForm from '../components/BulkEditForm';
 import FilterBar, { FilterState } from '../components/FilterBar';
 import { placeholderImage } from '../lib/assets';
-import { Plus, CheckSquare, Trash2, X, LayoutGrid, ChevronLeft, Edit3, ArrowUp, Search, Filter, Heart, Truck } from 'lucide-react';
+import { Plus, CheckSquare, Trash2, X, LayoutGrid, ChevronLeft, Edit3, ArrowUp, Search, Filter, Truck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface CollectionProps {
@@ -15,6 +15,11 @@ interface CollectionProps {
   onCardClick: (pc: Photocard) => void;
   onNewCard: () => void;
   onImportGrid: () => void;
+  canUseBulkEdit?: boolean;
+  onUpgradeRequired?: (reason: string) => void;
+  trackedCardCount?: number;
+  cardLimit?: number | null;
+  shouldShowUpgradePrompt?: boolean;
 }
 
 type ViewMode = 'all' | 'group' | 'member' | 'era' | 'category' | 'year';
@@ -83,7 +88,20 @@ function GroupTile({ name, count, imageUrl, onClick }: GroupTileProps) {
   );
 }
 
-export default function Collection({ photocards, isOwner = true, onDelete, onBulkUpdate, onCardClick, onNewCard, onImportGrid }: CollectionProps) {
+export default function Collection({
+  photocards,
+  isOwner = true,
+  onDelete,
+  onBulkUpdate,
+  onCardClick,
+  onNewCard,
+  onImportGrid,
+  canUseBulkEdit = true,
+  onUpgradeRequired,
+  trackedCardCount,
+  cardLimit,
+  shouldShowUpgradePrompt = false,
+}: CollectionProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('all');
   const [drilldownValue, setDrilldownValue] = useState<string | number | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -188,6 +206,14 @@ export default function Collection({ photocards, isOwner = true, onDelete, onBul
     }
   };
 
+  const openBulkEdit = () => {
+    if (!canUseBulkEdit) {
+      onUpgradeRequired?.('Bulk edit is a Pro feature. Upgrade to Pro to update many photocards at once.');
+      return;
+    }
+    setIsBulkEditing(true);
+  };
+
   const toggleSelectMode = () => {
     if (!isOwner) return;
     setSelectedIds([]);
@@ -229,14 +255,12 @@ export default function Collection({ photocards, isOwner = true, onDelete, onBul
     All: photocards.length,
     owned: photocards.filter(pc => pc.status === 'owned').length,
     on_the_way: photocards.filter(pc => pc.status === 'on_the_way').length,
-    wishlist: photocards.filter(pc => pc.status === 'wishlist').length,
   }), [photocards]);
 
-  const STATUS_FILTERS: { id: StatusFilter; label: string; icon?: typeof Heart; activeClass: string; inactiveClass: string }[] = [
+  const STATUS_FILTERS: { id: StatusFilter; label: string; icon?: typeof Truck; activeClass: string; inactiveClass: string }[] = [
     { id: 'All', label: 'All', activeClass: 'bg-primary/10 text-primary border-primary/25 shadow-sm', inactiveClass: 'bg-white text-foreground/45 border-gray-100 hover:text-primary hover:border-primary/20' },
     { id: 'owned', label: 'Owned', activeClass: 'bg-primary text-white border-primary shadow-md', inactiveClass: 'bg-white text-foreground/45 border-gray-100 hover:text-primary hover:border-primary/20' },
     { id: 'on_the_way', label: 'On the Way', icon: Truck, activeClass: 'bg-accent-blue text-white border-accent-blue shadow-md', inactiveClass: 'bg-white text-foreground/45 border-gray-100 hover:text-accent-blue hover:border-accent-blue/30' },
-    { id: 'wishlist', label: 'Wishlist', icon: Heart, activeClass: 'bg-[var(--wishlist-red)] text-white border-[var(--wishlist-red)] shadow-md', inactiveClass: 'bg-white text-foreground/45 border-gray-100 hover:text-[var(--wishlist-red)] hover:border-[var(--wishlist-red)]/30' },
   ];
 
   return (
@@ -250,6 +274,25 @@ export default function Collection({ photocards, isOwner = true, onDelete, onBul
           {uniqueGroups.length > 0 && ` · ${uniqueGroups.length} ${uniqueGroups.length === 1 ? 'artist' : 'artists'}`}
         </p>
       </div>
+
+      {isOwner && shouldShowUpgradePrompt && cardLimit && trackedCardCount !== undefined && (
+        <button
+          type="button"
+          onClick={() => onUpgradeRequired?.(
+            trackedCardCount >= cardLimit
+              ? `You have reached the Free plan limit of ${cardLimit} owned or on-the-way cards. Upgrade to Pro before adding another tracked card.`
+              : `You have ${Math.max(0, cardLimit - trackedCardCount)} Free tracked card slot${cardLimit - trackedCardCount !== 1 ? 's' : ''} left. Upgrade to Pro for unlimited cards.`
+          )}
+          className="rounded-[24px] border-2 border-primary/10 bg-primary/5 px-5 py-4 text-left shadow-sm transition-all hover:border-primary/25 hover:bg-primary/10"
+        >
+          <p className="text-xs font-black uppercase tracking-widest text-primary">
+            Free plan {trackedCardCount}/{cardLimit} tracked cards
+          </p>
+          <p className="mt-1 text-sm font-semibold text-foreground/55">
+            Owned and on-the-way cards count toward the limit. Wishlist cards do not.
+          </p>
+        </button>
+      )}
 
       {/* Binder navigation + controls */}
       <div className="mx-auto flex w-full min-w-0 flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
@@ -266,7 +309,7 @@ export default function Collection({ photocards, isOwner = true, onDelete, onBul
                   className={`flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border px-3 text-[10px] font-black uppercase tracking-widest transition-all md:h-9 md:px-4 ${isActive ? statusFilter.activeClass : statusFilter.inactiveClass}`}
                   aria-pressed={isActive}
                 >
-                  {Icon && <Icon size={13} className={statusFilter.id === 'wishlist' ? 'fill-current' : undefined} />}
+                  {Icon && <Icon size={13} />}
                   <span>{statusFilter.label}</span>
                   <span className={`rounded-full px-1.5 py-0.5 text-[9px] leading-none ${isActive ? 'bg-white/30 text-current' : 'bg-foreground/5 text-foreground/35'}`}>
                     {statusCounts[statusFilter.id]}
@@ -394,11 +437,12 @@ export default function Collection({ photocards, isOwner = true, onDelete, onBul
             <div className="flex gap-2 w-full md:w-auto">
               <button
                 disabled={selectedIds.length === 0}
-                onClick={() => setIsBulkEditing(true)}
+                onClick={openBulkEdit}
                 className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 md:px-6 py-2.5 md:py-3 bg-white text-secondary rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black uppercase tracking-widest shadow-md hover:bg-secondary hover:text-white disabled:opacity-30 transition-all border-white/20 border-2"
               >
                 <Edit3 className="w-3.5 h-3.5 md:w-4 md:h-4" />
                 Bulk Edit
+                {!canUseBulkEdit && <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[8px] text-primary">Pro</span>}
               </button>
               <button
                 disabled={selectedIds.length === 0}

@@ -167,6 +167,15 @@ export async function insertPhotocard(userId: string, pc: Photocard): Promise<Ph
   const templateId = getPhotocardTemplateId(normalized);
   const existing = await findPhotocardByTemplateId(userId, templateId);
   if (existing) {
+    if (existing.status === 'wishlist' && normalized.status !== 'wishlist') {
+      return await updatePhotocard(userId, {
+        ...existing,
+        ...normalized,
+        id: existing.id,
+        cardTemplateId: templateId,
+        ownerUserId: userId,
+      });
+    }
     // If the existing card has a different category/source than what we intend to insert,
     // the stored data is stale. Update it so the DB stays consistent with the UI.
     const categoryMismatch = existing.category !== normalized.category;

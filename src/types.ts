@@ -203,6 +203,8 @@ export interface Profile {
   is_bio_public?: boolean | null;
   has_password?: boolean | null;
   deletion_requested_at?: string | null;
+  subscription_tier?: 'free' | 'pro' | null;
+  subscription_expires_at?: string | null;
   created_at: string;
   updated_at: string;
 }

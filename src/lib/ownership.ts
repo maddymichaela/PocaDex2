@@ -22,19 +22,27 @@ export function hasMatchingPhotocard(photocards: Photocard[], target: Photocard)
   return getCollectionMatchState(target, photocards).alreadyInCollection;
 }
 
+export function findMatchingUserPhotocard(currentUserCards: Photocard[], target: Photocard) {
+  const exactMatchId = getPhotocardMatchId(target);
+  const baseMatchId = getPhotocardBaseIdentity(target);
+  const exactMatch = currentUserCards.find((card) => getPhotocardMatchId(card) === exactMatchId);
+  const baseMatch = exactMatch ? undefined : currentUserCards.find((card) => getPhotocardBaseIdentity(card) === baseMatchId);
+  return exactMatch ?? baseMatch;
+}
+
 export function getCollectionMatchState(
   publicCard: Photocard,
   currentUserCards: Photocard[],
   currentUserId?: string | null,
 ) {
   const ownerMatch = isPhotocardOwner(currentUserId, publicCard);
-  const exactMatchId = getPhotocardMatchId(publicCard);
-  const baseMatchId = getPhotocardBaseIdentity(publicCard);
-  const exactMatch = currentUserCards.find((card) => getPhotocardMatchId(card) === exactMatchId);
-  const baseMatch = exactMatch ? undefined : currentUserCards.find((card) => getPhotocardBaseIdentity(card) === baseMatchId);
+  const exactMatch = currentUserCards.find((card) => getPhotocardMatchId(card) === getPhotocardMatchId(publicCard));
+  const baseMatch = exactMatch ? undefined : currentUserCards.find((card) => getPhotocardBaseIdentity(card) === getPhotocardBaseIdentity(publicCard));
   const matchedOwnedCard = exactMatch ?? baseMatch ?? (ownerMatch ? publicCard : undefined);
   const matchType: CollectionMatchType = ownerMatch ? 'owner' : exactMatch ? 'exact' : baseMatch ? 'base' : 'none';
   const alreadyInCollection = matchType !== 'none';
+  const matchedStatus = matchedOwnedCard?.status;
+  const isTrackedInBinder = matchedStatus === 'owned' || matchedStatus === 'on_the_way';
 
   return {
     isOwner: ownerMatch,
@@ -42,8 +50,10 @@ export function getCollectionMatchState(
     baseMatch,
     alreadyInCollection,
     inCollection: alreadyInCollection,
-    actionLabel: alreadyInCollection ? 'In Collection' : 'Add to My Collection',
-    canAdd: Boolean(currentUserId && !alreadyInCollection),
+    isTrackedInBinder,
+    isWishlisted: matchedStatus === 'wishlist',
+    actionLabel: isTrackedInBinder ? 'In Binder' : 'Add to Binder',
+    canAdd: Boolean(currentUserId && !isTrackedInBinder),
     requiresAuth: !currentUserId,
     matchedOwnedCard,
     matchType,

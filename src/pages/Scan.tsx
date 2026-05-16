@@ -9,6 +9,7 @@ import { Status, Condition, Photocard, PHOTOCARD_CATEGORIES, PhotocardCategory, 
 import ImageEditor, { ImageEditorState } from '../components/ImageEditor';
 import PhotocardForm from '../components/PhotocardForm';
 import MemberTagInput from '../components/MemberTagInput';
+import { isTrackedCollectionCard, PlanRules } from '../lib/plan';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -342,7 +343,19 @@ function TemplateLightbox({ image, onClose }: { image: string; onClose: () => vo
 
 // ── Main component ─────────────────────────────────────────────────────────
 
-export default function Scan({ onDone, onImported }: { onDone: () => void; onImported?: (cards: Photocard[]) => void }) {
+export default function Scan({
+  onDone,
+  onImported,
+  plan,
+  trackedCardCount = 0,
+  onUpgradeRequired,
+}: {
+  onDone: () => void;
+  onImported?: (cards: Photocard[]) => void;
+  plan?: PlanRules;
+  trackedCardCount?: number;
+  onUpgradeRequired?: (reason: string) => void;
+}) {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<Step>('upload');
@@ -615,6 +628,22 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
       return;
     }
 
+    const selectedTrackedCount = cardsToSave.filter(isTrackedCollectionCard).length;
+    const nextTrackedCount = trackedCardCount + selectedTrackedCount;
+    if (plan && !plan.canAddMoreCards(trackedCardCount) && selectedTrackedCount > 0) {
+      const reason = `Free plans include ${plan.cardLimit} owned or on-the-way cards. This grid import would add ${selectedTrackedCount} tracked card${selectedTrackedCount !== 1 ? 's' : ''}.`;
+      onUpgradeRequired?.(reason);
+      setError(reason);
+      return;
+    }
+    if (plan && plan.cardLimit !== null && nextTrackedCount > plan.cardLimit) {
+      const remaining = plan.remainingCards(trackedCardCount) ?? 0;
+      const reason = `This import has ${selectedTrackedCount} owned or on-the-way cards, but your Free plan has ${remaining} tracked card slot${remaining !== 1 ? 's' : ''} remaining.`;
+      onUpgradeRequired?.(reason);
+      setError(reason);
+      return;
+    }
+
     const invalidCards = cardsToSave
       .map((card, index) => ({
         index,
@@ -627,7 +656,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
         .slice(0, 4)
         .map(({ index, card, missingFields }) => `${formatPhotocardMembers(card) || `Card ${index + 1}`}: ${missingFields.join(', ')}`)
         .join('; ');
-      setError(`Add to Collection blocked. Fill required fields on ${invalidCards.length} selected card${invalidCards.length !== 1 ? 's' : ''}: ${examples}${invalidCards.length > 4 ? '; …' : ''}.`);
+      setError(`Add to Binder blocked. Fill required fields on ${invalidCards.length} selected card${invalidCards.length !== 1 ? 's' : ''}: ${examples}${invalidCards.length > 4 ? '; …' : ''}.`);
       return;
     }
 
@@ -1159,7 +1188,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
                   </span>
                 ) : (
                   <>
-                    Adding <span className="text-foreground font-black">{selectedCards.length}</span> card{selectedCards.length !== 1 ? 's' : ''} to your collection
+                    Adding <span className="text-foreground font-black">{selectedCards.length}</span> card{selectedCards.length !== 1 ? 's' : ''} to your binder
                   </>
                 )}
               </p>
@@ -1167,7 +1196,7 @@ export default function Scan({ onDone, onImported }: { onDone: () => void; onImp
                 onClick={handleSave}
                 disabled={selectedCards.length === 0 || hasInvalidSelectedCards}
                 className={primaryButtonClass}>
-                Add to Collection →
+                Add to Binder →
               </button>
             </div>
           </div>
