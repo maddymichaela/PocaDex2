@@ -4,6 +4,32 @@ dist/
 coverage/
 .DS_Store
 *.log
+
+# Local environment and secrets
 .env*
 !.env.example
+.env.*.local
+
+# Supabase local/linking state and database dumps
+supabase/.temp/
+supabase/.branches/
+*.dump
+*.sql.gz
+*.sql.zip
+*.backup
+
+# Deployment/tooling state that can contain project IDs or tokens
+.netlify/
+.vercel/
+.mcp.json
+
+# Private keys and certificates
+*.pem
+*.key
+*.p8
+*.p12
+*.crt
+*.cer
+*.mobileprovision
+
 PRIVATE_README.md

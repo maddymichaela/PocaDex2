@@ -1,6 +1,17 @@
 import { supabase } from './supabase';
 import { getKnownPhotocardCategory, getPhotocardBaseIdentity, getPhotocardMembers, getPhotocardTemplateId, getPhotocardTemplateMetadata, getSharedPhotocardIdentity, normalizePhotocardForSave, normalizePhotocardUpdates, Photocard } from '../types';
 
+const PHOTOCARD_IMAGE_BUCKET = 'photocard-images';
+const MAX_PHOTOCARD_IMAGE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_PHOTOCARD_IMAGE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/heic',
+  'image/heif',
+]);
+
 // ── Row ↔ Photocard mappers ────────────────────────────────────────────────
 
 export function rowToPhotocard(row: Record<string, unknown>): Photocard {
@@ -108,23 +119,173 @@ function isMissingNewSchemaColumnError(error: unknown) {
 
 // ── Image upload ───────────────────────────────────────────────────────────
 
+function logImageCopyDebug(value: Record<string, unknown>) {
+  if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
+    console.debug('[PocaDex image copy debug]', value);
+  }
+}
+
+function getContentTypeExtension(contentType: string) {
+  const normalized = contentType.split(';')[0]?.trim().toLowerCase();
+  if (normalized === 'image/png') return 'png';
+  if (normalized === 'image/webp') return 'webp';
+  if (normalized === 'image/gif') return 'gif';
+  if (normalized === 'image/heic') return 'heic';
+  if (normalized === 'image/heif') return 'heif';
+  return 'jpg';
+}
+
+function getNormalizedImageContentType(contentType: string) {
+  return contentType.split(';')[0]?.trim().toLowerCase() || 'image/jpeg';
+}
+
+function assertAllowedImagePayload(contentType: string, sizeBytes: number) {
+  const normalized = getNormalizedImageContentType(contentType);
+  if (!ALLOWED_PHOTOCARD_IMAGE_TYPES.has(normalized)) {
+    throw new Error('Unsupported image type.');
+  }
+  if (sizeBytes > MAX_PHOTOCARD_IMAGE_BYTES) {
+    throw new Error('Image is too large. Use an image under 10 MB.');
+  }
+  return normalized;
+}
+
+function getFileExtension(path: string, contentType: string) {
+  const basename = path.split('/').pop() ?? '';
+  const extension = basename.split('.').pop()?.toLowerCase() ?? '';
+  if (/^[a-z0-9]{2,5}$/.test(extension)) return extension === 'jpeg' ? 'jpg' : extension;
+  return getContentTypeExtension(contentType);
+}
+
+function getSafeFilenamePart(value?: string) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || Math.random().toString(36).slice(2);
+}
+
+function getSafeUrlDescription(imageUrl: string) {
+  try {
+    const url = new URL(imageUrl);
+    return { origin: url.origin, pathname: url.pathname };
+  } catch {
+    return { origin: null, pathname: 'unparseable' };
+  }
+}
+
+function parsePhotocardImageStoragePath(imageUrl?: string | null) {
+  if (!imageUrl || imageUrl.startsWith('data:')) return null;
+
+  try {
+    const url = new URL(imageUrl);
+    const marker = `/storage/v1/object/public/${PHOTOCARD_IMAGE_BUCKET}/`;
+    const markerIndex = url.pathname.indexOf(marker);
+    if (markerIndex === -1) return null;
+
+    const encodedObjectPath = url.pathname.slice(markerIndex + marker.length);
+    const objectPath = decodeURIComponent(encodedObjectPath);
+    const ownerFolder = objectPath.split('/')[0] || '';
+    if (!ownerFolder || !objectPath.includes('/')) return null;
+    return { objectPath, ownerFolder };
+  } catch {
+    return null;
+  }
+}
+
+export async function ensurePhotocardImageOwnedByUser(
+  userId: string,
+  imageUrl?: string | null,
+  filenameHint?: string,
+): Promise<string | undefined> {
+  if (!imageUrl) {
+    logImageCopyDebug({ userId, action: 'skipped_empty' });
+    return undefined;
+  }
+
+  if (imageUrl.startsWith('data:')) {
+    logImageCopyDebug({ userId, action: 'skipped_data_url' });
+    return imageUrl;
+  }
+
+  const storagePath = parsePhotocardImageStoragePath(imageUrl);
+  if (!storagePath) {
+    logImageCopyDebug({ userId, action: 'skipped_non_bucket_url', sourceUrl: getSafeUrlDescription(imageUrl) });
+    return imageUrl;
+  }
+
+  if (storagePath.ownerFolder === userId) {
+    logImageCopyDebug({
+      userId,
+      action: 'skipped_already_owned',
+      sourceOwnerFolder: storagePath.ownerFolder,
+      sourceObjectPath: storagePath.objectPath,
+      resultImageUrl: getSafeUrlDescription(imageUrl),
+    });
+    return imageUrl;
+  }
+
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) throw new Error(`Image fetch failed with ${response.status}`);
+
+    const contentLength = Number(response.headers.get('content-length') ?? 0);
+    if (contentLength > MAX_PHOTOCARD_IMAGE_BYTES) throw new Error('Image is too large. Use an image under 10 MB.');
+
+    const sourceBlob = await response.blob();
+    const contentType = assertAllowedImagePayload(response.headers.get('content-type') || sourceBlob.type || 'image/jpeg', sourceBlob.size);
+    const extension = getFileExtension(storagePath.objectPath, contentType);
+    const filename = `${userId}/${Date.now()}-${getSafeFilenamePart(filenameHint)}.${extension}`;
+    const blob = sourceBlob.type ? sourceBlob : new Blob([await sourceBlob.arrayBuffer()], { type: contentType });
+
+    const { error } = await supabase.storage.from(PHOTOCARD_IMAGE_BUCKET).upload(filename, blob, {
+      contentType,
+      upsert: false,
+    });
+    if (error) throw error;
+
+    const { data } = supabase.storage.from(PHOTOCARD_IMAGE_BUCKET).getPublicUrl(filename);
+    logImageCopyDebug({
+      userId,
+      action: 'copied',
+      sourceOwnerFolder: storagePath.ownerFolder,
+      sourceObjectPath: storagePath.objectPath,
+      resultImageUrl: data.publicUrl,
+    });
+    return data.publicUrl;
+  } catch (error) {
+    console.warn('Failed to copy public photocard image into user storage; saving original image URL instead:', error);
+    logImageCopyDebug({
+      userId,
+      action: 'copy_failed',
+      sourceOwnerFolder: storagePath.ownerFolder,
+      sourceObjectPath: storagePath.objectPath,
+      resultImageUrl: getSafeUrlDescription(imageUrl),
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return imageUrl;
+  }
+}
+
 export async function uploadPhotocardImage(userId: string, dataUrl: string): Promise<string> {
   const [header, base64] = dataUrl.split(',');
-  const mime = header.split(':')[1]?.split(';')[0] || 'image/jpeg';
+  const mime = getNormalizedImageContentType(header.split(':')[1]?.split(';')[0] || 'image/jpeg');
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  assertAllowedImagePayload(mime, bytes.byteLength);
   const blob = new Blob([bytes], { type: mime });
   const ext = mime.split('/')[1] || 'jpg';
   const filename = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-  const { error } = await supabase.storage.from('photocard-images').upload(filename, blob, {
+  const { error } = await supabase.storage.from(PHOTOCARD_IMAGE_BUCKET).upload(filename, blob, {
     contentType: mime,
     upsert: false,
   });
   if (error) throw error;
 
-  const { data } = supabase.storage.from('photocard-images').getPublicUrl(filename);
+  const { data } = supabase.storage.from(PHOTOCARD_IMAGE_BUCKET).getPublicUrl(filename);
   return data.publicUrl;
 }
 
@@ -213,7 +374,7 @@ export async function insertPhotocard(userId: string, pc: Photocard): Promise<Ph
     }
   }
 
-  let imageUrl = normalized.imageUrl;
+  let imageUrl = await ensurePhotocardImageOwnedByUser(userId, normalized.imageUrl, normalized.id || templateId);
   if (imageUrl?.startsWith('data:')) {
     try {
       imageUrl = await uploadPhotocardImage(userId, imageUrl);
@@ -244,7 +405,7 @@ export async function insertPhotocard(userId: string, pc: Photocard): Promise<Ph
 }
 
 export async function updatePhotocard(userId: string, pc: Photocard): Promise<Photocard> {
-  let imageUrl = pc.imageUrl;
+  let imageUrl = await ensurePhotocardImageOwnedByUser(userId, pc.imageUrl, pc.id || pc.cardTemplateId);
   if (imageUrl?.startsWith('data:')) {
     try {
       imageUrl = await uploadPhotocardImage(userId, imageUrl);

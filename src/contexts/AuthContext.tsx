@@ -67,7 +67,7 @@ async function uploadAvatar(userId: string, dataUrl: string): Promise<string> {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   const blob = new Blob([bytes], { type: mime });
   const ext = mime.split('/')[1] || 'jpg';
-  const filename = `avatars/${userId}/${Date.now()}.${ext}`;
+  const filename = `${userId}/avatars/${Date.now()}.${ext}`;
 
   const { error } = await supabase.storage.from('photocard-images').upload(filename, blob, {
     contentType: mime,
@@ -238,14 +238,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const bio = updates.bio?.trim() ?? profile?.bio ?? '';
     if (bio.length > BIO_MAX_LENGTH) return { error: `Bio must be ${BIO_MAX_LENGTH} characters or fewer.` };
 
-    const { data: duplicate, error: duplicateError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('username', username)
-      .neq('id', user.id)
-      .maybeSingle();
-    if (duplicateError) return { error: duplicateError.message };
-    if (duplicate) return { error: 'That username is already taken.' };
+    const { data: isAvailable, error: availabilityError } = await supabase
+      .rpc('is_username_available', { next_username: username });
+    if (availabilityError) return { error: availabilityError.message };
+    if (!isAvailable) return { error: 'That username is already taken.' };
 
     try {
       const avatarUrl = updates.avatarDataUrl?.startsWith('data:')
@@ -320,13 +316,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const { data, error } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('username', normalized)
-      .neq('id', user.id)
-      .maybeSingle();
+      .rpc('is_username_available', { next_username: normalized });
     if (error) return { available: false, error: error.message, normalized };
-    return { available: !data, error: null, normalized };
+    return { available: Boolean(data), error: null, normalized };
   };
 
   const updateEmail = async (email: string) => {

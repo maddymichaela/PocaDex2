@@ -353,7 +353,7 @@ export default function App() {
     setPhotocards(prev => [draft, ...prev]);
     try {
       const saved = await insertPhotocard(user.id, draft);
-      const mergedSaved = normalizePhotocardForSave({ ...saved, ...draft, id: saved.id });
+      const mergedSaved = normalizePhotocardForSave({ ...saved, ...draft, id: saved.id, imageUrl: saved.imageUrl ?? draft.imageUrl });
       const savedTemplateId = getCardTemplateId(mergedSaved);
       setPhotocards(prev => [
         mergedSaved,
@@ -403,7 +403,7 @@ export default function App() {
     setPhotocards(prev => prev.map(card => card.id === nextCard.id ? nextCard : card));
     try {
       const saved = await updatePhotocard(user.id, nextCard);
-      const mergedSaved = normalizePhotocardForSave({ ...saved, ...nextCard });
+      const mergedSaved = normalizePhotocardForSave({ ...saved, ...nextCard, imageUrl: saved.imageUrl ?? nextCard.imageUrl });
       setPhotocards(prev => prev.map(card => card.id === mergedSaved.id ? mergedSaved : card));
       setToastMessage('Moved to Binder');
       setSelectedId(mergedSaved.id);
@@ -538,7 +538,7 @@ export default function App() {
       const saved = await insertPhotocard(user.id, normalizedPC);
       // Merge: prefer normalizedPC for descriptive fields (category, source, etc.)
       // but take saved.id so we use the DB's authoritative record identity.
-      const mergedSaved = normalizePhotocardForSave({ ...saved, ...normalizedPC, id: saved.id });
+      const mergedSaved = normalizePhotocardForSave({ ...saved, ...normalizedPC, id: saved.id, imageUrl: saved.imageUrl ?? normalizedPC.imageUrl });
       const savedTemplateId = getCardTemplateId(mergedSaved);
       setPhotocards(prev => [
         mergedSaved,
@@ -561,7 +561,7 @@ export default function App() {
     setPhotocards(prev => prev.map(pc => pc.id === normalizedPC.id ? normalizedPC : pc));
     try {
       const saved = await updatePhotocard(user.id, normalizedPC);
-      const mergedSaved = normalizePhotocardForSave({ ...saved, ...normalizedPC });
+      const mergedSaved = normalizePhotocardForSave({ ...saved, ...normalizedPC, imageUrl: saved.imageUrl ?? normalizedPC.imageUrl });
       setPhotocards(prev => prev.map(pc => pc.id === mergedSaved.id ? mergedSaved : pc));
       return true;
     } catch (err) {

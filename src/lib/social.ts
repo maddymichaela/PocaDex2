@@ -61,9 +61,6 @@ const PUBLIC_PHOTOCARD_SELECT = [
   'card_name',
   'version',
   'status',
-  'condition',
-  'is_duplicate',
-  'notes',
   'image_url',
   'created_at',
 ].join(',');
@@ -79,8 +76,6 @@ const LEGACY_PUBLIC_PHOTOCARD_SELECT = [
   'card_name',
   'version',
   'status',
-  'condition',
-  'is_duplicate',
   'image_url',
   'created_at',
 ].join(',');
@@ -396,17 +391,6 @@ function withPublicProfileDefaults(profile: Partial<Profile>): Profile {
   };
 }
 
-function createFallbackProfile(userId: string): Profile {
-  return withPublicProfileDefaults({
-    id: userId,
-    username: `unknown-${userId.slice(0, 8)}`,
-    display_name: 'Unknown collector',
-    nickname: 'Unknown collector',
-    bio: null,
-    avatar_url: null,
-  });
-}
-
 export function getCardIdentity(card: Photocard) {
   return getPhotocardTemplateId(card);
 }
@@ -418,7 +402,7 @@ export function getCardTemplateId(card: Photocard) {
 export async function fetchPublicProfileByUsername(username: string): Promise<Profile | null> {
   const normalized = normalizeUsername(username.replace(/^@/, ''));
   const runProfileLookup = (select: string) => supabase
-    .from('profiles')
+    .from('public_profiles_search')
     .select(select)
     .ilike('username', normalized)
     .limit(1)
@@ -435,9 +419,12 @@ export async function fetchPublicProfileByUsername(username: string): Promise<Pr
 }
 
 export async function fetchSocialCounts(profileUserId: string, viewerId?: string | null): Promise<FollowState> {
-  const [followersResult, followingResult, viewerResult] = await Promise.all([
-    supabase.from('follows').select('following_id', { count: 'exact', head: true }).eq('following_id', profileUserId),
-    supabase.from('follows').select('follower_id', { count: 'exact', head: true }).eq('follower_id', profileUserId),
+  const [countsResult, viewerResult] = await Promise.all([
+    supabase
+      .from('public_follow_counts')
+      .select('followers,following')
+      .eq('profile_user_id', profileUserId)
+      .maybeSingle(),
     viewerId
       ? supabase
           .from('follows')
@@ -448,13 +435,12 @@ export async function fetchSocialCounts(profileUserId: string, viewerId?: string
       : Promise.resolve({ data: null, error: null }),
   ]);
 
-  if (followersResult.error) throw followersResult.error;
-  if (followingResult.error) throw followingResult.error;
+  if (countsResult.error) throw countsResult.error;
   if (viewerResult.error) throw viewerResult.error;
 
   return {
-    followers: followersResult.count ?? 0,
-    following: followingResult.count ?? 0,
+    followers: (countsResult.data as { followers?: number } | null)?.followers ?? 0,
+    following: (countsResult.data as { following?: number } | null)?.following ?? 0,
     isFollowing: Boolean(viewerResult.data),
   };
 }
@@ -502,7 +488,7 @@ async function fetchPublicPhotocards(profile: Profile, viewerId?: string | null)
   };
 
   const request = applyVisibility(supabase
-    .from('photocards')
+    .from('public_card_discovery')
     .select('*')
     .eq('user_id', getProfileUserId(profile))
     .order('created_at', { ascending: false }));
@@ -517,7 +503,7 @@ async function fetchPublicPhotocards(profile: Profile, viewerId?: string | null)
   });
   if (error && isMissingColumnError(error, ['members', 'category', 'source', 'card_template_id'])) {
     const legacyRequest = applyVisibility(supabase
-      .from('photocards')
+      .from('public_card_discovery')
       .select(LEGACY_PUBLIC_PHOTOCARD_SELECT)
       .eq('user_id', getProfileUserId(profile))
       .order('created_at', { ascending: false }));
@@ -594,16 +580,19 @@ export async function unfollowUser(followerId: string, followingId: string): Pro
 }
 
 export async function fetchUnreadFollowNotificationCount(userId: string): Promise<number> {
-  const { count, error } = await supabase
+  const { data, error } = await supabase
     .from('notifications')
-    .select('id', { count: 'exact', head: true })
+    .select('actor_user_id')
     .eq('user_id', userId)
     .eq('type', 'follow')
     .eq('read', false);
 
   if (error && isMissingNotificationsTableError(error)) return 0;
   if (error) throw error;
-  return count ?? 0;
+
+  const actorIds = Array.from(new Set((data ?? []).map((row) => row.actor_user_id as string).filter(Boolean)));
+  const profilesById = await fetchProfilesByUserIds(actorIds, userId, 'followers');
+  return (data ?? []).filter((row) => profilesById.has(row.actor_user_id as string)).length;
 }
 
 export async function fetchRecentFollowNotifications(userId: string, limit = 5): Promise<FollowerNotification[]> {
@@ -622,10 +611,10 @@ export async function fetchRecentFollowNotifications(userId: string, limit = 5):
   const actorIds = Array.from(new Set(rows.map((row) => row.actor_user_id).filter(Boolean)));
   const profilesById = await fetchProfilesByUserIds(actorIds, userId, 'followers');
 
-  return rows.map((row) => ({
-    ...row,
-    actor: profilesById.get(row.actor_user_id) ?? null,
-  }));
+  return rows.flatMap((row) => {
+    const actor = profilesById.get(row.actor_user_id);
+    return actor ? [{ ...row, actor }] : [];
+  });
 }
 
 export async function markFollowNotificationsRead(userId: string): Promise<void> {
@@ -652,7 +641,7 @@ export async function searchProfiles(query: string, viewerId?: string | null): P
       ...(includeDisplayName ? [`display_name.ilike.%${safeQuery}%`] : []),
     ];
     return supabase
-      .from('profiles')
+      .from('public_profiles_search')
       .select(select)
       .or(fields.join(','))
       .limit(24);
@@ -670,24 +659,26 @@ export async function searchProfiles(query: string, viewerId?: string | null): P
 
 export async function fetchFollowingUsers(userId: string, viewerId?: string | null): Promise<FollowUser[]> {
   const { data, error } = await supabase
-    .from('follows')
-    .select('*')
-    .eq('follower_id', userId);
+    .from('public_following')
+    .select(FOLLOW_PROFILE_SELECT)
+    .eq('profile_user_id', userId)
+    .order('created_at', { ascending: false });
   logSocialQuery('following follow records', { currentUserId: userId, data, error });
   if (error) throw createSocialDataError({ currentUserId: userId, tab: 'following', stage: 'follow-query', error });
-  const ids = (data ?? []).map((row) => row.following_id as string).filter(Boolean);
-  return fetchFollowUsersByIds(ids, viewerId, true, 'following');
+  const profiles = ((data ?? []) as unknown as Profile[]).map(withPublicProfileDefaults);
+  if (viewerId === userId) return profiles.map((profile) => ({ ...profile, is_following: true }));
+  return hydrateFollowState(profiles, viewerId, 'following');
 }
 
 export async function fetchFollowerUsers(userId: string, viewerId?: string | null): Promise<FollowUser[]> {
   const { data, error } = await supabase
-    .from('follows')
-    .select('*')
-    .eq('following_id', userId);
+    .from('public_followers')
+    .select(FOLLOW_PROFILE_SELECT)
+    .eq('profile_user_id', userId)
+    .order('created_at', { ascending: false });
   logSocialQuery('follower follow records', { currentUserId: userId, data, error });
   if (error) throw createSocialDataError({ currentUserId: userId, tab: 'followers', stage: 'follow-query', error });
-  const ids = (data ?? []).map((row) => row.follower_id as string).filter(Boolean);
-  return fetchFollowUsersByIds(ids, viewerId, false, 'followers');
+  return hydrateFollowState(((data ?? []) as unknown as Profile[]).map(withPublicProfileDefaults), viewerId, 'followers');
 }
 
 async function fetchFollowUsersByIds(ids: string[], viewerId?: string | null, knownFollowing = false, tab?: FollowListTab): Promise<FollowUser[]> {
@@ -704,7 +695,8 @@ async function fetchFollowUsersByIds(ids: string[], viewerId?: string | null, kn
     });
   }
   const profiles = ids.flatMap((id) => {
-    return profileById.get(id) ?? createFallbackProfile(id);
+    const profile = profileById.get(id);
+    return profile ? [profile] : [];
   });
   if (knownFollowing) return profiles.map((profile) => ({ ...profile, is_following: true }));
   return hydrateFollowState(profiles, viewerId);
@@ -740,7 +732,7 @@ async function fetchProfilesByUserIds(userIds: string[], currentUserId?: string 
   if (userIds.length === 0) return new Map();
 
   const { data, error } = await supabase
-    .from('profiles')
+    .from('public_profiles_search')
     .select(FOLLOW_PROFILE_SELECT)
     .in('id', userIds);
   logSocialQuery('follow profile records', { userIds, data, error });
@@ -756,12 +748,12 @@ async function fetchProfilesById(ownerIds: string[]): Promise<Map<string, Profil
   if (ownerIds.length === 0) return new Map();
 
   const { data, error } = await supabase
-    .from('profiles')
+    .from('public_profiles_search')
     .select(PUBLIC_PROFILE_SELECT)
     .in('id', ownerIds);
   if (error && isMissingColumnError(error, ['display_name', 'is_collection_public', 'is_wishlist_public', 'is_bio_public'])) {
     const { data: legacyData, error: legacyError } = await supabase
-      .from('profiles')
+      .from('public_profiles_search')
       .select(LEGACY_PUBLIC_PROFILE_SELECT)
       .in('id', ownerIds);
     if (legacyError) throw legacyError;
@@ -782,7 +774,7 @@ async function hydrateGlobalSearchRows(rows: unknown[]): Promise<unknown[]> {
   if (ids.length === 0) return rows;
 
   const { data, error } = await supabase
-    .from('photocards')
+    .from('public_card_discovery')
     .select('*')
     .in('id', ids);
 
@@ -900,7 +892,7 @@ function dedupeRowsById(rows: unknown[]) {
 
 async function fetchClientSearchSupplement(trimmed: string): Promise<unknown[]> {
   const { data, error } = await supabase
-    .from('photocards')
+    .from('public_card_discovery')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(GLOBAL_SEARCH_CLIENT_SUPPLEMENT_LIMIT);
@@ -945,7 +937,7 @@ export async function searchPublicCardTemplates(query: string): Promise<PublicCa
     const safeQuery = escapeLikePattern(searchTerm);
     const fields = searchableFields.map((field) => `${field}.ilike.%${safeQuery}%`);
     return supabase
-      .from('photocards')
+      .from('public_card_discovery')
       .select(select)
       .or(fields.join(','))
       .limit(80);
@@ -1099,13 +1091,13 @@ async function fetchWishlistCountsForCards(cards: Photocard[]): Promise<Map<stri
 
   let wishlistRows: unknown[] | null = null;
   const { data, error } = await supabase
-    .from('photocards')
+    .from('public_card_discovery')
     .select(PUBLIC_PHOTOCARD_SELECT)
     .eq('status', 'wishlist')
     .limit(500);
   if (error && isMissingColumnError(error, ['members', 'category', 'source', 'card_template_id'])) {
     const { data: legacyData, error: legacyError } = await supabase
-      .from('photocards')
+      .from('public_card_discovery')
       .select(LEGACY_PUBLIC_PHOTOCARD_SELECT)
       .eq('status', 'wishlist')
       .limit(500);
