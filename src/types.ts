@@ -187,6 +187,7 @@ export interface CollectionStats {
   wishlistGoals: number;
   duplicates: number;
   collectionValue: number;
+  cardsAddedThisWeek?: number;
 }
 
 export interface Profile {

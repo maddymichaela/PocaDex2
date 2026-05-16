@@ -4,7 +4,7 @@
  */
 
 import { useMemo } from 'react';
-import { Photocard, CollectionStats } from '../types';
+import { Photocard, CollectionStats, getPhotocardMembers } from '../types';
 import { PhotocardGrid } from '../components/PhotocardGrid';
 import { Sidebar } from '../components/Sidebar';
 import BackupControls from '../components/BackupControls';
@@ -17,6 +17,9 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ photocards, onEdit, onImport }: DashboardProps) {
+  const softPrimaryMix = 'color-mix(in oklab, var(--color-primary) 70%, transparent)';
+  const mostCollectedBarClass = 'bg-sky-300/70';
+
   const recentPhotocards = useMemo(() =>
     [...photocards].sort((a, b) => b.createdAt - a.createdAt).slice(0, 4),
     [photocards]
@@ -28,9 +31,11 @@ export default function Dashboard({ photocards, onEdit, onImport }: DashboardPro
   const duplicateCount = photocards.filter(p => p.isDuplicate).length;
   const totalCards = ownedCount + onTheWayCount + wishlistCount;
   const hasCards = totalCards > 0;
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const cardsAddedThisWeek = photocards.filter(p => p.createdAt >= weekAgo).length;
 
   const progressSegments = [
-    { key: 'owned', label: 'Owned', count: ownedCount, colorClass: STATUS_COLORS.owned.bgClass },
+    { key: 'owned', label: 'Owned', count: ownedCount, colorClass: '', colorStyle: softPrimaryMix },
     { key: 'on-the-way', label: 'On the Way', count: onTheWayCount, colorClass: STATUS_COLORS.onTheWay.bgClass },
     { key: 'wishlist', label: 'Wishlist', count: wishlistCount, colorClass: STATUS_COLORS.wishlist.bgClass },
   ].map(segment => ({
@@ -48,6 +53,7 @@ export default function Dashboard({ photocards, onEdit, onImport }: DashboardPro
     wishlistGoals: wishlistCount,
     duplicates: duplicateCount,
     collectionValue: ownedCount * 25,
+    cardsAddedThisWeek,
   };
 
   const groupStats = useMemo(() => {
@@ -64,6 +70,63 @@ export default function Dashboard({ photocards, onEdit, onImport }: DashboardPro
       .map(([name, data]) => ({ name, ...data }))
       .sort((a, b) => b.count - a.count);
   }, [photocards]);
+
+  const memberCompletion = useMemo(() => {
+    const map = new Map<string, { owned: number; onTheWay: number; wishlist: number }>();
+    photocards.forEach((card) => {
+      const members = getPhotocardMembers(card);
+      members.forEach((member) => {
+        const current = map.get(member) ?? { owned: 0, onTheWay: 0, wishlist: 0 };
+        if (card.status === 'owned') current.owned += 1;
+        if (card.status === 'on_the_way') current.onTheWay += 1;
+        if (card.status === 'wishlist') current.wishlist += 1;
+        map.set(member, current);
+      });
+    });
+
+    return Array.from(map.entries())
+      .map(([member, counts]) => {
+        const secured = counts.owned + counts.onTheWay;
+        const total = secured + counts.wishlist;
+        return {
+          member,
+          secured,
+          total,
+          percentage: total > 0 ? (secured / total) * 100 : 0,
+        };
+      })
+      .filter(item => item.total > 0)
+      .sort((a, b) => b.total - a.total || b.percentage - a.percentage || a.member.localeCompare(b.member))
+      .slice(0, 8);
+  }, [photocards]);
+
+  const mostCollectedMembers = useMemo(() => {
+    const weights = new Map<string, number>();
+    photocards
+      .filter(card => card.status === 'owned' || card.status === 'on_the_way')
+      .forEach((card) => {
+        const members = getPhotocardMembers(card);
+        if (members.length === 0) return;
+        const weight = 1 / members.length;
+        members.forEach((member) => {
+          weights.set(member, (weights.get(member) ?? 0) + weight);
+        });
+      });
+
+    const totalWeight = Array.from(weights.values()).reduce((sum, value) => sum + value, 0);
+    return Array.from(weights.entries())
+      .map(([member, weight]) => ({
+        member,
+        weight,
+        percentage: totalWeight > 0 ? (weight / totalWeight) * 100 : 0,
+      }))
+      .sort((a, b) => b.percentage - a.percentage || a.member.localeCompare(b.member))
+      .slice(0, 8);
+  }, [photocards]);
+
+  const formatWeightedCount = (value: number) => (
+    Number.isInteger(value) ? value.toLocaleString() : value.toLocaleString(undefined, { maximumFractionDigits: 1 })
+  );
 
   return (
     <div className="flex flex-col gap-8 w-full">
@@ -128,7 +191,10 @@ export default function Dashboard({ photocards, onEdit, onImport }: DashboardPro
                     <div
                       key={segment.key}
                       className={`${segment.colorClass} h-full shrink-0 transition-all duration-1000`}
-                      style={{ flex: `0 0 ${segment.percentage}%` }}
+                      style={{
+                        flex: `0 0 ${segment.percentage}%`,
+                        ...(segment.colorStyle ? { backgroundColor: segment.colorStyle } : {}),
+                      }}
                       title={`${segment.label}: ${segment.count.toLocaleString()} (${formatPercentage(segment.percentage)})`}
                     />
                   ))}
@@ -149,7 +215,10 @@ export default function Dashboard({ photocards, onEdit, onImport }: DashboardPro
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {progressSegments.map(segment => (
                   <div key={segment.key} className="flex items-center gap-2 min-w-0">
-                    <span className={`h-3 w-3 rounded-full ${segment.colorClass} shrink-0`} />
+                    <span
+                      className={`h-3 w-3 rounded-full ${segment.colorClass} shrink-0`}
+                      style={segment.colorStyle ? { backgroundColor: segment.colorStyle } : undefined}
+                    />
                     <span className="min-w-0 truncate text-[10px] font-black uppercase tracking-widest text-foreground/45">
                       {segment.label} ({segment.count.toLocaleString()})
                     </span>
@@ -168,6 +237,64 @@ export default function Dashboard({ photocards, onEdit, onImport }: DashboardPro
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {(memberCompletion.length > 0 || mostCollectedMembers.length > 0) && (
+          <div className="grid gap-5 lg:grid-cols-2">
+            {memberCompletion.length > 0 && (
+              <section className="glass-card rounded-[28px] border-2 border-white p-5 shadow-sm">
+                <div className="mb-5">
+                  <h3 className="text-lg font-bold tracking-tight text-foreground">Completion by Member</h3>
+                  <p className="text-xs font-semibold text-foreground/40">Owned and on-the-way progress against each member wishlist.</p>
+                </div>
+                <div className="grid gap-3">
+                  {memberCompletion.map(item => (
+                    <div key={item.member} className="grid gap-1.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="min-w-0 truncate text-sm font-black text-foreground">{item.member}</span>
+                        <span className="shrink-0 text-[10px] font-black uppercase tracking-widest text-foreground/40">
+                          {item.secured.toLocaleString()}/{item.total.toLocaleString()} · {formatPercentage(item.percentage)}
+                        </span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-white/70">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${Math.min(item.percentage, 100)}%`,
+                            backgroundColor: softPrimaryMix,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {mostCollectedMembers.length > 0 && (
+              <section className="glass-card rounded-[28px] border-2 border-white p-5 shadow-sm">
+                <div className="mb-5">
+                  <h3 className="text-lg font-bold tracking-tight text-foreground">Most Collected Members</h3>
+                  <p className="text-xs font-semibold text-foreground/40">Share of owned and on-the-way cards.</p>
+                </div>
+                <div className="grid gap-3">
+                  {mostCollectedMembers.map(item => (
+                    <div key={item.member} className="grid gap-1.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="min-w-0 truncate text-sm font-black text-foreground">{item.member}</span>
+                        <span className="shrink-0 text-[10px] font-black uppercase tracking-widest text-foreground/40">
+                          {formatPercentage(item.percentage)} · {formatWeightedCount(item.weight)} cards
+                        </span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-white/70">
+                        <div className={`${mostCollectedBarClass} h-full rounded-full`} style={{ width: `${Math.min(item.percentage, 100)}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
 

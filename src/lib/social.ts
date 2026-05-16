@@ -22,6 +22,16 @@ export interface FollowUser extends Profile {
   is_following?: boolean;
 }
 
+export interface FollowerNotification {
+  id: string;
+  user_id: string;
+  actor_user_id: string;
+  type: 'follow';
+  created_at: string;
+  read: boolean;
+  actor?: Pick<Profile, 'id' | 'username' | 'nickname' | 'display_name' | 'avatar_url'> | null;
+}
+
 export interface PublicCardTemplate {
   identity: string;
   card: Photocard;
@@ -343,6 +353,24 @@ function isMissingColumnError(error: unknown, columns: string[]) {
   ));
 }
 
+function isMissingNotificationsTableError(error: unknown) {
+  if (!error || typeof error !== 'object' || !('message' in error)) return false;
+  const message = String((error as { message: unknown }).message).toLowerCase();
+  return (
+    message.includes('notifications') &&
+    (
+      message.includes('does not exist') ||
+      message.includes('could not find') ||
+      message.includes('schema cache')
+    )
+  );
+}
+
+function isDuplicateFollowError(error: unknown) {
+  const details = getSupabaseErrorDetails(error);
+  return details.code === '23505' || details.message.toLowerCase().includes('duplicate key');
+}
+
 function isUnsupportedSearchFieldError(error: unknown) {
   if (!error || typeof error !== 'object' || !('message' in error)) return false;
   const message = String((error as { message: unknown }).message).toLowerCase();
@@ -548,9 +576,11 @@ async function fetchPublicPhotocards(profile: Profile, viewerId?: string | null)
 
 export async function followUser(followerId: string, followingId: string): Promise<void> {
   if (followerId === followingId) throw new Error('You cannot follow yourself.');
+
   const { error } = await supabase
     .from('follows')
-    .upsert({ follower_id: followerId, following_id: followingId }, { onConflict: 'follower_id,following_id' });
+    .insert({ follower_id: followerId, following_id: followingId });
+  if (error && isDuplicateFollowError(error)) return;
   if (error) throw error;
 }
 
@@ -560,6 +590,53 @@ export async function unfollowUser(followerId: string, followingId: string): Pro
     .delete()
     .eq('follower_id', followerId)
     .eq('following_id', followingId);
+  if (error) throw error;
+}
+
+export async function fetchUnreadFollowNotificationCount(userId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('type', 'follow')
+    .eq('read', false);
+
+  if (error && isMissingNotificationsTableError(error)) return 0;
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function fetchRecentFollowNotifications(userId: string, limit = 5): Promise<FollowerNotification[]> {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id,user_id,actor_user_id,type,created_at,read')
+    .eq('user_id', userId)
+    .eq('type', 'follow')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error && isMissingNotificationsTableError(error)) return [];
+  if (error) throw error;
+
+  const rows = ((data ?? []) as unknown as FollowerNotification[]).filter((row) => row.type === 'follow');
+  const actorIds = Array.from(new Set(rows.map((row) => row.actor_user_id).filter(Boolean)));
+  const profilesById = await fetchProfilesByUserIds(actorIds, userId, 'followers');
+
+  return rows.map((row) => ({
+    ...row,
+    actor: profilesById.get(row.actor_user_id) ?? null,
+  }));
+}
+
+export async function markFollowNotificationsRead(userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read: true })
+    .eq('user_id', userId)
+    .eq('type', 'follow')
+    .eq('read', false);
+
+  if (error && isMissingNotificationsTableError(error)) return;
   if (error) throw error;
 }
 

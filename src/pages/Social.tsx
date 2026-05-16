@@ -3,11 +3,14 @@ import { Search, UsersRound } from 'lucide-react';
 import UserCard from '../components/UserCard';
 import { Profile } from '../types';
 import {
+  fetchRecentFollowNotifications,
   fetchFollowerUsers,
   fetchFollowingUsers,
   followUser,
+  FollowerNotification,
   FollowUser,
   getProfileUserId,
+  markFollowNotificationsRead,
   searchProfiles,
   unfollowUser,
 } from '../lib/social';
@@ -18,14 +21,17 @@ interface SocialProps {
   currentUserId: string;
   onOpenProfile: (profile: Profile) => void;
   initialTab?: SocialTab;
+  onNotificationsRead?: () => void;
 }
 
-export default function Social({ currentUserId, onOpenProfile, initialTab = 'people' }: SocialProps) {
+export default function Social({ currentUserId, onOpenProfile, initialTab = 'people', onNotificationsRead }: SocialProps) {
   const [activeTab, setActiveTab] = useState<SocialTab>(
     initialTab === 'following' || initialTab === 'followers' ? initialTab : 'people'
   );
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState<FollowUser[]>([]);
+  const [notifications, setNotifications] = useState<FollowerNotification[]>([]);
+  const [notificationsLoaded, setNotificationsLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +41,34 @@ export default function Social({ currentUserId, onOpenProfile, initialTab = 'peo
     setQuery('');
     setError(null);
   }, [initialTab]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    setNotificationsLoaded(false);
+    fetchRecentFollowNotifications(currentUserId, 10)
+      .then(async (nextNotifications) => {
+        if (!isCurrent) return;
+        setNotifications(nextNotifications);
+        if (nextNotifications.some((notification) => !notification.read)) {
+          await markFollowNotificationsRead(currentUserId);
+          if (isCurrent) {
+            setNotifications((current) => current.map((notification) => ({ ...notification, read: true })));
+            onNotificationsRead?.();
+          }
+        }
+      })
+      .catch((err) => {
+        if (!isCurrent) return;
+        setError(err instanceof Error ? err.message : 'Could not load follower notifications.');
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setNotificationsLoaded(true);
+        }
+      });
+
+    return () => { isCurrent = false; };
+  }, [currentUserId, onNotificationsRead]);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -101,6 +135,36 @@ export default function Social({ currentUserId, onOpenProfile, initialTab = 'peo
         <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Friends</h1>
         <p className="text-sm font-medium text-foreground/45">Find collectors, follow friends, and peek at public binders.</p>
       </div>
+
+      {notificationsLoaded && notifications.length > 0 && (
+        <section className="rounded-[28px] border-2 border-white bg-white/75 p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-black uppercase tracking-widest text-foreground/55">New Followers ✨</h2>
+            {notifications.length > 0 && (
+              <span className="text-[10px] font-black uppercase tracking-widest text-foreground/30">Recent</span>
+            )}
+          </div>
+          <div className="grid gap-2">
+            {notifications.map((notification) => {
+              const actor = notification.actor;
+              const username = actor?.username ? `@${actor.username}` : 'Someone';
+              return (
+                <button
+                  key={notification.id}
+                  type="button"
+                  onClick={() => actor && onOpenProfile(actor as Profile)}
+                  className="flex items-center justify-between gap-3 rounded-2xl bg-white/70 px-4 py-3 text-left transition-all hover:bg-primary/5"
+                >
+                  <span className="min-w-0 truncate text-sm font-bold text-foreground/70">
+                    <span className="text-primary">{username}</span> followed you
+                  </span>
+                  {!notification.read && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--wishlist-red)]" />}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <div className="flex gap-1 rounded-2xl border-2 border-white bg-white/75 p-1 shadow-sm">

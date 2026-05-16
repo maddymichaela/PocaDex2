@@ -11,6 +11,7 @@ interface NavbarProps {
   onSignOut?: () => void;
   onAddCard?: () => void;
   onOpenSettings?: () => void;
+  friendsUnreadCount?: number;
 }
 
 const NAV_ITEMS = [
@@ -22,7 +23,7 @@ const NAV_ITEMS = [
   { id: 'Friends', label: 'Friends', icon: UsersRound },
 ] as const;
 
-export default function Navbar({ currentPage, onPageChange, profile, onSignOut, onAddCard, onOpenSettings }: NavbarProps) {
+export default function Navbar({ currentPage, onPageChange, profile, onSignOut, onAddCard, onOpenSettings, friendsUnreadCount = 0 }: NavbarProps) {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
   const desktopMenuRef = useRef<HTMLDivElement>(null);
@@ -111,7 +112,14 @@ export default function Navbar({ currentPage, onPageChange, profile, onSignOut, 
                   size={17}
                   className={active ? '' : 'group-hover:-rotate-6 transition-transform duration-200'}
                 />
-                {label}
+                <span className="min-w-0 flex-1 truncate">{label}</span>
+                {id === 'Friends' && friendsUnreadCount > 0 && (
+                  <span className={`ml-auto inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-black ${
+                    active ? 'bg-white text-primary' : 'bg-[var(--wishlist-red)] text-white'
+                  }`}>
+                    {friendsUnreadCount > 9 ? '9+' : friendsUnreadCount}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -208,6 +216,13 @@ export default function Navbar({ currentPage, onPageChange, profile, onSignOut, 
               >
                 <Icon size={13} />
                 {label}
+                {id === 'Friends' && friendsUnreadCount > 0 && (
+                  <span className={`ml-0.5 inline-flex min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-black ${
+                    active ? 'bg-white text-primary' : 'bg-[var(--wishlist-red)] text-white'
+                  }`}>
+                    {friendsUnreadCount > 9 ? '9+' : friendsUnreadCount}
+                  </span>
+                )}
               </button>
             );
           })}

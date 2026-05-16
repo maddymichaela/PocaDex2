@@ -22,7 +22,7 @@ import {
   deletePhotocard,
   bulkUpdatePhotocards,
 } from './lib/db';
-import { getCardTemplateId } from './lib/social';
+import { fetchUnreadFollowNotificationCount, getCardTemplateId } from './lib/social';
 import { createPhotocardDraftFromPublicCard, getCollectionMatchState, isPhotocardOwner, isProfileOwner } from './lib/ownership';
 
 type AuthScreen = 'splash' | 'login' | 'signup';
@@ -196,6 +196,7 @@ export default function App() {
   const [dataLoading, setDataLoading] = useState(false);
   const [viewedProfile, setViewedProfile] = useState<Profile | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [friendsUnreadCount, setFriendsUnreadCount] = useState(0);
   const binderReadyToastUserRef = useRef<string | null>(null);
   const currentPageRef = useRef(currentPage);
 
@@ -314,6 +315,30 @@ export default function App() {
     if (!userId || dataLoading) return;
     writeCachedPhotocards(userId, photocards);
   }, [dataLoading, photocards, userId]);
+
+  const refreshFriendsUnreadCount = useCallback(() => {
+    if (!userId) {
+      setFriendsUnreadCount(0);
+      return;
+    }
+    fetchUnreadFollowNotificationCount(userId)
+      .then(setFriendsUnreadCount)
+      .catch((err) => {
+        console.warn('Could not load follower notification count:', err);
+        setFriendsUnreadCount(0);
+      });
+  }, [userId]);
+
+  useEffect(() => {
+    refreshFriendsUnreadCount();
+    if (!userId) return;
+    const intervalId = window.setInterval(refreshFriendsUnreadCount, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, [refreshFriendsUnreadCount, userId]);
+
+  const handleNotificationsRead = useCallback(() => {
+    setFriendsUnreadCount(0);
+  }, []);
 
   useEffect(() => {
     if (!toastMessage) return;
@@ -560,6 +585,7 @@ export default function App() {
             currentUserId={user.id}
             initialTab={socialTab}
             onOpenProfile={(nextProfile) => navigateToPage('Profile', nextProfile.username)}
+            onNotificationsRead={handleNotificationsRead}
           />
         );
       case 'Collection':
@@ -607,6 +633,7 @@ export default function App() {
         profile={profile}
         onSignOut={signOut}
         onAddCard={handleAddCard}
+        friendsUnreadCount={friendsUnreadCount}
         onOpenSettings={() => {
           if (currentPageRef.current === 'FindCards') {
             clearGlobalSearchState('opened account settings from Find Cards');

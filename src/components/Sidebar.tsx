@@ -6,6 +6,7 @@
 import { CollectionStats } from '../types';
 import { STATUS_COLORS } from '../lib/statusStyles';
 
+const SOFT_PRIMARY_MIX = 'color-mix(in oklab, var(--color-primary) 70%, transparent)';
 
 interface StatCardProps {
   label: string;
@@ -36,25 +37,25 @@ export function Sidebar({ stats }: { stats: CollectionStats }) {
   return (
     <aside className="w-full grid grid-cols-2 md:grid-cols-4 gap-4 items-start">
       <StatCard
-        label="Owned"
-        value={stats.totalCollected.toLocaleString()}
-        highlightColor={STATUS_COLORS.owned.css}
+        label="Total Cards"
+        value={(stats.totalCollected + stats.onTheWay + stats.wishlistGoals).toLocaleString()}
+        highlightColor={SOFT_PRIMARY_MIX}
+      />
+      <StatCard
+        label="Added This Week"
+        value={(stats.cardsAddedThisWeek ?? 0).toLocaleString()}
+        highlightColor={SOFT_PRIMARY_MIX}
+      />
+      <StatCard
+        label="Wishlist"
+        value={stats.wishlistGoals.toLocaleString()}
+        highlightColor={STATUS_COLORS.wishlist.css}
+        isWishlist
       />
       <StatCard
         label="On The Way"
         value={stats.onTheWay.toLocaleString()}
         highlightColor={STATUS_COLORS.onTheWay.css}
-      />
-      <StatCard
-        label="Wishlist"
-        value={stats.wishlistGoals}
-        highlightColor={STATUS_COLORS.wishlist.css}
-        isWishlist
-      />
-      <StatCard
-        label="Duplicates"
-        value={stats.duplicates || 0}
-        highlightColor={STATUS_COLORS.duplicates.css}
       />
       {/* <StatCard 
         label="Est. Value" 
