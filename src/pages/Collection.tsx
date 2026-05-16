@@ -14,6 +14,7 @@ interface CollectionProps {
   onBulkUpdate: (ids: string[], updates: Partial<Photocard>) => void;
   onCardClick: (pc: Photocard) => void;
   onNewCard: () => void;
+  onImportGrid: () => void;
 }
 
 type ViewMode = 'all' | 'group' | 'member' | 'era' | 'category' | 'year';
@@ -82,7 +83,7 @@ function GroupTile({ name, count, imageUrl, onClick }: GroupTileProps) {
   );
 }
 
-export default function Collection({ photocards, isOwner = true, onDelete, onBulkUpdate, onCardClick, onNewCard }: CollectionProps) {
+export default function Collection({ photocards, isOwner = true, onDelete, onBulkUpdate, onCardClick, onNewCard, onImportGrid }: CollectionProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('all');
   const [drilldownValue, setDrilldownValue] = useState<string | number | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -486,13 +487,22 @@ export default function Collection({ photocards, isOwner = true, onDelete, onBul
                     You can add cards manually, upload an image, or import from a grid.
                   </p>
                   {isOwner && (
-                    <button
-                      onClick={onNewCard}
-                      className="btn-primary-pink mt-8 inline-flex items-center gap-2 rounded-2xl px-8 py-4 text-xs font-black uppercase tracking-widest shadow-xl shadow-primary/10"
-                    >
-                      <Plus size={16} />
-                      Add Card
-                    </button>
+                    <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                      <button
+                        onClick={onNewCard}
+                        className="btn-primary-pink inline-flex items-center gap-2 rounded-2xl px-8 py-4 text-xs font-black uppercase tracking-widest shadow-xl shadow-primary/10"
+                      >
+                        <Plus size={16} />
+                        Add Card
+                      </button>
+                      <button
+                        onClick={onImportGrid}
+                        className="inline-flex items-center gap-2 rounded-2xl border-2 border-primary/15 bg-white px-8 py-4 text-xs font-black uppercase tracking-widest text-primary shadow-xl shadow-primary/10 transition-all hover:border-primary/30 hover:bg-primary/5"
+                      >
+                        <LayoutGrid size={16} />
+                        Import from Grid
+                      </button>
+                    </div>
                   )}
                 </>
               ) : (

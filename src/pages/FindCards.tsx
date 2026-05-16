@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { PhotocardCard } from '../components/PhotocardGrid';
 import PublicCardAction, { getPublicCardActionState } from '../components/PublicCardAction';
 import { Photocard } from '../types';
@@ -52,9 +52,10 @@ interface FindCardsProps {
   onOpenCard?: (card: Photocard, visibleCards?: Photocard[]) => void;
   onAddToCollection: (card: Photocard) => void;
   onRequireAuth?: () => void;
+  onSearchInteract?: () => void;
 }
 
-export default function FindCards({ currentUserId, ownPhotocards, onOpenCard, onAddToCollection, onRequireAuth }: FindCardsProps) {
+export default function FindCards({ currentUserId, ownPhotocards, onOpenCard, onAddToCollection, onRequireAuth, onSearchInteract }: FindCardsProps) {
   const [query, setQuery] = useState(() => readStoredGlobalSearchState().query);
   const [results, setResults] = useState<PublicCardTemplate[]>(() => readStoredGlobalSearchState().results);
   const [loading, setLoading] = useState(false);
@@ -133,15 +134,16 @@ export default function FindCards({ currentUserId, ownPhotocards, onOpenCard, on
           <Search size={15} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-primary" />
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onClick={onSearchInteract}
+            onFocus={onSearchInteract}
+            onChange={(e) => {
+              onSearchInteract?.();
+              setQuery(e.target.value);
+            }}
             autoFocus
             className="h-12 w-full rounded-2xl border-2 border-white bg-white/85 pl-11 pr-4 text-sm font-semibold outline-none shadow-sm transition-all placeholder:text-foreground/25 focus:border-primary/30"
-            placeholder="Search by member, group, album, era, version…"
+            placeholder="Search by member, group, album, era, shop, version…"
           />
-        </div>
-        <div className="flex items-center gap-2 text-xs font-semibold text-foreground/35 select-none">
-          <SlidersHorizontal size={13} />
-          member · group · album/era · shop/event · version
         </div>
       </div>
 
@@ -218,27 +220,27 @@ export default function FindCards({ currentUserId, ownPhotocards, onOpenCard, on
             }
             return (
               <div key={result.identity} className="relative h-full">
-                  {result.wishlistCount > 0 && (
-                    <div className="absolute left-3 top-3 z-20 rounded-full bg-white/95 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-[var(--wishlist-red)] shadow-sm">
-                      {result.wishlistCount} {result.wishlistCount === 1 ? 'wish' : 'wishes'}
-                    </div>
+                {result.wishlistCount > 0 && (
+                  <div className="absolute left-3 top-3 z-20 rounded-full bg-white/95 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-[var(--wishlist-red)] shadow-sm">
+                    {result.wishlistCount} {result.wishlistCount === 1 ? 'wish' : 'wishes'}
+                  </div>
+                )}
+                <PhotocardCard
+                  photocard={displayCard}
+                  index={index}
+                  onClick={handleOpenCard}
+                  context="global-search"
+                  actionFooter={(
+                    <PublicCardAction
+                      card={displayCard}
+                      currentUserId={currentUserId}
+                      ownPhotocards={ownPhotocards}
+                      onAddToCollection={onAddToCollection}
+                      onRequireAuth={onRequireAuth ?? (() => setError('Sign in or create an account to add cards to your collection.'))}
+                      className="h-10 w-full rounded-xl bg-primary/95 text-[8px] shadow-sm backdrop-blur disabled:bg-white/95"
+                    />
                   )}
-                  <PhotocardCard
-                    photocard={displayCard}
-                    index={index}
-                    onClick={handleOpenCard}
-                    context="global-search"
-                    actionFooter={(
-                      <PublicCardAction
-                        card={displayCard}
-                        currentUserId={currentUserId}
-                        ownPhotocards={ownPhotocards}
-                        onAddToCollection={onAddToCollection}
-                        onRequireAuth={onRequireAuth ?? (() => setError('Sign in or create an account to add cards to your collection.'))}
-                        className="h-10 w-full rounded-xl bg-primary/95 text-[8px] shadow-sm backdrop-blur disabled:bg-white/95"
-                      />
-                    )}
-                  />
+                />
               </div>
             );
           })}
@@ -248,9 +250,16 @@ export default function FindCards({ currentUserId, ownPhotocards, onOpenCard, on
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-3xl bg-primary/10 text-primary">
             <Search size={24} />
           </div>
-          <p className="text-sm font-black uppercase tracking-widest text-foreground/30">
-            {query.trim() ? 'No cards found.' : 'Search for photocards to add to your binder.'}
-          </p>
+          {query.trim() ? (
+            <div className="space-y-2">
+              <p className="text-sm font-black uppercase tracking-widest text-foreground/30">No matching cards found.</p>
+              <p className="text-sm font-medium text-foreground/40">Try searching by member, album, source, or event.</p>
+            </div>
+          ) : (
+            <p className="text-sm font-black uppercase tracking-widest text-foreground/30">
+              Search for photocards to add to your binder.
+            </p>
+          )}
         </div>
       )}
     </div>

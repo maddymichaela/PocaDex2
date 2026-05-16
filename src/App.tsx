@@ -12,7 +12,7 @@ import AccountSettings from './pages/AccountSettings';
 import PublicProfile from './pages/PublicProfile';
 import Social from './pages/Social';
 import FindCards, { clearGlobalSearchState } from './pages/FindCards';
-import { Grid3x3, ImagePlus } from 'lucide-react';
+import { Grid3x3, ImagePlus, X } from 'lucide-react';
 import { normalizePhotocardForSave, normalizePhotocardUpdates, Photocard, Profile } from './types';
 import { useAuth } from './contexts/AuthContext';
 import {
@@ -153,6 +153,30 @@ function AddCardEntry({ onManualAdd, onImportGrid, onBack }: {
   );
 }
 
+function AppToast({ message, onClick, onDismiss }: { message: string; onClick?: () => void; onDismiss: () => void }) {
+  const messageClassName = `min-w-0 truncate ${onClick ? 'cursor-pointer text-primary hover:text-primary/80' : ''}`;
+
+  return (
+    <div className="fixed bottom-5 left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-2xl border-2 border-white bg-white/95 px-4 py-3 text-sm font-bold text-foreground/65 shadow-xl shadow-primary/10 backdrop-blur">
+      {onClick ? (
+        <button type="button" onClick={onClick} className={messageClassName}>
+          {message}
+        </button>
+      ) : (
+        <span className={messageClassName}>{message}</span>
+      )}
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-foreground/35 transition-all hover:bg-primary/10 hover:text-primary"
+        aria-label="Dismiss message"
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
   const { user, profile, loading: authLoading, signOut, cancelAccountDeletion } = useAuth();
   const [authScreen, setAuthScreen] = useState<AuthScreen>('splash');
@@ -171,6 +195,8 @@ export default function App() {
   const [photocards, setPhotocards] = useState<Photocard[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [viewedProfile, setViewedProfile] = useState<Profile | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const binderReadyToastUserRef = useRef<string | null>(null);
   const currentPageRef = useRef(currentPage);
 
   useEffect(() => {
@@ -289,8 +315,22 @@ export default function App() {
     writeCachedPhotocards(userId, photocards);
   }, [dataLoading, photocards, userId]);
 
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timeoutId = window.setTimeout(() => setToastMessage(null), 4200);
+    return () => window.clearTimeout(timeoutId);
+  }, [toastMessage]);
+
+  useEffect(() => {
+    if (!userId || dataLoading || photocards.length !== 0) return;
+    if (binderReadyToastUserRef.current === userId) return;
+    binderReadyToastUserRef.current = userId;
+    setToastMessage('✨ Your binder is ready');
+  }, [dataLoading, photocards.length, userId]);
+
   const handleAddPhotocard = useCallback(async (newPC: Photocard) => {
     if (!user) return;
+    const wasEmpty = photocards.length === 0;
     const normalizedPC = normalizePhotocardForSave(newPC);
     const templateId = getCardTemplateId(normalizedPC);
     setPhotocards(prev => prev.some((card) => getCardTemplateId(card) === templateId) ? prev : [normalizedPC, ...prev]);
@@ -304,11 +344,12 @@ export default function App() {
         mergedSaved,
         ...prev.filter((pc) => pc.id !== normalizedPC.id && pc.id !== saved.id && getCardTemplateId(pc) !== savedTemplateId),
       ]);
+      if (wasEmpty) setToastMessage('✨ Explore Find Cards to discover more photocards');
     } catch (err) {
       console.error('Failed to add photocard:', err);
       setPhotocards(prev => prev.filter(pc => pc.id !== normalizedPC.id));
     }
-  }, [user]);
+  }, [photocards.length, user]);
 
   const handleUpdatePhotocard = useCallback(async (updatedPC: Photocard) => {
     if (!user) return;
@@ -353,11 +394,13 @@ export default function App() {
   }, [photocards, user]);
 
   const handleScanImported = useCallback((savedCards: Photocard[]) => {
+    const wasEmpty = photocards.length === 0;
     setPhotocards(prev => {
       const savedTemplateIds = new Set(savedCards.map(getCardTemplateId));
       return dedupePhotocardsByTemplateId([...savedCards, ...prev.filter(card => !savedTemplateIds.has(getCardTemplateId(card)))]);
     });
-  }, []);
+    if (wasEmpty && savedCards.length > 0) setToastMessage('✨ Explore Find Cards to discover more photocards');
+  }, [photocards.length]);
 
   const handleImportPhotocards = useCallback((newData: Photocard[], mode: 'replace' | 'merge') => {
     setPhotocards(prev => {
@@ -443,7 +486,7 @@ export default function App() {
   const currentCardIsOwner = currentCard ? isPhotocardOwner(user.id, currentCard) : false;
   const isViewingOwnProfile = currentPage === 'Profile'
     && isProfileOwner(user.id, viewedProfile?.id ?? (
-      !viewedProfile && Boolean(profile?.username) && routeUsername.toLowerCase() === profile.username.toLowerCase() ? profile?.id : null
+      !viewedProfile && Boolean(profile?.username) && routeUsername.toLowerCase() === profile?.username?.toLowerCase() ? profile?.id : null
     ));
   const navbarCurrentPage = currentPage === 'Profile' && !isViewingOwnProfile ? 'Friends' : currentPage;
 
@@ -506,6 +549,9 @@ export default function App() {
             }}
             onAddToCollection={handleAddPublicCard}
             onRequireAuth={() => window.alert('Sign in or create an account to add cards to your collection.')}
+            onSearchInteract={() => {
+              if (toastMessage?.includes('Explore Find Cards')) setToastMessage(null);
+            }}
           />
         );
       case 'Friends':
@@ -524,6 +570,7 @@ export default function App() {
             onBulkUpdate={handleBulkUpdatePartial}
             onCardClick={(pc) => { setSelectedCardBackLabel('Back to Binder'); setSelectedId(pc.id); }}
             onNewCard={handleAddCard}
+            onImportGrid={() => navigateToPage('Import')}
           />
         );
       default:
@@ -658,6 +705,16 @@ export default function App() {
           </div>
         )}
       </main>
+      {toastMessage && (
+        <AppToast
+          message={toastMessage}
+          onClick={toastMessage.includes('Explore Find Cards') ? () => {
+            setToastMessage(null);
+            navigateToPage('FindCards');
+          } : undefined}
+          onDismiss={() => setToastMessage(null)}
+        />
+      )}
     </div>
   );
 }
