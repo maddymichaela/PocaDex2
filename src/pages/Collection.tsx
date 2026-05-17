@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { formatPhotocardMembers, getPhotocardCategory, getPhotocardMembers, Photocard } from '../types';
 import { PhotocardGrid } from '../components/PhotocardGrid';
 import BulkEditForm from '../components/BulkEditForm';
-import FilterBar, { FilterState } from '../components/FilterBar';
+import FilterBar, { FilterState, getBasicFilterState, getDefaultFilterState } from '../components/FilterBar';
 import { placeholderImage } from '../lib/assets';
 import { Plus, CheckSquare, Trash2, X, LayoutGrid, ChevronLeft, Edit3, ArrowUp, Search, Filter, Truck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -16,6 +16,7 @@ interface CollectionProps {
   onNewCard: () => void;
   onImportGrid: () => void;
   canUseBulkEdit?: boolean;
+  canUseAdvancedFilters?: boolean;
   onUpgradeRequired?: (reason: string) => void;
   trackedCardCount?: number;
   cardLimit?: number | null;
@@ -97,6 +98,7 @@ export default function Collection({
   onNewCard,
   onImportGrid,
   canUseBulkEdit = true,
+  canUseAdvancedFilters = true,
   onUpgradeRequired,
   trackedCardCount,
   cardLimit,
@@ -106,15 +108,7 @@ export default function Collection({
   const [drilldownValue, setDrilldownValue] = useState<string | number | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
-  const [filters, setFilters] = useState<FilterState>({
-    group: 'All',
-    member: 'All',
-    category: 'All',
-    year: 'All',
-    status: 'All',
-    search: '',
-    sortBy: 'recently-added',
-  });
+  const [filters, setFilters] = useState<FilterState>(getDefaultFilterState);
 
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
@@ -134,17 +128,26 @@ export default function Collection({
   const uniqueMembers = useMemo(() => Array.from(new Set(photocards.flatMap(pc => getPhotocardMembers(pc)))).sort((a, b) => a.localeCompare(b)), [photocards]);
   const uniqueCategories = useMemo(() => Array.from(new Set(photocards.map(pc => getPhotocardCategory(pc)))), [photocards]);
   const uniqueYears = useMemo(() => Array.from(new Set(photocards.map(pc => pc.year))), [photocards]);
+  const uniqueConditions = useMemo(() => Array.from(new Set(photocards.map(pc => pc.condition).filter(Boolean))) as NonNullable<Photocard['condition']>[], [photocards]);
+  const uniqueEras = useMemo(() => Array.from(new Set(photocards.map(pc => pc.era).filter(Boolean))) as string[], [photocards]);
 
   const filteredPhotocards = useMemo(() => {
+    const activeFilters = canUseAdvancedFilters ? filters : getBasicFilterState(filters);
     return photocards.filter(pc => {
-      const matchGroup = filters.group === 'All' || pc.group === filters.group;
+      const matchGroup = activeFilters.group === 'All' || pc.group === activeFilters.group;
       const members = getPhotocardMembers(pc);
       const memberLabel = formatPhotocardMembers(pc);
-      const matchMember = filters.member === 'All' || members.includes(filters.member);
-      const matchCategory = filters.category === 'All' || getPhotocardCategory(pc) === filters.category;
-      const matchYear = filters.year === 'All' || pc.year === filters.year;
-      const matchStatus = filters.status === 'All' || pc.status === filters.status;
-      const q = filters.search.toLowerCase();
+      const matchMember = activeFilters.member === 'All' || members.includes(activeFilters.member);
+      const matchCategory = activeFilters.category === 'All' || getPhotocardCategory(pc) === activeFilters.category;
+      const matchYear = activeFilters.year === 'All' || pc.year === activeFilters.year;
+      const matchStatus = activeFilters.status === 'All' || pc.status === activeFilters.status;
+      const matchCondition = activeFilters.condition === 'All' || pc.condition === activeFilters.condition;
+      const matchDuplicate =
+        activeFilters.duplicate === 'All' ||
+        (activeFilters.duplicate === 'duplicates' && !!pc.isDuplicate) ||
+        (activeFilters.duplicate === 'non_duplicates' && !pc.isDuplicate);
+      const matchEra = activeFilters.era === 'All' || pc.era === activeFilters.era;
+      const q = activeFilters.search.toLowerCase();
       const matchSearch = !q ||
         pc.cardName.toLowerCase().includes(q) ||
         pc.version.toLowerCase().includes(q) ||
@@ -159,9 +162,9 @@ export default function Collection({
         matchDrilldown = getGroupedViewKey(pc, viewMode) === drilldownValue;
       }
 
-      return matchGroup && matchMember && matchCategory && matchYear && matchStatus && matchSearch && matchDrilldown;
+      return matchGroup && matchMember && matchCategory && matchYear && matchStatus && matchCondition && matchDuplicate && matchEra && matchSearch && matchDrilldown;
     });
-  }, [photocards, filters, drilldownValue, viewMode]);
+  }, [photocards, filters, canUseAdvancedFilters, drilldownValue, viewMode]);
 
   const processedPhotocards = useMemo(() => {
     return [...filteredPhotocards].sort((a, b) => {
@@ -227,10 +230,15 @@ export default function Collection({
   const scrollToTop = () => document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
 
   const hasActiveFilters =
-    filters.group !== 'All' ||
-    filters.member !== 'All' ||
-    filters.category !== 'All' ||
-    filters.year !== 'All' ||
+    (canUseAdvancedFilters && (
+      filters.group !== 'All' ||
+      filters.member !== 'All' ||
+      filters.category !== 'All' ||
+      filters.year !== 'All' ||
+      filters.condition !== 'All' ||
+      filters.duplicate !== 'All' ||
+      filters.era !== 'All'
+    )) ||
     filters.sortBy !== 'recently-added';
 
   const activeFilterChips = [
@@ -238,7 +246,10 @@ export default function Collection({
     { label: 'Member', value: filters.member, key: 'member' as const },
     { label: 'Category', value: filters.category, key: 'category' as const },
     { label: 'Year', value: String(filters.year), key: 'year' as const },
-  ].filter(f => f.value !== 'All');
+    { label: 'Condition', value: filters.condition.replace('_', ' '), key: 'condition' as const },
+    { label: 'Duplicates', value: filters.duplicate === 'duplicates' ? 'Duplicates' : filters.duplicate === 'non_duplicates' ? 'No Duplicates' : 'All', key: 'duplicate' as const },
+    { label: 'Era', value: filters.era, key: 'era' as const },
+  ].filter(f => canUseAdvancedFilters && f.value !== 'All');
 
   const VIEW_MODES = [
     { id: 'all', label: 'None' },
@@ -332,11 +343,16 @@ export default function Collection({
             />
           </div>
 
-          <label className="flex h-10 min-w-0 items-center overflow-hidden rounded-[13px] border-2 border-gray-100 bg-white focus-within:border-primary/30 lg:h-9 lg:w-[190px] xl:w-[205px]">
+          <label className={`flex h-10 min-w-0 items-center overflow-hidden rounded-[13px] border-2 border-gray-100 bg-white focus-within:border-primary/30 lg:h-9 lg:w-[190px] xl:w-[205px] ${!canUseAdvancedFilters ? 'opacity-60' : ''}`}>
             <span className="shrink-0 border-r border-gray-100 px-2.5 text-[8px] font-black uppercase tracking-widest text-foreground/40">Group By</span>
             <select
               value={viewMode}
+              onClick={!canUseAdvancedFilters ? () => onUpgradeRequired?.('Advanced filters are Pro.') : undefined}
               onChange={e => {
+                if (!canUseAdvancedFilters) {
+                  onUpgradeRequired?.('Advanced filters are Pro.');
+                  return;
+                }
                 setViewMode(e.target.value as ViewMode);
                 setDrilldownValue(null);
                 setSelectedIds([]);
@@ -347,6 +363,11 @@ export default function Collection({
                 <option key={mode.id} value={mode.id}>{mode.label}</option>
               ))}
             </select>
+            {!canUseAdvancedFilters && (
+              <span className="mr-2 rounded-full bg-primary/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-primary">
+                Pro
+              </span>
+            )}
           </label>
 
           <button
@@ -379,6 +400,10 @@ export default function Collection({
               uniqueMembers={uniqueMembers}
               uniqueCategories={uniqueCategories}
               uniqueYears={uniqueYears}
+              uniqueConditions={uniqueConditions}
+              uniqueEras={uniqueEras}
+              canUseAdvancedFilters={canUseAdvancedFilters}
+              onUpgradeRequired={onUpgradeRequired}
             />
           </motion.div>
         )}
@@ -398,7 +423,7 @@ export default function Collection({
             </button>
           ))}
           <button
-            onClick={() => setFilters(prev => ({ ...prev, group: 'All', member: 'All', category: 'All', year: 'All', search: '', sortBy: 'recently-added' }))}
+            onClick={() => setFilters(prev => ({ ...getDefaultFilterState(), status: prev.status }))}
             className="text-[9px] font-black text-foreground/40 uppercase hover:text-red-400 p-2 italic bg-white/30 rounded-xl px-3 border border-white"
           >
             Clear All
@@ -554,7 +579,7 @@ export default function Collection({
               )}
               {photocards.length > 0 && showReturnToFullView && (
                 <button
-                  onClick={() => setFilters({ group: 'All', member: 'All', category: 'All', year: 'All', status: 'All', search: '', sortBy: 'recently-added' })}
+                  onClick={() => setFilters(getDefaultFilterState())}
                   className="mt-8 px-8 py-4 bg-white text-primary border-2 border-primary/20 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-xl shadow-primary/10"
                 >
                   Return to Full View

@@ -20,9 +20,21 @@ interface PhotocardFormProps {
   title?: string;
   subtitle?: string;
   allowImageEditing?: boolean;
+  canUseAdvancedImageEditor?: boolean;
+  onUpgradeRequired?: (reason: string) => void;
 }
 
-export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose, title, subtitle, allowImageEditing = true }: PhotocardFormProps) {
+export default function PhotocardForm({
+  initialData,
+  onSubmit,
+  onDelete,
+  onClose,
+  title,
+  subtitle,
+  allowImageEditing = true,
+  canUseAdvancedImageEditor = true,
+  onUpgradeRequired,
+}: PhotocardFormProps) {
   const [group, setGroup] = useState(initialData?.group || '');
   const [members, setMembers] = useState<string[]>(initialData ? getPhotocardMembers(initialData) : []);
   const [category, setCategory] = useState<PhotocardCategory>(initialData ? getPhotocardCategory(initialData) : 'Album');
@@ -457,6 +469,8 @@ export default function PhotocardForm({ initialData, onSubmit, onDelete, onClose
               image={editingImage}
               onSave={handleSaveEditedImage}
               onCancel={() => { setIsEditorOpen(false); setEditingImage(null); }}
+              advancedEnabled={canUseAdvancedImageEditor}
+              onUpgradeRequired={onUpgradeRequired}
             />
           )}
         </AnimatePresence>

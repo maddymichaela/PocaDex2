@@ -1251,6 +1251,8 @@ export default function Scan({
             title="Edit Card Details"
             subtitle="Updating Imported Card"
             allowImageEditing={false}
+            canUseAdvancedImageEditor={plan?.canUseAdvancedImageEditor ?? true}
+            onUpgradeRequired={onUpgradeRequired}
           />
         )}
         {editingCropId && templateUrl && (
@@ -1260,6 +1262,8 @@ export default function Scan({
             initialState={cards.find(card => card.id === editingCropId)?.cropperState}
             onSave={handleSaveEditedCrop}
             onCancel={handleCancelCropEdit}
+            advancedEnabled={plan?.canUseAdvancedImageEditor ?? true}
+            onUpgradeRequired={onUpgradeRequired}
           />
         )}
         {isAddingManualCrop && templateUrl && (
@@ -1267,6 +1271,8 @@ export default function Scan({
             image={templateUrl}
             onSave={handleSaveManualCrop}
             onCancel={handleCancelManualCrop}
+            advancedEnabled={plan?.canUseAdvancedImageEditor ?? true}
+            onUpgradeRequired={onUpgradeRequired}
           />
         )}
       </AnimatePresence>

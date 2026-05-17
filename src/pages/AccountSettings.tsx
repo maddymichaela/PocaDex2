@@ -476,22 +476,30 @@ export default function AccountSettings({ photocards }: AccountSettingsProps) {
               </label>
             </div>
 
-            <div className="md:col-span-2 grid gap-3 rounded-[24px] border-2 border-gray-100 bg-white/70 p-4 md:grid-cols-3">
-              {[
-                { label: 'Public Collection', checked: isCollectionPublic, onChange: setIsCollectionPublic },
-                { label: 'Public Wishlist', checked: isWishlistPublic, onChange: setIsWishlistPublic },
-                { label: 'Public Bio', checked: isBioPublic, onChange: setIsBioPublic },
-              ].map((item) => (
-                <label key={item.label} className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm">
-                  <span className="text-xs font-black uppercase tracking-widest text-foreground/50">{item.label}</span>
-                  <input
-                    type="checkbox"
-                    checked={item.checked}
-                    onChange={(e) => item.onChange(e.target.checked)}
-                    className="h-5 w-5 accent-primary"
-                  />
-                </label>
-              ))}
+            <div className="md:col-span-2 space-y-3 rounded-[24px] border-2 border-gray-100 bg-white/70 p-4">
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-widest text-foreground/55">Public Visibility</h3>
+                <p className="mt-1 text-xs font-semibold leading-5 text-foreground/35">
+                  Profiles are visible only to logged-in users. These settings control what signed-in collectors can see.
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                {[
+                  { label: 'Collection', checked: isCollectionPublic, onChange: setIsCollectionPublic },
+                  { label: 'Wishlist', checked: isWishlistPublic, onChange: setIsWishlistPublic },
+                  { label: 'Bio', checked: isBioPublic, onChange: setIsBioPublic },
+                ].map((item) => (
+                  <label key={item.label} className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm">
+                    <span className="text-xs font-black uppercase tracking-widest text-foreground/50">{item.label}</span>
+                    <input
+                      type="checkbox"
+                      checked={item.checked}
+                      onChange={(e) => item.onChange(e.target.checked)}
+                      className="h-5 w-5 accent-primary"
+                    />
+                  </label>
+                ))}
+              </div>
             </div>
 
             <div className="md:col-span-2">

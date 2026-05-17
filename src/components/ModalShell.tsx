@@ -55,11 +55,11 @@ export default function ModalShell({
               </div>
             )}
             <div className="min-w-0 space-y-1">
-              <h2 className="truncate text-xl font-bold leading-tight tracking-tight text-foreground md:text-2xl">
+              <h2 className="text-xl font-bold leading-tight tracking-tight text-foreground md:text-2xl">
                 {title}
               </h2>
               {subtitle && (
-                <p className="truncate text-[9px] font-black uppercase tracking-[0.2em] text-foreground/30">
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-foreground/30">
                   {subtitle}
                 </p>
               )}

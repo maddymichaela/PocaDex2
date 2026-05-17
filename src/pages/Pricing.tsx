@@ -3,7 +3,7 @@ import { Check, Crown } from 'lucide-react';
 const FREE_FEATURES = [
   'Up to 200 tracked cards',
   '1 binder',
-  'Basic filters',
+  'Basic collection filters',
   'Basic upload',
   'Public profile',
   'Follow friends',
@@ -12,12 +12,10 @@ const FREE_FEATURES = [
 
 const PRO_FEATURES = [
   'Unlimited tracked cards',
-  'Multiple binders',
   'Import from Grid',
   'Bulk edit',
-  'Advanced filters later',
-  'Advanced image editor later',
-  'Enhanced profile customization later',
+  'Advanced collection filters',
+  'Advanced image editor',
 ];
 
 function PlanColumn({ title, price, features, highlighted = false }: {
@@ -56,7 +54,7 @@ function PlanColumn({ title, price, features, highlighted = false }: {
         disabled={highlighted}
         className={`mt-8 w-full rounded-2xl px-5 py-4 text-xs font-black uppercase tracking-widest transition-all ${highlighted ? 'cursor-not-allowed bg-gray-100 text-foreground/30' : 'bg-white text-primary ring-2 ring-primary/15 hover:bg-primary/5'}`}
       >
-        {highlighted ? 'Payments coming soon' : 'Current Free Plan'}
+        {highlighted ? 'Upgrade to Pro' : 'Current Free Plan'}
       </button>
     </section>
   );
@@ -68,13 +66,13 @@ export default function Pricing() {
       <div className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Plans</h1>
         <p className="max-w-2xl text-sm font-medium leading-6 text-foreground/50">
-          PocaDex Pro is being staged before payments go live. You can preview the plan split now; checkout is not connected yet.
+          Compare Free and Pro features before upgrading.
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <PlanColumn title="Free" price="$0 for everyday collecting" features={FREE_FEATURES} />
-        <PlanColumn title="Pro" price="Pricing placeholder" features={PRO_FEATURES} highlighted />
+        <PlanColumn title="Pro" price="Unlock more collecting tools" features={PRO_FEATURES} highlighted />
       </div>
     </div>
   );

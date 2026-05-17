@@ -11,6 +11,8 @@ export interface PlanRules {
   canUseImport: boolean;
   canUseBulkEdit: boolean;
   canUseMultipleBinders: boolean;
+  canUseAdvancedFilters: boolean;
+  canUseAdvancedImageEditor: boolean;
   canAddMoreCards: (currentCardCount: number) => boolean;
   remainingCards: (currentCardCount: number) => number | null;
   shouldShowUpgradePrompt: (currentCardCount: number) => boolean;
@@ -27,6 +29,8 @@ export const PLAN_FEATURES = {
     importFromGrid: false,
     bulkEdit: false,
     multipleBinders: false,
+    advancedFilters: false,
+    advancedImageEditor: false,
   },
   pro: {
     cardLimit: null,
@@ -34,6 +38,8 @@ export const PLAN_FEATURES = {
     importFromGrid: true,
     bulkEdit: true,
     multipleBinders: true,
+    advancedFilters: true,
+    advancedImageEditor: true,
   },
 } as const;
 
@@ -65,6 +71,8 @@ export function getPlanRules(profile?: Pick<Profile, 'subscription_tier'> | null
     canUseImport: config.importFromGrid,
     canUseBulkEdit: config.bulkEdit,
     canUseMultipleBinders: config.multipleBinders,
+    canUseAdvancedFilters: config.advancedFilters,
+    canUseAdvancedImageEditor: config.advancedImageEditor,
     canAddMoreCards: (currentCardCount: number) => (
       config.cardLimit === null || currentCardCount < config.cardLimit
     ),

@@ -15,7 +15,7 @@ import PublicProfile from './pages/PublicProfile';
 import Social from './pages/Social';
 import FindCards, { clearGlobalSearchState } from './pages/FindCards';
 import { Grid3x3, ImagePlus, X, PackageCheck, Truck } from 'lucide-react';
-import { normalizePhotocardForSave, normalizePhotocardUpdates, Photocard, Profile } from './types';
+import { normalizePhotocardForSave, normalizePhotocardUpdates, Photocard, Profile, Status } from './types';
 import { useAuth } from './contexts/AuthContext';
 import {
   fetchPhotocards,
@@ -251,6 +251,7 @@ export default function App() {
   const [isAddCardEntryOpen, setIsAddCardEntryOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
+  const [formDefaultStatus, setFormDefaultStatus] = useState<Status>('owned');
   const [formCard, setFormCard] = useState<Photocard | null>(null);
   const [photocards, setPhotocards] = useState<Photocard[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
@@ -278,6 +279,7 @@ export default function App() {
       clearGlobalSearchState('opened new-card form from Find Cards');
     }
     setFormMode('create');
+    setFormDefaultStatus('owned');
     setFormCard(null);
     setSelectedPublicCard(null);
     setSelectedPublicCards([]);
@@ -288,10 +290,23 @@ export default function App() {
 
   const openManualAddForm = useCallback(() => {
     setFormMode('create');
+    setFormDefaultStatus('owned');
     setFormCard(null);
     setSelectedPublicCard(null);
     setSelectedPublicCards([]);
     setSelectedCardBackLabel('Back to Binder');
+    setIsAddCardEntryOpen(false);
+    setIsFormOpen(true);
+  }, []);
+
+  const openManualWishlistForm = useCallback(() => {
+    setFormMode('create');
+    setFormDefaultStatus('wishlist');
+    setFormCard(null);
+    setSelectedPublicCard(null);
+    setSelectedPublicCards([]);
+    setSelectedCardBackLabel('Back to Wishlist');
+    setSelectedId(null);
     setIsAddCardEntryOpen(false);
     setIsFormOpen(true);
   }, []);
@@ -311,7 +326,7 @@ export default function App() {
     if (plan.canAddMoreCards(nextTrackedCount - (isTrackedCollectionCard(nextCard) ? 1 : 0))) return true;
     if (!isTrackedCollectionCard(nextCard)) return true;
 
-    showUpgradePrompt(`Free plans include ${plan.cardLimit} owned or on-the-way cards. Wishlist cards do not count, but this card would become tracked card ${nextTrackedCount}.`);
+    showUpgradePrompt('Upgrade to Pro to add more owned or on-the-way cards.');
     return false;
   }, [getTrackedCountAfterSave, plan, showUpgradePrompt]);
 
@@ -319,7 +334,7 @@ export default function App() {
     if (!user) return;
     if (getCollectionMatchState(sourceCard, photocards, user.id).isTrackedInBinder) return;
     if (!plan.canAddMoreCards(trackedCardCount)) {
-      showUpgradePrompt(`You have ${trackedCardCount} owned or on-the-way cards, which reaches the Free plan limit of ${plan.cardLimit}. Upgrade to Pro before adding another tracked card.`);
+      showUpgradePrompt('Upgrade to Pro to add more owned or on-the-way cards.');
       return;
     }
     if (currentPageRef.current === 'FindCards') {
@@ -330,6 +345,7 @@ export default function App() {
       console.debug('[PocaDex global search debug] clone/add payload', { sourceCard, draft });
     }
     setFormMode('create');
+    setFormDefaultStatus('owned');
     setFormCard(draft);
     setSelectedPublicCard(null);
     setSelectedPublicCards([]);
@@ -585,7 +601,7 @@ export default function App() {
   const handleBulkUpdatePartial = useCallback(async (ids: string[], updates: Partial<Photocard>) => {
     if (!user) return;
     if (!plan.canUseBulkEdit) {
-      showUpgradePrompt('Bulk edit is a Pro feature. Upgrade to Pro to update many photocards at once.');
+      showUpgradePrompt('Bulk Edit is a Pro feature.');
       return;
     }
     const ownedIds = ids.filter((id) => {
@@ -620,7 +636,7 @@ export default function App() {
       })();
     const nextTrackedCount = countTrackedCollectionCards(nextCards);
     if (plan.cardLimit !== null && nextTrackedCount > plan.cardLimit) {
-      showUpgradePrompt(`This backup would put your binder at ${nextTrackedCount} owned or on-the-way cards. Free plans include ${plan.cardLimit} tracked cards.`);
+      showUpgradePrompt('Upgrade to Pro to import more owned or on-the-way cards.');
       return;
     }
     setPhotocards(prev => {
@@ -644,55 +660,24 @@ export default function App() {
 
   // Not authenticated
   if (!user) {
+    if (authScreen === 'login' || authScreen === 'signup') {
+      return <Login initialMode={authScreen === 'signup' ? 'signup' : 'signin'} onBack={() => setAuthScreen('splash')} />;
+    }
     if (currentPage === 'Profile' && routeUsername) {
-      const publicCardIndex = selectedPublicCard ? selectedPublicCards.findIndex(p => p.id === selectedPublicCard.id) : -1;
       return (
         <div className="relative min-h-screen overflow-auto bg-white">
           <div className="pointer-events-none absolute inset-0 app-shell-bg" />
           <div className="pointer-events-none absolute inset-0 app-shell-dots opacity-60" />
           <main className="relative z-10 px-4 py-5 xl:p-8">
-            {selectedPublicCard ? (
-              <CardDetail
-                photocard={selectedPublicCard}
-                onBack={() => { setSelectedId(null); setSelectedPublicCard(null); setSelectedPublicCards([]); }}
-                onEdit={() => undefined}
-                backLabel="Back to Profile"
-                hasPrev={publicCardIndex > 0}
-                hasNext={publicCardIndex >= 0 && publicCardIndex < selectedPublicCards.length - 1}
-                onPrev={() => {
-                  const previousCard = selectedPublicCards[publicCardIndex - 1];
-                  if (previousCard) {
-                    setSelectedPublicCard(previousCard);
-                    setSelectedId(previousCard.id);
-                  }
-                }}
-                onNext={() => {
-                  const nextCard = selectedPublicCards[publicCardIndex + 1];
-                  if (nextCard) {
-                    setSelectedPublicCard(nextCard);
-                    setSelectedId(nextCard.id);
-                  }
-                }}
-                isOwner={false}
-                currentUserId={null}
-                ownPhotocards={[]}
-                onRequireAuth={() => window.alert('Sign in or create an account to add cards to your collection.')}
-              />
-            ) : (
-              <PublicProfile
-                username={routeUsername}
-                currentUserId={null}
-                ownPhotocards={[]}
-                onEditProfile={() => setAuthScreen('login')}
-                onOpenCard={(pc, cards) => { setSelectedPublicCard(pc); setSelectedPublicCards(cards ?? []); setSelectedCardBackLabel('Back to Profile'); setSelectedId(pc.id); }}
-              />
-            )}
+            <PublicProfile
+              username={routeUsername}
+              currentUserId={null}
+              ownPhotocards={[]}
+              onEditProfile={() => setAuthScreen('login')}
+            />
           </main>
         </div>
       );
-    }
-    if (authScreen === 'login' || authScreen === 'signup') {
-      return <Login initialMode={authScreen === 'signup' ? 'signup' : 'signin'} onBack={() => setAuthScreen('splash')} />;
     }
     return <Splash onGetStarted={() => setAuthScreen('signup')} onSignIn={() => setAuthScreen('login')} />;
   }
@@ -729,11 +714,11 @@ export default function App() {
               </div>
               <h1 className="text-2xl font-bold tracking-tight text-foreground">Import from Grid is a Pro feature</h1>
               <p className="mt-3 max-w-md text-sm font-medium leading-6 text-foreground/50">
-                Free users can preview this feature, but grid import saves are reserved for Pro.
+                Grid Import is included with Pro. Upgrade to split grid images into multiple photocards.
               </p>
               <button
                 type="button"
-                onClick={() => showUpgradePrompt('Import from Grid is included with Pro, along with unlimited cards, bulk edit, and multiple binders.')}
+                onClick={() => showUpgradePrompt('Grid Import is a Pro feature.')}
                 className="btn-primary-pink mt-7 rounded-2xl px-7 py-4 text-xs font-black uppercase tracking-widest"
               >
                 View Pro
@@ -812,6 +797,7 @@ export default function App() {
             photocards={photocards}
             onCardClick={(pc) => { setSelectedCardBackLabel('Back to Wishlist'); setSelectedId(pc.id); }}
             onFindCards={() => navigateToPage('FindCards')}
+            onAddWishlistCard={openManualWishlistForm}
             onRemoveFromWishlist={handleRemoveWishlistCard}
           />
         );
@@ -836,6 +822,7 @@ export default function App() {
             onNewCard={handleAddCard}
             onImportGrid={() => navigateToPage('Import')}
             canUseBulkEdit={plan.canUseBulkEdit}
+            canUseAdvancedFilters={plan.canUseAdvancedFilters}
             onUpgradeRequired={showUpgradePrompt}
             trackedCardCount={trackedCardCount}
             cardLimit={plan.cardLimit}
@@ -917,6 +904,9 @@ export default function App() {
             key={formCard?.id ?? 'new'}
             initialData={formCard}
             mode={formMode}
+            defaultStatus={formDefaultStatus}
+            canUseAdvancedImageEditor={plan.canUseAdvancedImageEditor}
+            onUpgradeRequired={showUpgradePrompt}
             onSubmit={async (pc) => {
               const saved = formMode === 'edit'
                 ? await handleUpdatePhotocard(pc)

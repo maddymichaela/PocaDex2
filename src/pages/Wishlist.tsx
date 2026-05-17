@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Heart, Search, X } from 'lucide-react';
+import { Heart, Plus, Search, X } from 'lucide-react';
 import { Photocard } from '../types';
 import { PhotocardGrid } from '../components/PhotocardGrid';
 import { STATUS_COLORS } from '../lib/statusStyles';
@@ -8,11 +8,13 @@ interface WishlistProps {
   photocards: Photocard[];
   onCardClick: (pc: Photocard) => void;
   onFindCards: () => void;
+  onAddWishlistCard: () => void;
   onRemoveFromWishlist: (pc: Photocard) => void;
 }
 
-export default function Wishlist({ photocards, onCardClick, onFindCards, onRemoveFromWishlist }: WishlistProps) {
+export default function Wishlist({ photocards, onCardClick, onFindCards, onAddWishlistCard, onRemoveFromWishlist }: WishlistProps) {
   const [search, setSearch] = useState('');
+  const totalWishlistCount = useMemo(() => photocards.filter(card => card.status === 'wishlist').length, [photocards]);
 
   const wishlistCards = useMemo(() => (
     photocards
@@ -35,32 +37,39 @@ export default function Wishlist({ photocards, onCardClick, onFindCards, onRemov
     <div className="flex w-full flex-col gap-6 pb-20">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-[var(--wishlist-red)]">
+          <div className="flex flex-wrap items-center gap-2 text-[var(--wishlist-red)]">
             <Heart size={20} className="fill-current" />
             <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Wishlist</h1>
+            <span className="rounded-full bg-[var(--wishlist-red)]/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[var(--wishlist-red)]">
+              {totalWishlistCount.toLocaleString()} saved
+            </span>
           </div>
           <p className="max-w-2xl text-sm font-medium leading-6 text-foreground/45">
             Keep track of the photocards you're still hunting for.
           </p>
           <p className="text-xs font-semibold text-foreground/35">
-            Save cards from Find Cards or other collectors' profiles.
+            Search globally for cards to wishlist, or add one manually.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onFindCards}
-          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-xs font-black uppercase tracking-widest text-[var(--wishlist-red)] shadow-sm ring-2 ring-[var(--wishlist-red)]/10 transition-all hover:bg-[var(--wishlist-red)] hover:text-white"
-        >
-          <Search size={15} />
-          Find Cards
-        </button>
-      </div>
-
-      <div className="rounded-[24px] border-2 border-[var(--wishlist-red)]/10 bg-white/70 px-5 py-4 shadow-sm">
-        <p className="text-xs font-black uppercase tracking-widest text-[var(--wishlist-red)]">
-          {wishlistCards.length.toLocaleString()} card{wishlistCards.length === 1 ? '' : 's'} in wishlist
-        </p>
+        <div className="flex flex-col gap-2 sm:flex-row md:justify-end">
+          <button
+            type="button"
+            onClick={onAddWishlistCard}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[var(--wishlist-red)] px-5 py-3 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-red-200/40 transition-all hover:scale-[1.01]"
+          >
+            <Plus size={15} />
+            Add Wishlist Card
+          </button>
+          <button
+            type="button"
+            onClick={onFindCards}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-xs font-black uppercase tracking-widest text-[var(--wishlist-red)] shadow-sm ring-2 ring-[var(--wishlist-red)]/10 transition-all hover:bg-[var(--wishlist-red)] hover:text-white"
+          >
+            <Search size={15} />
+            Find Cards
+          </button>
+        </div>
       </div>
 
       <div className="relative max-w-md">
@@ -68,7 +77,7 @@ export default function Wishlist({ photocards, onCardClick, onFindCards, onRemov
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search wishlist..."
+          placeholder="Search your wishlist..."
           className="h-11 w-full rounded-2xl border-2 border-white bg-white/85 pl-10 pr-10 text-sm font-semibold outline-none shadow-sm transition-all placeholder:text-foreground/25 focus:border-[var(--wishlist-red)]/30"
         />
         {search && (
@@ -109,6 +118,14 @@ export default function Wishlist({ photocards, onCardClick, onFindCards, onRemov
           >
             <Search size={15} />
             Find Cards
+          </button>
+          <button
+            type="button"
+            onClick={onAddWishlistCard}
+            className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-white px-7 py-4 text-xs font-black uppercase tracking-widest text-[var(--wishlist-red)] shadow-sm ring-2 ring-[var(--wishlist-red)]/10 transition-all hover:bg-[var(--wishlist-red)] hover:text-white"
+          >
+            <Plus size={15} />
+            Add Wishlist Card
           </button>
         </div>
       )}

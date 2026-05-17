@@ -10,6 +10,9 @@ import { placeholderImage } from '../lib/assets';
 interface CardFormProps {
   initialData?: Photocard | null;
   mode?: 'create' | 'edit';
+  defaultStatus?: Status;
+  canUseAdvancedImageEditor?: boolean;
+  onUpgradeRequired?: (reason: string) => void;
   onSubmit: (pc: Photocard) => void;
   onDelete?: (id: string) => void;
   onBack: () => void;
@@ -42,7 +45,16 @@ function logCloneMetadata(label: string, value: unknown) {
   }
 }
 
-export default function CardForm({ initialData, mode, onSubmit, onDelete, onBack }: CardFormProps) {
+export default function CardForm({
+  initialData,
+  mode,
+  defaultStatus = 'owned',
+  canUseAdvancedImageEditor = true,
+  onUpgradeRequired,
+  onSubmit,
+  onDelete,
+  onBack,
+}: CardFormProps) {
   const isEditing = mode ? mode === 'edit' : !!initialData;
 
   const [group, setGroup] = useState(initialData?.group || '');
@@ -55,7 +67,7 @@ export default function CardForm({ initialData, mode, onSubmit, onDelete, onBack
   const [cardName, setCardName] = useState(initialData?.cardName || '');
   const [version, setVersion] = useState(initialData?.version || '');
   const [notes, setNotes] = useState(initialData?.notes || '');
-  const [status, setStatus] = useState<Status>(initialData?.status || 'owned');
+  const [status, setStatus] = useState<Status>(initialData?.status || defaultStatus);
   const [condition, setCondition] = useState<Condition>(initialData?.condition || 'mint');
   const [isDuplicate, setIsDuplicate] = useState(!!initialData?.isDuplicate);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
@@ -131,7 +143,7 @@ export default function CardForm({ initialData, mode, onSubmit, onDelete, onBack
               {isEditing ? 'Edit Card' : 'New Photocard'}
             </h2>
             <p className="hidden text-[9px] font-black uppercase tracking-[0.2em] text-foreground/30 sm:block">
-              {isEditing ? 'Updating entry' : 'Adding to binder'}
+              {isEditing ? 'Updating entry' : status === 'wishlist' ? 'Adding to wishlist' : 'Adding to binder'}
             </p>
           </div>
           <button
@@ -140,7 +152,7 @@ export default function CardForm({ initialData, mode, onSubmit, onDelete, onBack
             className="btn-primary-pink flex items-center gap-2 rounded-xl px-4 py-2.5 text-[10px] font-black uppercase tracking-widest md:px-6"
           >
             {isEditing ? <Save size={14} /> : <Upload size={14} />}
-            {isEditing ? 'Save Changes' : 'Add to Binder'}
+            {isEditing ? 'Save Changes' : status === 'wishlist' ? 'Add to Wishlist' : 'Add to Binder'}
           </button>
         </div>
       </div>
@@ -378,6 +390,8 @@ export default function CardForm({ initialData, mode, onSubmit, onDelete, onBack
             image={editingImage}
             onSave={handleSaveEditedImage}
             onCancel={() => { setIsEditorOpen(false); setEditingImage(null); }}
+            advancedEnabled={canUseAdvancedImageEditor}
+            onUpgradeRequired={onUpgradeRequired}
           />
         )}
       </AnimatePresence>

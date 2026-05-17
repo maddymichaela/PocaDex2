@@ -12,12 +12,11 @@ export default function UpgradePrompt({
   reason,
   onClose,
   onViewPro,
-  title = 'You have reached the Free plan limit.',
+  title = 'Upgrade to Pro',
 }: UpgradePromptProps) {
   return (
     <ModalShell
       title={title}
-      subtitle="Pro upgrade placeholder"
       icon={<Crown size={19} />}
       onClose={onClose}
       maxWidth="md:max-w-md"
@@ -42,18 +41,11 @@ export default function UpgradePrompt({
         </div>
       )}
     >
-      <div className="space-y-5 p-6 md:p-8">
-        <p className="text-sm font-semibold leading-6 text-foreground/60">
-          {reason}
+      <div className="space-y-4 p-6 md:p-7">
+        <p className="text-sm font-bold leading-6 text-foreground/70">{reason}</p>
+        <p className="rounded-3xl border-2 border-primary/10 bg-primary/5 p-5 text-sm font-semibold leading-6 text-foreground/60">
+          Unlock unlimited cards, grid import, bulk edit, and more.
         </p>
-        <div className="rounded-3xl border-2 border-primary/10 bg-primary/5 p-5">
-          <p className="text-sm font-black text-foreground">
-            Upgrade to Pro for unlimited cards, grid import, bulk edit, multiple binders, and more.
-          </p>
-          <p className="mt-3 text-xs font-bold uppercase tracking-widest text-primary/60">
-            Payments coming soon
-          </p>
-        </div>
       </div>
     </ModalShell>
   );

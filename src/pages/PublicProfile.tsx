@@ -53,6 +53,29 @@ function CardErrorState({ message }: { message: string }) {
   );
 }
 
+function SignedOutProfileGate({ onSignIn }: { onSignIn: () => void }) {
+  return (
+    <div className="mx-auto flex min-h-[420px] max-w-xl flex-col items-center justify-center rounded-[36px] border-2 border-white bg-white/75 px-6 py-14 text-center shadow-sm">
+      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-[28px] bg-primary/10 text-primary">
+        <Lock size={26} />
+      </div>
+      <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
+        Sign in to view this collector's profile
+      </h1>
+      <p className="mt-3 max-w-md text-sm font-medium leading-6 text-foreground/50">
+        Create an account or log in to browse public binders, wishlist cards, and follow collectors.
+      </p>
+      <button
+        type="button"
+        onClick={onSignIn}
+        className="btn-primary-pink mt-7 rounded-2xl px-7 py-4 text-xs font-black uppercase tracking-widest"
+      >
+        Log in / Sign up
+      </button>
+    </div>
+  );
+}
+
 export default function PublicProfile({
   username,
   currentUserId,
@@ -77,6 +100,14 @@ export default function PublicProfile({
     let isCurrent = true;
     setLoading(true);
     setError(null);
+
+    if (!currentUserId && !isOwnProfileRoute) {
+      setBundle(null);
+      setLoading(false);
+      return () => {
+        isCurrent = false;
+      };
+    }
 
     if (isOwnProfileRoute && ownProfile) {
       setBundle({
@@ -169,6 +200,10 @@ export default function PublicProfile({
         <div className="h-10 w-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
       </div>
     );
+  }
+
+  if (!currentUserId && !isOwnProfileRoute) {
+    return <SignedOutProfileGate onSignIn={onEditProfile} />;
   }
 
   if (!bundle) {
@@ -288,11 +323,7 @@ export default function PublicProfile({
                 {counts.isFollowing ? <UserCheck size={16} /> : <UserPlus size={16} />}
                 {counts.isFollowing ? '- Unfollow' : '+ Follow'}
               </button>
-            ) : (
-              <div className="rounded-[22px] bg-white px-5 py-4 text-center text-xs font-black uppercase tracking-widest text-foreground/35 shadow-sm ring-2 ring-primary/10">
-                Sign in to Follow
-              </div>
-            )}
+            ) : null}
 
             <div className="grid grid-cols-3 gap-2 rounded-[26px] bg-white/75 p-2 shadow-sm">
               {[

@@ -19,6 +19,7 @@ import {
   Moon,
   Palette,
   Focus,
+  Lock,
 } from 'lucide-react';
 import { getCroppedImg, ImageAdjustments } from '../lib/imageUtils';
 
@@ -37,6 +38,8 @@ interface ImageEditorProps {
   onCancel: (editorState?: ImageEditorState) => void;
   aspectRatio?: number;
   initialState?: ImageEditorState;
+  advancedEnabled?: boolean;
+  onUpgradeRequired?: (reason: string) => void;
 }
 
 type AdjustmentId = keyof ImageAdjustments;
@@ -101,7 +104,15 @@ function getCropGridSize(viewportSize: { width: number; height: number }) {
   return { width, height: Math.round(width / CARD_ASPECT_RATIO) };
 }
 
-export default function ImageEditor({ image, onSave, onCancel, aspectRatio = CARD_ASPECT_RATIO, initialState }: ImageEditorProps) {
+export default function ImageEditor({
+  image,
+  onSave,
+  onCancel,
+  aspectRatio = CARD_ASPECT_RATIO,
+  initialState,
+  advancedEnabled = true,
+  onUpgradeRequired,
+}: ImageEditorProps) {
   const [crop, setCrop] = useState<Point>(initialState?.crop ?? { x: 0, y: 0 });
   const [zoom, setZoom] = useState(initialState?.zoom ?? 1);
   const [rotation, setRotation] = useState(initialState?.rotation ?? 0);
@@ -267,12 +278,23 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = CAR
     });
   }, []);
 
+  const showAdvancedUpgrade = () => {
+    onUpgradeRequired?.('Upgrade to save advanced edits.');
+  };
+
+  const hasAdvancedAdjustments = Object.keys(DEFAULT_ADJUSTMENTS).some(key => {
+    const adjustmentKey = key as AdjustmentId;
+    return adjustments[adjustmentKey] !== DEFAULT_ADJUSTMENTS[adjustmentKey];
+  });
+  const effectiveAdjustments = adjustments;
+  const effectiveAdjustmentsRef = adjustmentsRef.current;
+
   const currentEditorState = (area = croppedAreaPixelsRef.current): ImageEditorState => ({
     crop: cropRef.current,
     zoom: zoomRef.current,
     rotation: rotationRef.current,
     hasUserPosition: true,
-    adjustments: adjustmentsRef.current,
+    adjustments: effectiveAdjustmentsRef,
     ...(area ? { croppedAreaPixels: area } : {}),
   });
 
@@ -280,12 +302,16 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = CAR
     try {
       const area = croppedAreaPixelsRef.current ?? croppedAreaPixels;
       if (area) {
+        if (!advancedEnabled && hasAdvancedAdjustments) {
+          showAdvancedUpgrade();
+          return;
+        }
         const croppedImage = await getCroppedImg(
           image,
           area,
           rotationRef.current,
           { horizontal: false, vertical: false },
-          adjustmentsRef.current
+          effectiveAdjustmentsRef
         );
         onSave(croppedImage, currentEditorState(area));
       }
@@ -313,20 +339,28 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = CAR
   };
 
   const activeControl = adjustmentControls.find(adj => adj.id === activeAdjustment) ?? adjustmentControls[0];
-  const activeValue = adjustments[activeAdjustment];
+  const activeValue = effectiveAdjustments[activeAdjustment];
   const sliderLabel = activeControl.label;
   const sliderValueLabel = activeControl.format(activeValue);
   const previewFilter = [
-    `brightness(${adjustments.brightness}%)`,
-    `contrast(${adjustments.contrast}%)`,
-    `saturate(${adjustments.saturation}%)`,
-    `hue-rotate(${adjustments.tint * 0.25}deg)`,
+    `brightness(${effectiveAdjustments.brightness}%)`,
+    `contrast(${effectiveAdjustments.contrast}%)`,
+    `saturate(${effectiveAdjustments.saturation}%)`,
+    `hue-rotate(${effectiveAdjustments.tint * 0.25}deg)`,
   ].join(' ');
+
+  const proBadge = !advancedEnabled ? (
+    <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-primary">
+      <Lock size={11} />
+      Pro
+    </span>
+  ) : null;
 
   const adjustmentSlider = (
     <div className="w-full max-w-[560px] px-5">
       <div className="mb-2 flex items-center justify-center gap-3 text-sm text-white/85">
         <span>{sliderLabel}</span>
+        {proBadge}
         <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-primary">
           {sliderValueLabel}
         </span>
@@ -354,7 +388,7 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = CAR
             const nextValue = Number(e.target.value);
             handleAdjustmentChange(activeAdjustment, nextValue);
           }}
-          className="relative z-10 h-2 w-full appearance-none rounded-full bg-white/20 accent-primary"
+          className={`relative z-10 h-2 w-full appearance-none rounded-full bg-white/20 accent-primary ${!advancedEnabled ? 'cursor-pointer' : ''}`}
         />
       </div>
     </div>
@@ -379,7 +413,7 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = CAR
             Revert
           </button>
           <button type="button" onClick={handleSave} className="rounded-full bg-primary px-4 py-2 text-sm font-black text-white shadow-lg shadow-primary/20">
-            Save
+            {!advancedEnabled && hasAdvancedAdjustments ? 'Save Pro' : 'Save'}
           </button>
         </div>
       </header>
@@ -458,13 +492,18 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = CAR
                 <button
                   key={adj.id}
                   type="button"
-                  aria-label={adj.label}
+                  aria-label={advancedEnabled ? adj.label : `${adj.label} Pro`}
                   onClick={() => {
                     setActiveAdjustment(adj.id);
                   }}
-                  className={`flex h-11 w-11 items-center justify-center rounded-full transition-all ${activeAdjustment === adj.id ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/5 text-white/55 hover:bg-white/10 hover:text-white'}`}
+                  className={`relative flex h-11 w-11 items-center justify-center rounded-full transition-all ${activeAdjustment === adj.id ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/5 text-white/55 hover:bg-white/10 hover:text-white'} ${!advancedEnabled ? 'opacity-75' : ''}`}
                 >
                   <adj.icon size={18} />
+                  {!advancedEnabled && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-white ring-2 ring-[#0d0d13]">
+                      <Lock size={9} />
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -480,13 +519,18 @@ export default function ImageEditor({ image, onSave, onCancel, aspectRatio = CAR
               <button
                 key={adj.id}
                 type="button"
-                aria-label={adj.label}
+                aria-label={advancedEnabled ? adj.label : `${adj.label} Pro`}
                 onClick={() => {
                   setActiveAdjustment(adj.id);
                 }}
-                className={`flex h-10 items-center justify-center rounded-full transition-all ${activeAdjustment === adj.id ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-white/45 hover:bg-white/10 hover:text-white'}`}
+                className={`relative flex h-10 items-center justify-center rounded-full transition-all ${activeAdjustment === adj.id ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-white/45 hover:bg-white/10 hover:text-white'} ${!advancedEnabled ? 'opacity-75' : ''}`}
               >
                 <adj.icon size={17} />
+                {!advancedEnabled && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-white ring-2 ring-[#0d0d13]">
+                    <Lock size={8} />
+                  </span>
+                )}
               </button>
             ))}
           </div>
