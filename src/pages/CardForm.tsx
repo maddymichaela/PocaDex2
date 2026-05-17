@@ -73,6 +73,7 @@ export default function CardForm({
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [editingImage, setEditingImage] = useState<string | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [preserveInitialCrop, setPreserveInitialCrop] = useState(false);
 
   const { previewUrl, removeImage, updatePreview } = useImageUpload(initialData?.imageUrl || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -83,6 +84,7 @@ export default function CardForm({
     const reader = new FileReader();
     reader.onload = () => {
       setEditingImage(reader.result as string);
+      setPreserveInitialCrop(false);
       setIsEditorOpen(true);
     };
     reader.readAsDataURL(file);
@@ -93,6 +95,7 @@ export default function CardForm({
     updatePreview(croppedImage);
     setIsEditorOpen(false);
     setEditingImage(null);
+    setPreserveInitialCrop(false);
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -191,7 +194,7 @@ export default function CardForm({
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => { setEditingImage(previewUrl); setIsEditorOpen(true); }}
+                      onClick={() => { setEditingImage(previewUrl); setPreserveInitialCrop(true); setIsEditorOpen(true); }}
                       className="flex-1 py-3 bg-white border border-gray-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
                     >
                       <Edit3 size={13} /> Edit
@@ -389,7 +392,8 @@ export default function CardForm({
           <ImageEditor
             image={editingImage}
             onSave={handleSaveEditedImage}
-            onCancel={() => { setIsEditorOpen(false); setEditingImage(null); }}
+            onCancel={() => { setIsEditorOpen(false); setEditingImage(null); setPreserveInitialCrop(false); }}
+            preserveInitialCrop={preserveInitialCrop}
             advancedEnabled={canUseAdvancedImageEditor}
             onUpgradeRequired={onUpgradeRequired}
           />

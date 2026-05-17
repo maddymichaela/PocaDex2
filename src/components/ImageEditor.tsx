@@ -38,6 +38,7 @@ interface ImageEditorProps {
   onCancel: (editorState?: ImageEditorState) => void;
   aspectRatio?: number;
   initialState?: ImageEditorState;
+  preserveInitialCrop?: boolean;
   advancedEnabled?: boolean;
   onUpgradeRequired?: (reason: string) => void;
 }
@@ -110,6 +111,7 @@ export default function ImageEditor({
   onCancel,
   aspectRatio = CARD_ASPECT_RATIO,
   initialState,
+  preserveInitialCrop = false,
   advancedEnabled = true,
   onUpgradeRequired,
 }: ImageEditorProps) {
@@ -133,6 +135,7 @@ export default function ImageEditor({
   const redoStackRef = useRef<EditorSnapshot[]>([]);
   const croppedAreaPixelsRef = useRef<Area | null>(initialState?.croppedAreaPixels ?? null);
   const hasAppliedInitialAreaRef = useRef(false);
+  const cropFrameSize = preserveInitialCrop && !initialState?.croppedAreaPixels ? cropViewportSize : cropSize;
 
   useEffect(() => {
     const handleResize = () => setCropViewportSize(getCropViewportSize());
@@ -163,7 +166,7 @@ export default function ImageEditor({
 
   const applyInitialCroppedArea = useCallback((mediaSize: MediaSize) => {
     const initialArea = initialState?.croppedAreaPixels;
-    if (!initialArea || initialState?.hasUserPosition || hasAppliedInitialAreaRef.current) return;
+    if (preserveInitialCrop || !initialArea || initialState?.hasUserPosition || hasAppliedInitialAreaRef.current) return;
 
     const naturalW = mediaSize.naturalWidth;
     const naturalH = mediaSize.naturalHeight;
@@ -172,7 +175,7 @@ export default function ImageEditor({
       console.debug('[EditCrop] naturalSize:', naturalW, '×', naturalH);
       console.debug('[EditCrop] renderedMediaSize:', mediaSize.width, '×', mediaSize.height);
       console.debug('[EditCrop] savedCropRect:', JSON.stringify(initialArea));
-      console.debug('[EditCrop] cropFrameSize:', cropSize.width, '×', cropSize.height);
+      console.debug('[EditCrop] cropFrameSize:', cropFrameSize.width, '×', cropFrameSize.height);
     }
 
     // For contain mode, both axes give the same display scale; min handles edge cases safely.
@@ -181,8 +184,8 @@ export default function ImageEditor({
       : 1;
 
     // Zoom needed so the crop rect fills (not under-fills) the crop frame.
-    const scaleX = cropSize.width / (initialArea.width * displayScale);
-    const scaleY = cropSize.height / (initialArea.height * displayScale);
+    const scaleX = cropFrameSize.width / (initialArea.width * displayScale);
+    const scaleY = cropFrameSize.height / (initialArea.height * displayScale);
     const rawZoom = Math.max(scaleX, scaleY);
     const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, rawZoom));
 
@@ -207,7 +210,7 @@ export default function ImageEditor({
     setCrop(crop);
     setZoom(zoom);
     setCroppedAreaPixels(initialArea);
-  }, [cropSize, initialState]);
+  }, [cropFrameSize, initialState, preserveInitialCrop]);
 
   const syncHistoryState = useCallback(() => {
     setHistoryState({
@@ -436,7 +439,7 @@ export default function ImageEditor({
                 zoom={zoom}
                 rotation={rotation}
                 aspect={aspectRatio}
-                cropSize={cropSize}
+                cropSize={cropFrameSize}
                 onCropChange={handleCropChange}
                 onCropComplete={onCropComplete}
                 onCropAreaChange={onCropComplete}
